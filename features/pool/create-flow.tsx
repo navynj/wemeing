@@ -8,15 +8,14 @@ import { saveLane } from '@/features/lanes/actions';
 import type { MyCategory } from '@/lib/queries/profile';
 
 import { createPool } from './actions';
-import { POOL_KINDS, type PoolKind } from './kinds';
 import { LaneMatch } from './lane-match';
 import { LaneEditor, type DraftLane } from './lane-editor';
 import { joinLabel, linkedCount, prefillLinks, type Links } from './match';
 import { PrimaryButton, StepPage } from './step-page';
 
 /**
- * "Open a new Pool" (1c, then 1d): step 1 names the pool, its kind, its
- * visibility and its lanes; step 2 matches them to mine. Nothing is written
+ * "Open a new Pool" (1c, then 1d): step 1 names the pool, its visibility
+ * and its lanes; step 2 matches them to mine. Nothing is written
  * until the last button, which opens the pool, its lanes, my membership and
  * my links as one act (`create_pool`), then goes to the pool.
  *
@@ -27,7 +26,6 @@ export function CreateFlow({ categories }: { categories: MyCategory[] }) {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
   const [name, setName] = useState('');
-  const [kind, setKind] = useState<PoolKind | null>(null);
   const [lanes, setLanes] = useState<DraftLane[]>([]);
   const [mine, setMine] = useState<Pick<MyCategory, 'id' | 'name' | 'icon'>[]>(categories);
   const [links, setLinks] = useState<Links>({});
@@ -73,7 +71,6 @@ export function CreateFlow({ categories }: { categories: MyCategory[] }) {
                 setMessage(null);
                 const made = await createPool({
                   name: name.trim(),
-                  kind,
                   lanes: lanes.map((lane) => ({
                     name: lane.name,
                     icon: lane.icon,
@@ -116,30 +113,6 @@ export function CreateFlow({ categories }: { categories: MyCategory[] }) {
           />
         </label>
       </div>
-
-      <fieldset className="mt-8">
-        <legend className="text-pool-500 text-xs">What kind of Pool?</legend>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {POOL_KINDS.map((option) => {
-            const selected = kind === option.kind;
-            return (
-              <button
-                key={option.kind}
-                type="button"
-                aria-pressed={selected}
-                data-pool-kind={option.kind}
-                onClick={() => setKind(selected ? null : option.kind)}
-                // Selection is ink, never blue (H20f).
-                className={`h-12 rounded-full px-5 text-sm ${
-                  selected ? 'bg-ink text-white' : 'border-pool-200 text-pool-500 border'
-                }`}
-              >
-                {option.label}
-              </button>
-            );
-          })}
-        </div>
-      </fieldset>
 
       <fieldset className="mt-8 flex flex-col gap-3">
         <legend className="text-pool-500 mb-3 text-xs">Visibility</legend>

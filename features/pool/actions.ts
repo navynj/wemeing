@@ -3,13 +3,13 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
+import type { Database } from '@/lib/database.types';
 import { removeRippleMedia } from '@/lib/media';
 import { createClient } from '@/lib/supabase/server';
 
 export type Done = { ok: true } | { ok: false; message: string };
 export type Made = { ok: true; id: string } | { ok: false; message: string };
 
-const KIND = z.enum(['couple_diary', 'study', 'running_crew', 'faith_group', 'friends']);
 const ICON = z.string().trim().max(16).nullable();
 const DESCRIPTION = z.string().trim().max(80).nullable();
 const LINKS = z
@@ -36,7 +36,6 @@ function said(error: { message: string; code?: string } | null): string {
 
 const NewPool = z.object({
   name: z.string().trim().min(1).max(60),
-  kind: KIND.nullable(),
   lanes: z
     .array(
       z.object({
@@ -59,8 +58,10 @@ export async function createPool(input: z.infer<typeof NewPool>): Promise<Made> 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc('create_pool', {
     p_name: pool.name,
-    // The enum has no "none"; a pool with no kind chosen reads as friends.
-    p_kind: pool.kind ?? 'friends',
+    // The kind is no longer chosen or written (2026-10-23): the column is
+    // nullable with no default, so it stays null. The function still takes
+    // the argument, and the generated type reads it as required.
+    p_kind: null as unknown as Database['public']['Enums']['pool_kind'],
     p_lanes: pool.lanes.map((lane) => ({
       name: lane.name,
       icon: lane.icon,

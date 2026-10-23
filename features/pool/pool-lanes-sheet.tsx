@@ -25,6 +25,8 @@ export function PoolLanesSheet({
 }) {
   const shown = useOptimisticAction(lanes);
   const [editing, setEditing] = useState<string | 'new' | null>(null);
+  // Each lane added remounts the form empty, so the next can be typed at once.
+  const [added, setAdded] = useState(0);
   return (
     <PoolSheet label="Pool lanes" onClose={onClose}>
       <SheetTitle>Pool lanes</SheetTitle>
@@ -73,10 +75,12 @@ export function PoolLanesSheet({
       </ul>
       {editing === 'new' ? (
         <PoolLaneForm
+          key={added}
           lane={null}
           onCancel={() => setEditing(null)}
           onSave={(fields) => {
-            setEditing(null);
+            // The form stays open, cleared, for the next lane.
+            setAdded((n) => n + 1);
             shown.run(
               (current) => [
                 ...current,
@@ -119,6 +123,10 @@ function PoolLaneForm({
   const [icon, setIcon] = useState(lane?.icon ?? '');
   const [name, setName] = useState(lane?.name ?? '');
   const [description, setDescription] = useState(lane?.description ?? '');
+  const save = (): void => {
+    if (!name.trim()) return;
+    onSave({ name: name.trim(), icon: icon || null, description: description.trim() || null });
+  };
   return (
     <div
       data-pool-lane-form
@@ -129,6 +137,12 @@ function PoolLaneForm({
         <input
           value={name}
           onChange={(event) => setName(event.target.value)}
+          onKeyDown={(event) => {
+            // Not mid-composition (Korean): that Enter commits the character.
+            if (event.key === 'Enter' && !event.nativeEvent.isComposing) save();
+          }}
+          // A new lane's form opens ready to type, and so does each next one.
+          autoFocus={lane === null}
           maxLength={40}
           aria-label="Lane name"
           className="border-pool-200 text-ink h-12 min-w-0 flex-1 rounded-xl border px-3 outline-none"
@@ -149,13 +163,7 @@ function PoolLaneForm({
         <button
           type="button"
           disabled={!name.trim()}
-          onClick={() =>
-            onSave({
-              name: name.trim(),
-              icon: icon || null,
-              description: description.trim() || null,
-            })
-          }
+          onClick={save}
           className="text-main-900 font-semibold disabled:opacity-40"
         >
           Save

@@ -1,4 +1,4 @@
-import { monogram } from '@/features/pool/kinds';
+import { monogram } from '@/features/pool/monogram';
 
 const SIZES = {
   // The create screen's tile (1c), beside the name field.

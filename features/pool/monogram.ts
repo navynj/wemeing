@@ -1,16 +1,3 @@
-import type { Database } from '@/lib/database.types';
-
-export type PoolKind = Database['public']['Enums']['pool_kind'];
-
-/** "What kind of Pool?" — display only (H23): the label changes no behaviour. */
-export const POOL_KINDS: { kind: PoolKind; label: string }[] = [
-  { kind: 'couple_diary', label: 'Couple diary' },
-  { kind: 'study', label: 'Study' },
-  { kind: 'running_crew', label: 'Running crew' },
-  { kind: 'faith_group', label: 'Faith group' },
-  { kind: 'friends', label: 'Friends' },
-];
-
 function graphemes(text: string): string[] {
   if (typeof Intl !== 'undefined' && 'Segmenter' in Intl) {
     return [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text)].map(

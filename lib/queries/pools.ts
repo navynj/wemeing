@@ -36,7 +36,6 @@ export type PoolMember = {
 export type MyPool = {
   id: string;
   name: string;
-  kind: PoolRow['kind'];
   members: PoolMember[];
   /** The latest thing someone else put here, for the "new since my last visit" dot. */
   latestActivity: string | null;
@@ -50,7 +49,7 @@ export type Placement = {
 };
 
 export type PoolView = {
-  pool: Pick<PoolRow, 'id' | 'name' | 'kind'>;
+  pool: Pick<PoolRow, 'id' | 'name'>;
   /** Current members, me first then join order (D7), then former members who kept theirs. */
   members: PoolMember[];
   lanes: PoolLane[];
@@ -112,13 +111,11 @@ async function membersOf(supabase: DuringClient, poolIds: string[]): Promise<Mem
 export async function getMyPools(supabase: DuringClient, me: string): Promise<MyPool[]> {
   const { data: mine, error } = await supabase
     .from('pool_members')
-    .select('pool_id, joined_at, pool:pools(id, name, kind)')
+    .select('pool_id, joined_at, pool:pools(id, name)')
     .eq('user_id', me)
     .is('left_at', null)
     .order('joined_at', { ascending: false })
-    .returns<
-      { pool_id: string; joined_at: string; pool: Pick<PoolRow, 'id' | 'name' | 'kind'> }[]
-    >();
+    .returns<{ pool_id: string; joined_at: string; pool: Pick<PoolRow, 'id' | 'name'> }[]>();
   if (error) throw error;
   const ids = mine.map((row) => row.pool_id);
   if (ids.length === 0) return [];
@@ -159,7 +156,6 @@ export async function getMyPools(supabase: DuringClient, me: string): Promise<My
   return mine.map((row) => ({
     id: row.pool.id,
     name: row.pool.name,
-    kind: row.pool.kind,
     members: orderMembers(
       members.filter((m) => m.pool_id === row.pool_id && m.left_at === null).map(toMember),
       me,
@@ -176,7 +172,7 @@ export async function getPoolView(
 ): Promise<PoolView | null> {
   const { data: pool, error } = await supabase
     .from('pools')
-    .select('id, name, kind')
+    .select('id, name')
     .eq('id', poolId)
     .maybeSingle();
   if (error) throw error;

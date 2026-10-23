@@ -56,6 +56,9 @@ describe('no Korean in the UI (H23)', () => {
       />,
     );
     expect(create.container.textContent).not.toMatch(HANGUL);
+    // The kind is no longer asked (2026-10-23).
+    expect(create.container.textContent).not.toMatch(/What kind of Pool/);
+    expect(create.container.querySelector('[data-pool-kind]')).toBeNull();
     cleanup();
     const join = render(
       <JoinFlow

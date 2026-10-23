@@ -82,7 +82,7 @@ const LANE = (id: string, pool: string, name: string, icon: string, position: nu
 
 /** Pool A: two current members and one who left keeping theirs; a placed post each, and a joint splash with two ripples. */
 const A: PoolView = {
-  pool: { id: 'p-a', name: 'Our Pool', kind: 'friends' },
+  pool: { id: 'p-a', name: 'Our Pool' },
   members: [
     { userId: ME, name: 'Yoonji Lee', initials: 'YL', joinedAt: '2026-10-01', former: false },
     { userId: MINA, name: 'Mina', initials: 'MI', joinedAt: '2026-10-02', former: false },
@@ -118,7 +118,7 @@ const A: PoolView = {
 
 /** Pool B: nothing of A's. */
 const B: PoolView = {
-  pool: { id: 'p-b', name: 'Study Crew', kind: 'study' },
+  pool: { id: 'p-b', name: 'Study Crew' },
   members: [
     { userId: ME, name: 'Yoonji Lee', initials: 'YL', joinedAt: '2026-10-05', former: false },
   ],
@@ -133,11 +133,10 @@ const B: PoolView = {
 };
 
 const POOLS: MyPool[] = [
-  { id: 'p-a', name: 'Our Pool', kind: 'friends', members: [], latestActivity: null },
+  { id: 'p-a', name: 'Our Pool', members: [], latestActivity: null },
   {
     id: 'p-b',
     name: 'Study Crew',
-    kind: 'study',
     members: [],
     latestActivity: '2026-10-22T00:00:00Z',
   },
@@ -319,5 +318,26 @@ describe('leaving (H23)', () => {
     expect(getByText('Keep your records in this Pool?')).toBeTruthy();
     expect(getByText('Keep them')).toBeTruthy();
     expect(getByText('Remove them')).toBeTruthy();
+  });
+});
+
+describe('pool lanes (H23)', () => {
+  it('keeps the add form open, cleared, after each lane so the next can follow', () => {
+    const { container, getByText } = ground(A);
+    fireEvent.click(container.querySelector('[data-manage-pool-lanes]')!);
+    fireEvent.click(getByText('+ Add lane'));
+    const doc = container.ownerDocument;
+    for (const name of ['Books', 'Walks']) {
+      const field = doc.querySelector(
+        '[data-pool-lane-form] [aria-label="Lane name"]',
+      ) as HTMLInputElement;
+      expect(field.value).toBe('');
+      fireEvent.change(field, { target: { value: name } });
+      fireEvent.keyDown(field, { key: 'Enter' });
+      expect(doc.querySelector('[data-pool-lane-form]')).not.toBeNull();
+    }
+    const listed = [...doc.querySelectorAll('[data-pool-lane]')].map((el) => el.textContent);
+    expect(listed.some((t) => t?.includes('Books'))).toBe(true);
+    expect(listed.some((t) => t?.includes('Walks'))).toBe(true);
   });
 });

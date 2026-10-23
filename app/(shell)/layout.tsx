@@ -1,4 +1,3 @@
-import { TabBar } from '@/components/ui/tab-bar';
 import { ComposerPanel, SheetHost } from '@/features/input-sheet/sheet-host';
 import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
@@ -8,9 +7,10 @@ import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
 
 /**
- * The shell: the page, the tab bar, and the composer — a bottom sheet from
- * the FAB on a phone, a standing card in the right half on a wide screen
- * (review). Each page lays out its own column, because Home's ground is
+ * The shell: the page and the composer — a bottom sheet from the drop bar
+ * on a phone, a standing card in the right half on a wide screen (review).
+ * No tab bar since H22: Home's menu reaches the Locker, and the drop bar is
+ * the way in. Each page lays out its own column, because Home's ground is
  * full-bleed and the white pages are not. The composer needs the lanes
  * only: sessions are date-based, so it has no session field.
  */
@@ -44,7 +44,6 @@ export default async function ShellLayout({ children }: LayoutProps<'/'>) {
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
           {context ? <ComposerPanel context={context} trail={trail} /> : null}
         </div>
-        <TabBar />
       </div>
       {context ? <SheetHost context={context} /> : null}
     </InputSheetProvider>

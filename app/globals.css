@@ -24,10 +24,6 @@
   /* Ink — body text */
   --color-ink: #161621;
 
-  /* The tab bar's own height, so anything that has to sit exactly on top of
-   * it can say so instead of guessing. Not a design token — a measurement. */
-  --tab-bar-h: 3.75rem;
-
   /* Wave ink. Contrast-determined, not a tone (H15c): a wave is drawn in
    * whatever reads against its ground. The surface sets this; no wave
    * component takes a colour, so H9a's single-tone ruling is untouched. */

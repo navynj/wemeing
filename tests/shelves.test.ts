@@ -7,9 +7,7 @@ import {
   monthSeats,
   monthlyTitle,
   monthsOfYear,
-  ROPE_ORDER,
   scrubberMonths,
-  seatsByLane,
   sessionRange,
   sessionSeats,
   type Session,
@@ -122,42 +120,6 @@ describe('the scrubber', () => {
     expect(monthsOfYear(2026, TODAY)).toHaveLength(9);
     expect(monthsOfYear(2025, TODAY)).toHaveLength(12);
     expect(monthsOfYear(2026, TODAY)[8]).toBe('2026-09');
-  });
-});
-
-describe('lane rows (Home)', () => {
-  it('seats every post once, on its lane\u2019s row, rows in lane order, newest first along the rope', () => {
-    const mixed = post('mixed', [
-      block('m1', '2026-09-05', 'c-place'),
-      block('m2', '2026-09-06', 'c-food'),
-    ]);
-    const seats = monthSeats([mixed, sepEarly, sepLate, aug], '2026-09', TZ);
-    const { rows, orphans } = seatsByLane(seats, [PLACE, FOOD, DAY]);
-    expect(ROPE_ORDER).toBe('newest-first');
-    expect(rows.map((r) => r.lane.name)).toEqual(['Place', 'Food', 'Day']);
-    // `mixed` took Place once and Food once; the later-written block wins the tie.
-    expect(rows[1].seats.map((s) => s.splash.id)).toEqual(['mixed']);
-    expect(rows[2].seats.map((s) => s.splash.id)).toEqual(['late', 'early']);
-    expect(orphans).toEqual([]);
-    expect(rows.flatMap((r) => r.seats).length + orphans.length).toBe(seats.length);
-  });
-
-  it('seats by the declared lane where one is declared: laneIds[0] is that lane', () => {
-    const declared = post('decl', [block('d', '2026-09-10', 'c-day')], {
-      declared_lane_id: 'c-place',
-    });
-    expect(declared.declaredLaneId).toBe('c-place');
-    expect(declared.laneIds[0]).toBe('c-place');
-    const { rows } = seatsByLane(monthSeats([declared], '2026-09', TZ), [PLACE, FOOD, DAY]);
-    expect(rows[0].seats.map((s) => s.splash.id)).toEqual(['decl']);
-    expect(rows[2].seats).toEqual([]);
-  });
-
-  it('keeps a post on no lane of mine apart, as an orphan', () => {
-    const stray = post('stray', [block('x', '2026-09-09', 'c-gone')]);
-    const { rows, orphans } = seatsByLane(monthSeats([stray], '2026-09', TZ), [PLACE, FOOD, DAY]);
-    expect(rows.every((r) => r.seats.length === 0)).toBe(true);
-    expect(orphans.map((s) => s.splash.id)).toEqual(['stray']);
   });
 });
 

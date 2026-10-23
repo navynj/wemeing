@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useRef } from 'react';
+import { useRef } from 'react';
 import { motion, useTransform, type PanInfo } from 'motion/react';
 
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
@@ -321,15 +321,13 @@ function Step({
 }
 
 /**
- * A small pool ladder hooked over the right end of the upper stair card's
- * top edge (review, to the reference): two straight rails and three rungs,
- * outlined, 2px, round caps, rising from inside the card some 30px up into
- * the water; its stroke white where it meets the card and the water blue
- * where it enters the water, the whole glyph at 60%. The same size at every
- * width, undoing the card's own scale; the card beneath is the tap.
+ * A small pool ladder standing on the upper stair card's top edge near its
+ * right end (review, to the reference): two rails leaning in toward the
+ * top and hooking outward there like handrails, three rungs between them
+ * shortening with the rails, outlined, white, round caps. The same size at every width, undoing the card's own scale; the
+ * card beneath is the tap.
  */
 function LadderGlyph() {
-  const gradient = useId();
   return (
     <svg
       aria-hidden
@@ -338,21 +336,16 @@ function LadderGlyph() {
       height={44}
       viewBox="0 0 24 44"
       fill="none"
-      stroke={`url(#${gradient})`}
-      strokeWidth={2}
+      stroke="currentColor"
+      strokeWidth={2.5}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="pointer-events-none absolute right-6 origin-top-right opacity-60"
-      style={{ top: -30, transform: `scale(${1 / STEP_SCALE})` }}
+      className="pointer-events-none absolute right-7 origin-bottom-right text-white"
+      style={{ top: -44, transform: `scale(${1 / STEP_SCALE})` }}
     >
-      <defs>
-        <linearGradient id={gradient} x1="0" y1="1" x2="0" y2="0">
-          <stop offset="0" stopColor="#ffffff" />
-          <stop offset="0.45" stopColor="#ffffff" />
-          <stop offset="1" stopColor="#0507c9" />
-        </linearGradient>
-      </defs>
-      <path d="M3 2v40M21 2v40M3 14h18M3 26h18M3 38h18" />
+      {/* In slight perspective, as the reference draws it: the rails lean in
+          toward the top and the rungs shorten with them. */}
+      <path d="M3 43L7 13a5 5 0 0 0-5-6M21 43l-4-30a5 5 0 0 1 5-6M4 36h16M5 28h14M6 20h12" />
     </svg>
   );
 }

@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, Plus } from 'lucide-react';
 
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { CategorySheet } from '@/features/lanes/category-sheet';
@@ -14,11 +14,20 @@ import type { MyCategory } from '@/lib/queries/profile';
 import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
 
-import { DivingBoard } from './diving-board';
+import { DiveBoard, type DiveBoardHandle } from './diving-board-dive';
+import { FlipBoard } from './diving-board-flip';
 import { byNewest, newestIn, placeCard, type Card } from './grid';
-import { LaneGrid } from './lane-grid';
+import { LaneGrid, type GridHandle, type Ring } from './lane-grid';
 import { PinnedBar } from './pinned-bar';
 import { useFlip } from './use-flip';
+
+/**
+ * Which board Home shows (review, 2026-10-22): the **dive** — a card flies
+ * to its mark in the water and rises from it — or the **page turn** onto a
+ * pile of strips. Both stay in the tree; this one word decides.
+ */
+export type Board = 'dive' | 'flip';
+export const BOARD: Board = 'dive';
 
 /** How long the commit ripple is given at a new post's mark once the real one has landed. */
 const RING_MS = 1800;
@@ -27,11 +36,11 @@ const RING_MS = 1800;
  * Home, the water ground (SPEC 5, H22; `_docs/mockups/home-grid-stack.png`):
  * one solid #0507C9 surface in two linked halves. Above, the lane grid — a
  * map of recent records, lanes across and days down. Below, the diving
- * board — the newest posts as a stack of cards, read in full and flipped
- * through. The post on top of the stack is the one with the ring at its
- * mark; flipping moves the ring, tapping a mark brings its card up, and a
- * post just dropped does both at once. Between them the pinned bar, when
- * anything is pinned.
+ * board — the newest posts as a stack of cards, read in full; a card dives
+ * to its own mark in the water and rises from it (or, on the page-turn
+ * board, turns onto a pile). The ring plays at a landing and at a drop;
+ * tapping a mark brings its card up. Between them the pinned bar, when
+ * anything is pinned; beneath, the compose `+` at the bottom right.
  *
  * The title opens the ground's menu: the Locker, the sessions sheet and the
  * lanes sheet. The Home dropdown's pool switching is P3's; nothing here
@@ -53,6 +62,7 @@ export function HomeGround({
   timeZone,
   initials,
   scrollToMonth,
+  board = BOARD,
 }: {
   /** Newest first. */
   cards: Card[];
@@ -68,6 +78,7 @@ export function HomeGround({
   initials: string;
   /** `?m=`: the month the ground opens on, its newest post on top. */
   scrollToMonth: string | null;
+  board?: Board;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [sessionsOpen, setSessionsOpen] = useState(false);
@@ -75,6 +86,8 @@ export function HomeGround({
   const [editingLanes, setEditingLanes] = useState(false);
   const { openSheet, pendingDrop, clearDropped, dropMessage, pendingDeletes } = useInputSheet();
   const lanes = useOptimisticAction(categories);
+  const grid = useRef<GridHandle>(null);
+  const diveBoard = useRef<DiveBoardHandle>(null);
 
   // The post just dropped takes its place before the server has it; once the
   // real row is on the ground the optimistic one steps aside. A post deleted
@@ -99,14 +112,43 @@ export function HomeGround({
   const flip = useFlip(
     ids,
     (scrollToMonth ? newestIn(shown, scrollToMonth)?.splash.id : null) ?? ids[0] ?? null,
+    board === 'dive' ? -1 : 1,
   );
-  const topId = flip.order[0] ?? null;
+  const { topId, n, bringForward } = flip;
 
-  // A post just dropped lands on top of the stack, on the spring.
-  const droppedId = pendingDrop?.splash.id ?? null;
-  const { bringForward } = flip;
+  /** Brings a post to the top, the way the board does it. */
+  const goTo = (id: string): void => {
+    if (board === 'dive') diveBoard.current?.goTo(id);
+    else bringForward(id);
+  };
+
+  // The ring: at a landing on the dive board, at the top card on the page
+  // turn, at a drop on either, and at the newest post on open.
+  const [ring, setRing] = useState<Ring | null>(() => (ids[0] ? { id: ids[0], seq: 0 } : null));
+  const seq = useRef(0);
+  const ringAt = (id: string): void => {
+    seq.current += 1;
+    setRing({ id, seq: seq.current });
+  };
+  const previous = useRef(n);
   useEffect(() => {
-    if (droppedId) bringForward(droppedId);
+    const was = previous.current;
+    previous.current = n;
+    if (board === 'dive') {
+      if (n > was && ids[n - 1]) ringAt(ids[n - 1]);
+    } else if (topId && n !== was) {
+      ringAt(topId);
+    }
+    // The depth changing is the event; the rest is read when it fires.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [n, board]);
+
+  // A post just dropped lands on top of the stack, on the spring, ringed.
+  const droppedId = pendingDrop?.splash.id ?? null;
+  useEffect(() => {
+    if (!droppedId) return;
+    goTo(droppedId);
+    ringAt(droppedId);
     // The drop is the event; the flip's identity changing is not.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [droppedId]);
@@ -114,9 +156,11 @@ export function HomeGround({
   // `?m=` while the ground is already open: the month's newest post comes up.
   const monthTop = scrollToMonth ? (newestIn(shown, scrollToMonth)?.splash.id ?? null) : null;
   useEffect(() => {
-    if (monthTop) bringForward(monthTop);
+    if (monthTop) goTo(monthTop);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollToMonth]);
+
+  const divedIds = useMemo(() => new Set(board === 'dive' ? ids.slice(0, n) : []), [board, ids, n]);
 
   return (
     <div data-home-ground className="water-ground flex min-h-0 flex-1 flex-col">
@@ -200,13 +244,15 @@ export function HomeGround({
         ) : null}
 
         <LaneGrid
+          ref={grid}
           cards={shown}
           categories={lanes.value}
           today={today}
-          topId={topId}
+          ring={ring}
+          divedIds={divedIds}
           initials={initials}
           scrollToMonth={scrollToMonth}
-          onPick={bringForward}
+          onPick={goTo}
           onEditLanes={() => setEditingLanes(true)}
           onCreateLane={() => setNewLane(true)}
         />
@@ -219,13 +265,34 @@ export function HomeGround({
           />
         </div>
 
-        <DivingBoard
-          cards={shown}
-          flip={flip}
-          categories={lanes.value}
-          initials={initials}
-          onDrop={openSheet}
-        />
+        {board === 'dive' ? (
+          <DiveBoard
+            ref={diveBoard}
+            cards={shown}
+            flip={flip}
+            categories={lanes.value}
+            initials={initials}
+            locate={(wanted) => grid.current?.revealMarks(wanted) ?? new Map()}
+          />
+        ) : (
+          <FlipBoard cards={shown} flip={flip} categories={lanes.value} initials={initials} />
+        )}
+
+        {/* Compose: the action, in blue, at the bottom right outside the stack. */}
+        <div
+          className="flex shrink-0 justify-end px-6 pt-2"
+          style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }}
+        >
+          <button
+            type="button"
+            aria-label="Drop a splash"
+            data-compose
+            onClick={openSheet}
+            className="bg-main-900 flex h-12 w-12 items-center justify-center rounded-full text-white"
+          >
+            <Plus aria-hidden size={24} />
+          </button>
+        </div>
       </div>
 
       {sessionsOpen ? (

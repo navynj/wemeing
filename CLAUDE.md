@@ -18,7 +18,7 @@ Weming (during.today; renamed from During at H22, user-facing only): a compact b
 
 When the spec is silent, choose the smallest implementation consistent with DECISIONS and say so in the commit message. If it smells like a product decision, ask instead of deciding.
 
-## Current scope: P1 (solo-complete)
+## Current scope: P1 (solo-complete), then pool phase 1 (H23)
 
 Scope is cut into phases, solo-first (H11). **P1 makes the app complete for one person, before anyone is invited.** Build in roughly this order:
 
@@ -41,7 +41,9 @@ Scope is cut into phases, solo-first (H11). **P1 makes the app complete for one 
 
 **Compactness and the lane/session structure are the core to defend (H21b).** A feature that makes a post heavier to start, or adds a second axis beside lanes and sessions, is rejected before its merits are heard.
 
-Explicitly NOT in P1 (do not scaffold, stub, or placeholder): Link and invites, Friends, the friend rail, view counts, presence TTL surfacing, the audience chip, Splash shared by two — all P2. Pools and everything inside them (including the pool pill on a splash and pool-side lane mappings), Lists UI, Home Weekly — P3 or later. Home has no tab bar and no menu (round 3): a header with the lane glyph (lane management) and the Lane | Date toggle, and the compose disc — white with the blue `+` — the one entry. The Locker and Sessions are retired as surfaces (round 3); the `sessions` table and its migration stay, unread. Never add a tab or a menu entry for a screen that has not shipped. The Lanes matrix is dormant for P3's pool Lanes. Pools and Friends are reserved seats: no menu entry, no dead button.
+**Pool phase 1 (H23) is built ahead of P2:** create, invite, join with lane mapping, the pool's home (Lane | Date | Swimmers), joint splashes, the per-post Audience chip, leaving. The foot of Home and of a pool is Home · Pool · + (no Locker); the pool switcher hangs off the pool's name.
+
+Explicitly NOT built yet (do not scaffold, stub, or placeholder): Link and invites, Friends, the friend rail, view counts, presence TTL surfacing, Splash shared by two — all P2. Open pools and search, roles on pool lanes, bulk placing earlier records after joining, the follow feed, notifications, Lists UI, Home Weekly — later. Home's header is the lane glyph (lane management) and the Lane | Date toggle; compose is the white disc with the blue `+`. The Locker and Sessions are retired as surfaces (round 3); the `sessions` table and its migration stay, unread. Never add a tab or a menu entry for a screen that has not shipped. The Lanes matrix is dormant for P3's pool Lanes. Pools and Friends are reserved seats: no menu entry, no dead button.
 
 **P1.5** is a dogfood window: daily personal use and small fixes, first candidate the Spotify now-playing suggestion. **P2** adds the Link world and is where the witnessing experiment runs. **P1/P1.5 validate input cost and recall value only — solo usage decay is not evidence of product failure**, because the witnessed hook is absent by design until P2.
 

@@ -46,7 +46,15 @@ Daily personal use, small fixes, no new surfaces unless use demands them.
 
 **The witnessing experiment runs here.** 4 to 6 weeks with real friends, then SPEC section 1's hypotheses are reviewed against their decide-by signals (reaction migration, "who saw this?" asks, quoting friction, cross-day scroll requests, recording persistence). Decisions land in DECISIONS.md as group I before any P3 work begins.
 
-## P3: Pool world (only after the P2 review)
+## Pool phase 1 (H23, ahead of P2)
+
+| # | Session | Builds | Done when | Status |
+| --- | --- | --- | --- | --- |
+| S12 | Pool phase 1 | 0009–0012 (pools, members, lanes, links, placements, joint splashes, invites; RLS; doors); create (1c) and lane matching (1d); invite links and `/join/[token]`; Home · Pool · + and the pool switcher; the pool's home in Lane, Date and Swimmers; joint splashes as bands with branches; the Audience chip and sheet; leaving | A member reads placed posts and not unplaced ones; a joint splash renders once as a band with a branch per ripple; Swimmers columns equal current members; an expired or revoked link opens nothing | in progress |
+
+Not in this phase: open pools and search; roles and permissions on pool lanes; bulk placing my earlier records from a chosen date after joining; the follow feed; notifications.
+
+## P3: Pool world, the rest (after the P2 review)
 
 - Pool create + invite code; join screen = mapping privacy contract (pre-checked matches, residual categories unchecked, lurker join first-class)
 - Pools tab (Lobby: my pools + join with code, activity ripple badges); tab appears now

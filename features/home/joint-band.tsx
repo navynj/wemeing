@@ -8,6 +8,8 @@ import { monthAbbrev, weekdayOf, type Card, type CardLane, type GridColumn } fro
 /** The band's height, a branch mark's diameter, and the rhythm branches stack at. */
 const BAND_PX = 44;
 const BRANCH_PX = 24;
+/** A ripple's dot on its branch: a ripple is never an icon or a title — those are a splash's (review). */
+const DOT_PX = 8;
 const BRANCH_GAP_PX = 6;
 const BRANCH_PAD_PX = 8;
 const RING_PX = 96;
@@ -16,7 +18,8 @@ const RING_PX = 96;
  * A joint splash on the grid (H23; `_docs/mockups/pool-swimmers.png`): a
  * horizontal band across every column at its day — its icon, its title, a
  * translucent fill at the card's radius — and beneath it, each ripple a
- * small mark that branches off the band by an elbow: in Swimmers in its
+ * small plain dot that branches off the band by an elbow (an icon and a
+ * title are a splash's alone, never a ripple's): in Swimmers in its
  * author's column, in the Lane view in the band's own lane, stacked by
  * author. Branch lines are white at 10%, fainter than the 15–20% ropes, so
  * they read as belonging to the band rather than as structure.
@@ -104,7 +107,6 @@ export function JointBand({
               key={column || 'orphans'}
               first={at === 0}
               branches={branches.filter((b) => b.column === column)}
-              icon={icon}
               dived={dived}
               onPick={() => onPick(card.splash.id)}
             />
@@ -146,13 +148,11 @@ function Rail({ day, label }: { day: IsoDate; label: { monthChanges: boolean } |
 function BranchCell({
   first,
   branches,
-  icon,
   dived,
   onPick,
 }: {
   first: boolean;
   branches: { id: string; initials: string }[];
-  icon: string | null;
   dived: boolean;
   onPick: () => void;
 }) {
@@ -190,7 +190,7 @@ function BranchCell({
                 style={{
                   top: last > 0 ? center(last) - 8 : 0,
                   height: last > 0 ? 8 : center(last),
-                  width: `calc(50% - ${BRANCH_PX / 2 + 8}px)`,
+                  width: `calc(50% - ${DOT_PX / 2 + 8}px)`,
                 }}
               />
             ) : (
@@ -198,7 +198,7 @@ function BranchCell({
                 key={`tee-${branch.id}`}
                 aria-hidden
                 className="pointer-events-none absolute left-2 h-px bg-white/10"
-                style={{ top: center(i), width: `calc(50% - ${BRANCH_PX / 2 + 8}px)` }}
+                style={{ top: center(i), width: `calc(50% - ${DOT_PX / 2 + 8}px)` }}
               />
             ),
           )}
@@ -209,14 +209,16 @@ function BranchCell({
               data-branch={branch.id}
               aria-label={`A ripple by ${branch.initials}`}
               onClick={onPick}
-              className={`relative flex items-center justify-center rounded-full text-xs/none ${
-                dived ? 'bg-white/20' : 'bg-white/90'
-              }`}
+              // A wide tap target around a small dot.
+              className="relative flex items-center justify-center"
               style={{ width: BRANCH_PX, height: BRANCH_PX }}
             >
-              <span aria-hidden className={dived ? 'opacity-60' : ''}>
-                {icon ?? branch.initials}
-              </span>
+              <span
+                aria-hidden
+                data-branch-dot
+                className={`rounded-full ${dived ? 'bg-white/30' : 'bg-white/90'}`}
+                style={{ width: DOT_PX, height: DOT_PX }}
+              />
             </button>
           ))}
         </>

@@ -221,6 +221,17 @@ describe('a joint splash on the grid (H23)', () => {
     expect(container.querySelectorAll('[data-cell] [data-mark="s-joint"]')).toHaveLength(0);
   });
 
+  it('draws each ripple as a plain dot, never with an icon or a title', () => {
+    setView('lane');
+    const { container } = ground(A);
+    for (const branch of container.querySelectorAll('[data-branch]')) {
+      expect(branch.textContent).toBe('');
+      expect(branch.querySelector('[data-branch-dot]')).not.toBeNull();
+    }
+    // The icon and the title are the splash's, on its band.
+    expect(container.querySelector('[data-joint-band="s-joint"]')!.textContent).toContain('🏛️');
+  });
+
   it('branches in its own lane in the Lane view, stacked by author', () => {
     setView('lane');
     const { container } = ground(A);

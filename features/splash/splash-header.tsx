@@ -8,7 +8,6 @@ import { WaveRule } from '@/components/ui/waves/wave-rule';
 import { impressionLineCount } from '@/components/ui/waves';
 import { QuietAffordance } from '@/features/input-sheet/annotation-control';
 import { LaneChips } from '@/features/input-sheet/lane-chips';
-import type { Session } from '@/features/sessions/shelves';
 import type { MyCategory } from '@/lib/queries/profile';
 import type { IsoDate } from '@/lib/time';
 
@@ -27,26 +26,22 @@ export type HeaderEdit = {
 /**
  * A post's header (SPEC 5, H21): lane tags (declared first), the title at
  * display scale, the range small below, a wave underline sized to the block
- * count. Title, declared date and declared lane are edited in place; pin,
- * session and Delete live in the quiet menu at the right.
+ * count. Title, declared date and declared lane are edited in place; pin
+ * and Delete live in the quiet menu at the right.
  */
 export function SplashHeader({
   splash,
   categories,
-  sessions,
   today,
   onEdit,
   onPin,
-  onSession,
   onDelete,
 }: {
   splash: SplashSummary;
   categories: MyCategory[];
-  sessions: Session[];
   today: IsoDate;
   onEdit: (edit: HeaderEdit) => Promise<void>;
   onPin: (pinned: boolean) => Promise<void>;
-  onSession: (sessionId: string | null) => Promise<void>;
   onDelete: () => Promise<void>;
 }) {
   const [editingTitle, setEditingTitle] = useState(false);
@@ -58,7 +53,7 @@ export function SplashHeader({
       : null,
   );
   const [editingLane, setEditingLane] = useState(false);
-  const [menu, setMenu] = useState<'closed' | 'open' | 'session' | 'delete'>('closed');
+  const [menu, setMenu] = useState<'closed' | 'open' | 'delete'>('closed');
   const [pending, startTransition] = useTransition();
 
   const header = (over: Partial<HeaderEdit> = {}): HeaderEdit => ({
@@ -75,7 +70,6 @@ export function SplashHeader({
     .filter((c): c is MyCategory => Boolean(c));
   const lines = Math.max(1, impressionLineCount(splash.count));
   const displayRange: DateRange | null = splash.range;
-  const session = sessions.find((s) => s.id === splash.sessionId) ?? null;
 
   return (
     <header data-splash-header className="flex flex-col gap-2 pb-6">
@@ -156,70 +150,12 @@ export function SplashHeader({
                 <button
                   type="button"
                   role="menuitem"
-                  onClick={() => setMenu('session')}
-                  className="text-ink hover:bg-pool-100 flex w-full items-center gap-2 px-3 py-2 text-left"
-                >
-                  {session ? `On ${session.title}` : 'Add to session'}
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  role="menuitem"
                   onClick={() => setMenu('delete')}
                   className="text-pool-500 hover:bg-pool-100 flex w-full items-center gap-2 px-3 py-2 text-left"
                 >
                   Delete
                 </button>
               </li>
-            </ul>
-          ) : null}
-
-          {menu === 'session' ? (
-            <ul
-              role="listbox"
-              aria-label="Session"
-              className="border-pool-100 absolute top-full right-0 z-10 flex w-56 flex-col rounded-xl border bg-white py-1 text-sm shadow-lg"
-            >
-              {sessions.map((candidate) => (
-                <li key={candidate.id}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={candidate.id === splash.sessionId}
-                    onClick={() => {
-                      setMenu('closed');
-                      run(() => onSession(candidate.id));
-                    }}
-                    className="text-ink hover:bg-pool-100 flex w-full flex-col px-3 py-2 text-left"
-                  >
-                    {candidate.title}
-                    {/* At most one shelf: choosing another replaces (H21e). */}
-                    {session && session.id !== candidate.id ? (
-                      <span className="text-pool-500 text-[10px]">moves from {session.title}</span>
-                    ) : null}
-                  </button>
-                </li>
-              ))}
-              {session ? (
-                <li>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={false}
-                    onClick={() => {
-                      setMenu('closed');
-                      run(() => onSession(null));
-                    }}
-                    className="text-pool-500 hover:bg-pool-100 w-full px-3 py-2 text-left"
-                  >
-                    Take off {session.title}
-                  </button>
-                </li>
-              ) : null}
-              {sessions.length === 0 ? (
-                <li className="text-pool-500 px-3 py-2">No sessions yet.</li>
-              ) : null}
             </ul>
           ) : null}
 

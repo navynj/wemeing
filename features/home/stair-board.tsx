@@ -255,7 +255,10 @@ export function StairBoard({
     }
     if (decided.current === 'across') return;
     if (!grabbed.current) {
-      const target = offset < 0 ? ids[n + 1] : ids[n - 1];
+      // From where the stack is going, so a swipe during a landing moves
+      // on to the next card rather than re-grabbing the one landing.
+      const at = Math.max(0, ids.indexOf(flip.heading ?? ''));
+      const target = offset < 0 ? ids[at + 1] : ids[at - 1];
       if (!target) return;
       grabbed.current = true;
       flip.grab(target);
@@ -276,8 +279,9 @@ export function StairBoard({
   };
   // The arrow keys, when the stack has focus: left back, right forward.
   const onKeyDown = (event: React.KeyboardEvent): void => {
+    const at = Math.max(0, ids.indexOf(flip.heading ?? ''));
     const target =
-      event.key === 'ArrowRight' ? ids[n + 1] : event.key === 'ArrowLeft' ? ids[n - 1] : null;
+      event.key === 'ArrowRight' ? ids[at + 1] : event.key === 'ArrowLeft' ? ids[at - 1] : null;
     if (!target) return;
     event.preventDefault();
     bringForward(target);
@@ -491,7 +495,8 @@ function Step({
                 onClick={() =>
                   bringForward(
                     !horizontal && stairSide === 'down'
-                      ? (flip.ids[n + 1] ?? card.splash.id)
+                      ? (flip.ids[Math.max(0, flip.ids.indexOf(flip.heading ?? '')) + 1] ??
+                          card.splash.id)
                       : card.splash.id,
                   )
                 }

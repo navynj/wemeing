@@ -29,6 +29,12 @@ export type Flip = {
   next: number;
   /** The post on top of the unread stack: `ids[n]`. */
   topId: string | null;
+  /**
+   * Where the stack is going: the card a released or tapped flip is landing
+   * on, from the moment it is committed to, else the top. The highlight and
+   * the ring follow this, so they never wait out the spring (review).
+   */
+  heading: string | null;
   /** The finger takes hold: the turn toward `id` on top now follows it. */
   grab: (id: string) => void;
   /** The finger moves: progress from where it took hold, down for a forward turn and up for a turn back. */
@@ -37,6 +43,8 @@ export type Flip = {
   release: (velocityY: number) => void;
   /** The post is brought to the top of the unread stack, turning every page between on the spring. */
   bringForward: (id: string) => void;
+  /** The post is put on top at once, with no motion: a stack restored, not flipped. */
+  jumpTo: (id: string) => void;
 };
 
 /**
@@ -68,6 +76,9 @@ export function useFlip(
   // The page in flight, readable the moment it is grabbed — a tap grabs and
   // releases in one handler, before any render.
   const targetRef = useRef<string | null>(null);
+  // The card a flip is landing on, once released toward it.
+  const [landing, setLanding] = useState<string | null>(null);
+  const landingRef = useRef<string | null>(null);
 
   const n = Math.max(0, ids.indexOf(topId ?? ''));
   const next = target ? Math.max(0, ids.indexOf(target)) : n;
@@ -75,6 +86,8 @@ export function useFlip(
   const commit = useCallback(
     (id: string) => {
       targetRef.current = null;
+      landingRef.current = null;
+      setLanding(null);
       // The new order renders before `p` snaps back, so no frame shows the
       // old order at rest.
       flushSync(() => {
@@ -91,9 +104,11 @@ export function useFlip(
       animation.current?.stop();
       const inFlight = targetRef.current;
       if (inFlight && inFlight !== id) {
-        // Grabbing another page mid-flight: the one in flight lands or
-        // returns, whichever is nearer, and the new turn starts from rest.
-        if (p.get() > 0.5) commit(inFlight);
+        // Grabbing another page mid-flight: a flip already released toward
+        // its card lands at once, so swipes chain without waiting out the
+        // spring (review); one still under the finger lands or returns,
+        // whichever is nearer. The new flip starts from rest.
+        if (landingRef.current === inFlight || p.get() > 0.5) commit(inFlight);
         else p.jump(0);
       }
       targetRef.current = id;
@@ -120,6 +135,8 @@ export function useFlip(
   /** The spring takes `p` to its end, in p-units per second. */
   const settle = useCallback(
     (id: string, end: 0 | 1, velocity: number) => {
+      landingRef.current = end === 1 ? id : null;
+      setLanding(end === 1 ? id : null);
       animation.current = animate(
         p,
         end,
@@ -157,8 +174,19 @@ export function useFlip(
     [ids, topId, grab, settle],
   );
 
+  const jumpTo = useCallback(
+    (id: string) => {
+      if (!ids.includes(id)) return;
+      animation.current?.stop();
+      commit(id);
+    },
+    [ids, commit],
+  );
+
   // A stopped spring on unmount, never a set on a dead component.
   useEffect(() => () => animation.current?.stop(), []);
 
-  return { p, ids, n, next, topId: ids[n] ?? null, grab, move, release, bringForward };
+  const top = ids[n] ?? null;
+  const heading = landing && ids.includes(landing) ? landing : top;
+  return { p, ids, n, next, topId: top, heading, grab, move, release, bringForward, jumpTo };
 }

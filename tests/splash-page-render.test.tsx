@@ -20,7 +20,6 @@ const { calls, record } = vi.hoisted(() => {
 vi.mock('@/features/splash/actions', () => ({
   updateSplashHeader: record('updateSplashHeader', { ok: true, splash: {} }),
   setSplashPinned: record('setSplashPinned'),
-  setSplashSession: record('setSplashSession'),
   deleteSplash: record('deleteSplash'),
   adoptRipple: record('adoptRipple', { ok: true, splash: { id: 's-adopted' } }),
 }));
@@ -40,7 +39,6 @@ vi.mock('@/lib/supabase/client', () => ({
   }),
 }));
 
-import type { Session } from '@/features/sessions/shelves';
 import { InputSheetProvider, useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { SplashPage } from '@/features/splash/splash-page';
 import { summarizeOrphan, summarizeSplash, type Splash } from '@/features/splash/summary';
@@ -67,18 +65,6 @@ const LANES = [
   lane('c-media', 'Media', '🎬', 1),
   lane('c-day', 'Day', '🖋', 2),
 ];
-const TRIPS: Session = {
-  id: 'ss1',
-  owner_id: 'a1',
-  kind: 'custom',
-  title: 'Trips',
-  month: null,
-  declared_start: null,
-  declared_end: null,
-  lane_id: null,
-  created_at: '2026-09-01T00:00:00Z',
-};
-
 function block(over: Partial<RippleWithCategory> & { id: string }): RippleWithCategory {
   return {
     author_id: 'a1',
@@ -172,7 +158,6 @@ function page(over: Partial<Parameters<typeof SplashPage>[0]> = {}) {
         photos={{ night: [null, 'https://signed/x.jpg'] }}
         lockedIds={[]}
         categories={LANES}
-        sessions={[TRIPS]}
         origin={{ label: 'August', href: '/?m=2026-08' }}
         timeZone={TZ}
         today={TODAY}
@@ -219,6 +204,18 @@ describe('the white page above the water (SPEC 5, H21c)', () => {
     expect(container.querySelector('[data-block-body]')!.className).toMatch(/text-\[15px\]/);
     expect(container.querySelector('[data-photo]')!.className).toContain('w-full');
     expect(container.querySelector('[data-photo-placeholder]')).not.toBeNull();
+  });
+
+  it('threads the ripples: an avatar each, one line fewer than ripples, the body beside', () => {
+    const { container } = page({ initials: 'YL' });
+    const thread = container.querySelector('[data-blocks] [data-ripple-thread]')!;
+    const avatars = thread.querySelectorAll('[data-thread-avatar]');
+    expect(avatars).toHaveLength(3);
+    expect(avatars[0].textContent).toBe('YL');
+    expect(thread.querySelectorAll('[data-thread-line]')).toHaveLength(2);
+    // The body sits in the column to the right of the avatar.
+    const entry = thread.querySelector('[data-thread-entry="first"]')!;
+    expect(entry.children[1].querySelector('[data-block="first"]')).not.toBeNull();
   });
 
   it('is two halves on a wide screen: the header left, the blocks right', () => {
@@ -326,20 +323,6 @@ describe('the header menu', () => {
     fireEvent.click(getByText('Pin'));
     await waitFor(() => expect(calls.some((c) => c.name === 'setSplashPinned')).toBe(true));
     expect(calls.find((c) => c.name === 'setSplashPinned')!.args).toEqual(['s1', true]);
-  });
-
-  it('shelves the post on a session by replacement, saying so', async () => {
-    const other: Session = { ...TRIPS, id: 'ss2', title: 'Food runs' };
-    const { getByLabelText, getByText, container } = page({
-      splash: summarizeSplash({ ...board, session_id: 'ss2' }, blocks, TZ, NOW),
-      sessions: [TRIPS, other],
-    });
-    fireEvent.click(getByLabelText('More'));
-    fireEvent.click(getByText('On Food runs'));
-    expect(container.textContent).toContain('moves from Food runs');
-    fireEvent.click(getByText('Trips'));
-    await waitFor(() => expect(calls.some((c) => c.name === 'setSplashSession')).toBe(true));
-    expect(calls.find((c) => c.name === 'setSplashSession')!.args).toEqual(['s1', 'ss1']);
   });
 
   it('says a delete takes the blocks with it (H21), then goes back where it came from', async () => {

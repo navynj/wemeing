@@ -17,7 +17,23 @@ export function monthHref(month: string): string {
   return `/?m=${month}`;
 }
 
+/**
+ * A post's page opened from Home's board: the back chip returns to Home
+ * with this post on top again, rather than to a fresh stack (review).
+ */
+export function splashFromHome(id: string): string {
+  return `/splash/${id}?from=${encodeURIComponent(`/?top=${id}`)}`;
+}
+
 /** Where a post's page says it came from, for the month it was opened in. */
 export function splashHref(id: string, month: string): string {
   return `/splash/${id}?from=${month}`;
+}
+
+/** `September`, from `2026-09`. */
+export function monthName(month: string): string {
+  return new Date(`${month}-01T00:00:00Z`).toLocaleDateString('en-US', {
+    month: 'long',
+    timeZone: 'UTC',
+  });
 }

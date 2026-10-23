@@ -9,21 +9,15 @@ import { GhostRing } from '@/components/ui/ghost-ring';
 import { commitRipple, type CommitResult } from '@/features/input-sheet/commit';
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { deleteRipple, setRippleLock, updateRipple } from '@/features/ripple-sheet/actions';
-import type { Session } from '@/features/sessions/shelves';
 import type { MyCategory } from '@/lib/queries/profile';
 import type { RippleWithCategory } from '@/lib/queries/ripples';
 import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction, type ActionOutcome } from '@/lib/use-optimistic-action';
 
-import {
-  adoptRipple,
-  deleteSplash,
-  setSplashPinned,
-  setSplashSession,
-  updateSplashHeader,
-} from './actions';
+import { adoptRipple, deleteSplash, setSplashPinned, updateSplashHeader } from './actions';
 import { BlockEditor, type BlockDraft, type EditorTarget } from './block-editor';
 import { BlockView } from './block';
+import { RippleThread } from './ripple-thread';
 import { SplashHeader, type HeaderEdit } from './splash-header';
 import { laneTags, type SplashSummary } from './summary';
 
@@ -64,10 +58,10 @@ export function SplashPage({
   photos,
   lockedIds,
   categories,
-  sessions,
   origin,
   timeZone,
   today,
+  initials = '',
 }: {
   splash: SplashSummary;
   /** Oldest first. */
@@ -75,10 +69,11 @@ export function SplashPage({
   photos: Record<string, (string | null)[]>;
   lockedIds: string[];
   categories: MyCategory[];
-  sessions: Session[];
   origin: Origin;
   timeZone: string;
   today: IsoDate;
+  /** The author's initials, for each ripple's avatar in the thread (round 3). */
+  initials?: string;
 }) {
   const router = useRouter();
   const { markDeleted } = useInputSheet();
@@ -134,17 +129,6 @@ export function SplashPage({
       async () => {
         const id = await ensureSplash();
         return id ? setSplashPinned(id, pinned) : { ok: false, message: 'That post is gone.' };
-      },
-    );
-    return Promise.resolve();
-  }
-
-  function shelve(sessionId: string | null): Promise<void> {
-    run(
-      (current) => ({ ...current, splash: { ...current.splash, sessionId } }),
-      async () => {
-        const id = await ensureSplash();
-        return id ? setSplashSession(id, sessionId) : { ok: false, message: 'That post is gone.' };
       },
     );
     return Promise.resolve();
@@ -265,11 +249,9 @@ export function SplashPage({
           key={page.splash.id}
           splash={page.splash}
           categories={categories}
-          sessions={sessions}
           today={today}
           onEdit={editHeader}
           onPin={pin}
-          onSession={shelve}
           onDelete={async () => {
             // Gone the moment it is asked for, from every surface (CLAUDE.md,
             // the principle): back where it came from, and the rows follow. A
@@ -291,39 +273,46 @@ export function SplashPage({
       </div>
 
       <div data-splash-blocks className="flex flex-col lg:pt-3">
-        <ol data-blocks className="flex flex-col">
-          {page.blocks.map((block, index) => (
-            <li
-              key={block.id}
-              id={`block-${block.id}`}
-              className={index === 0 ? 'py-2' : 'border-pool-100 border-t py-6'}
-            >
-              {editor?.kind === 'edit' && editor.block.id === block.id ? (
-                <BlockEditor
-                  target={editor}
-                  categories={categories}
-                  defaultLaneId={page.splash.declaredLaneId}
-                  timeZone={timeZone}
-                  today={today}
-                  onSubmit={(draft) => saveBlock(editor, draft)}
-                  onDelete={() => removeBlock(block)}
-                  onLock={(locked) => lockBlock(block, locked)}
-                  onCancel={() => setEditor(null)}
-                />
-              ) : (
-                <BlockView
-                  block={block}
-                  photos={photos[block.id] ?? []}
-                  timeZone={timeZone}
-                  today={today}
-                  onEdit={() =>
-                    setEditor({ kind: 'edit', block, locked: page.lockedIds.includes(block.id) })
-                  }
-                />
-              )}
-            </li>
-          ))}
-        </ol>
+        {/* Each block an entry of its own, threaded avatar to avatar (round 3). */}
+        <div data-blocks className="py-2">
+          <RippleThread
+            initials={initials}
+            entries={page.blocks.map((block) => ({
+              id: block.id,
+              body: (
+                <div id={`block-${block.id}`} data-block-entry={block.id} className="pb-2">
+                  {editor?.kind === 'edit' && editor.block.id === block.id ? (
+                    <BlockEditor
+                      target={editor}
+                      categories={categories}
+                      defaultLaneId={page.splash.declaredLaneId}
+                      timeZone={timeZone}
+                      today={today}
+                      onSubmit={(draft) => saveBlock(editor, draft)}
+                      onDelete={() => removeBlock(block)}
+                      onLock={(locked) => lockBlock(block, locked)}
+                      onCancel={() => setEditor(null)}
+                    />
+                  ) : (
+                    <BlockView
+                      block={block}
+                      photos={photos[block.id] ?? []}
+                      timeZone={timeZone}
+                      today={today}
+                      onEdit={() =>
+                        setEditor({
+                          kind: 'edit',
+                          block,
+                          locked: page.lockedIds.includes(block.id),
+                        })
+                      }
+                    />
+                  )}
+                </div>
+              ),
+            }))}
+          />
+        </div>
 
         {/* The add slot: the seat of the next block, at the bottom where the
           story continues. The ring ripples as the one invitation (law 3). */}

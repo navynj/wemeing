@@ -3,9 +3,9 @@
 import Link from 'next/link';
 
 import { OutlineChip } from '@/components/ui/chips/category-chip';
-import { splashHref } from '@/features/home/scope';
+import { splashFromHome } from '@/features/home/scope';
+import { RippleThread } from '@/features/splash/ripple-thread';
 import { DETAIL_TITLE_CLASS } from '@/features/splash/splash-header';
-import { monthKey } from '@/features/splash/summary';
 import type { MyCategory } from '@/lib/queries/profile';
 
 import { cardDate, type Card } from './grid';
@@ -111,7 +111,7 @@ export function CardFace({
   }
   return (
     <Link
-      href={splashHref(card.splash.id, monthKey(card.day))}
+      href={splashFromHome(card.splash.id)}
       data-card-link={card.splash.id}
       onClickCapture={onClickCapture}
       draggable={false}
@@ -125,19 +125,22 @@ export function CardFace({
         </span>
         {lane ? <OutlineChip icon={lane.icon} name={lane.name} /> : null}
       </span>
-      <span className="relative flex min-h-0 flex-1 items-start gap-2 overflow-hidden">
-        <span
-          aria-hidden
-          className="bg-pool-100 text-pool-500 mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[8px] font-medium"
-        >
-          {initials}
-        </span>
-        <span
-          data-card-body
-          className="text-ink/80 min-w-0 flex-1 text-[13px]/relaxed whitespace-pre-wrap"
-        >
-          {card.body}
-        </span>
+      <span data-card-body className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+        {/* Each ripple an entry of its own, threaded avatar to avatar (round 3). */}
+        <RippleThread
+          initials={initials}
+          entries={(card.ripples.length > 0
+            ? card.ripples
+            : [{ id: card.splash.id, note: card.body, createdAt: '' }]
+          ).map((ripple) => ({
+            id: ripple.id,
+            body: (
+              <span className="text-ink/80 text-[13px]/relaxed whitespace-pre-wrap">
+                {ripple.note}
+              </span>
+            ),
+          }))}
+        />
         <span
           aria-hidden
           className="pointer-events-none absolute inset-x-0 bottom-0 h-10"

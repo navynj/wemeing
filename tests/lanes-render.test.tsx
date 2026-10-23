@@ -17,15 +17,10 @@ vi.mock('@/features/lanes/actions', () => ({
 
 import { LanesMatrix } from '@/features/lanes/lanes-matrix';
 import { laneRows } from '@/features/lanes/matrix';
-import { Trail } from '@/features/locker/trail';
 import { EMPTY, quietDayCopy } from '@/lib/empty-states';
-import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
 import type { LaneCounts } from '@/lib/queries/lanes';
 import type { MyCategory } from '@/lib/queries/profile';
-import type { RippleWithCategory } from '@/lib/queries/ripples';
-import { groupByDay } from '@/lib/queries/trail';
 
-const TZ = 'America/Vancouver';
 const FOCUS = 'c-focus';
 
 beforeEach(() => {
@@ -55,27 +50,6 @@ function category(over: Partial<MyCategory> = {}): MyCategory {
     default_mode: 'timed',
     position: 0,
     created_at: '2027-01-01T00:00:00Z',
-    ...over,
-  };
-}
-
-function ripple(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
-  return {
-    id: 'r1',
-    author_id: 'a1',
-    category_id: FOCUS,
-    note: 'a private thought',
-    media: [],
-    occurred_on: '2027-07-08',
-    occurred_time: '09:00:00',
-    started_at: '2027-07-08T16:00:00.000Z',
-    ended_at: '2027-07-08T16:00:00.000Z',
-    planned: false,
-    participants: [],
-    created_at: '2027-07-08T16:00:00.000Z',
-    parent_ripple_id: null,
-    splash_id: null,
-    category: { name: 'Focus', icon: '🔍' },
     ...over,
   };
 }
@@ -162,110 +136,6 @@ describe('a lane that does not exist yet', () => {
   });
 });
 
-describe('locked records are not marked as locked', () => {
-  it('leaves a matrix cell counting them like any other', () => {
-    // The count cannot distinguish them, which is the point: this view is
-    // mine alone, and lock state lives in the detail sheet.
-    const { container } = matrix(new Map([['2027-07-08', { [FOCUS]: 2 }]]));
-
-    expect(container.textContent).not.toMatch(/lock|only me/i);
-  });
-
-  it('leaves a Trail row reading exactly like an unlocked one', () => {
-    const { container, getByText } = render(
-      <InputSheetProvider>
-        <Trail days={groupByDay([ripple()], TZ)} timeZone={TZ} />
-      </InputSheetProvider>,
-    );
-
-    expect(getByText('a private thought')).toBeTruthy();
-    expect(container.textContent).not.toMatch(/only me/i);
-  });
-});
-
-describe('the Trail is a backward scroll, not a feed', () => {
-  it('sinks each month a step further down (law 1)', () => {
-    const { container } = render(
-      <InputSheetProvider>
-        <Trail
-          days={groupByDay(
-            [
-              ripple({ id: 'now', occurred_on: '2027-07-08' }),
-              ripple({ id: 'then', occurred_on: '2027-05-02' }),
-            ],
-            TZ,
-          )}
-          timeZone={TZ}
-        />
-      </InputSheetProvider>,
-    );
-
-    const sections = container.querySelectorAll('[data-trail-day]');
-    expect((sections[0] as HTMLElement).style.background).toBe('rgb(255, 255, 255)');
-    expect((sections[1] as HTMLElement).style.background).toBe('rgb(216, 220, 232)');
-  });
-
-  it('sends a day header back to that month on the ground (H21h)', () => {
-    const { container } = render(
-      <InputSheetProvider>
-        <Trail days={groupByDay([ripple()], TZ)} timeZone={TZ} />
-      </InputSheetProvider>,
-    );
-
-    expect(container.querySelector('a')!.getAttribute('href')).toBe('/?m=2027-07');
-  });
-
-  it("opens a row at its block on its post's page (H21)", () => {
-    const { container } = render(
-      <InputSheetProvider>
-        <Trail days={groupByDay([ripple({ splash_id: 's1' })], TZ)} timeZone={TZ} />
-      </InputSheetProvider>,
-    );
-
-    expect(container.querySelector('[data-trail-row] a')!.getAttribute('href')).toBe(
-      '/splash/s1?from=locker#block-r1',
-    );
-  });
-
-  it('points a row back to its day’s month when it reads under the wide screen’s composer', () => {
-    const { container } = render(
-      <InputSheetProvider>
-        <Trail days={groupByDay([ripple({ splash_id: 's1' })], TZ)} timeZone={TZ} origin="month" />
-      </InputSheetProvider>,
-    );
-    expect(container.querySelector('[data-trail-row] a')!.getAttribute('href')).toBe(
-      '/splash/s1?from=2027-07#block-r1',
-    );
-  });
-
-  it('opens a lone block as an untitled post of one (H21a)', () => {
-    const { container } = render(
-      <InputSheetProvider>
-        <Trail days={groupByDay([ripple({ splash_id: null })], TZ)} timeZone={TZ} />
-      </InputSheetProvider>,
-    );
-
-    expect(container.querySelector('[data-trail-row] a')!.getAttribute('href')).toBe(
-      '/splash/r1?from=locker#block-r1',
-    );
-  });
-
-  it("shelves a block at its post's declared date when it has no annotation (H21f)", () => {
-    const days = groupByDay(
-      [
-        ripple({
-          id: 'resting',
-          occurred_on: null,
-          occurred_time: null,
-          splash: { declared_start: '2027-05-02', title: 'May' },
-        }),
-      ],
-      TZ,
-    );
-    expect(days.map((d) => d.date)).toEqual(['2027-05-02']);
-  });
-});
-
 describe('every empty state says something', () => {
   it('leaves today open', () => {
     expect(quietDayCopy('2027-07-08', '2027-07-08')).toBe('A quiet day so far.');
@@ -283,11 +153,6 @@ describe('every empty state says something', () => {
     const { getByText } = matrix(new Map());
     expect(getByText(EMPTY.lanes)).toBeTruthy();
   });
-
-  it('starts the trail rather than reporting it missing', () => {
-    const { getByText } = render(<Trail days={[]} timeZone={TZ} />);
-    expect(getByText(EMPTY.trail)).toBeTruthy();
-  });
 });
 
 describe('the ropes run the whole depth of the matrix', () => {
@@ -302,53 +167,5 @@ describe('the ropes run the whole depth of the matrix', () => {
 
     const quiet = container.querySelector('[data-quiet-row]')!;
     expect(quiet.querySelectorAll('.border-l')).toHaveLength(2);
-  });
-});
-
-describe('a day in the Trail reads every block, clocked or not', () => {
-  const note = ripple({
-    id: 'note',
-    note: 'Condition Nienzo (2.0/5.0)',
-    occurred_time: null,
-    started_at: null,
-    ended_at: null,
-  });
-
-  it('heads the section with a record that has no time, rather than crashing on it', () => {
-    // A date-only record belongs to the day without a position on its axis
-    // (SPEC 5.3). Drawn as a timeline row it has no clock to print, which is
-    // what took the Locker down.
-    const { getByText } = render(
-      <InputSheetProvider>
-        <Trail days={groupByDay([note], TZ)} timeZone={TZ} />
-      </InputSheetProvider>,
-    );
-
-    expect(getByText('Condition Nienzo (2.0/5.0)')).toBeTruthy();
-  });
-
-  it('reads a date-only block and a clocked one as two rows, early to late', () => {
-    const { container } = render(
-      <InputSheetProvider>
-        <Trail days={groupByDay([note, ripple({ id: 'timed' })], TZ)} timeZone={TZ} />
-      </InputSheetProvider>,
-    );
-
-    // The date-only block sits at the day's end (H20c), so it reads last.
-    expect(
-      [...container.querySelectorAll('[data-trail-row]')].map((r) =>
-        r.getAttribute('data-trail-row'),
-      ),
-    ).toEqual(['timed', 'note']);
-  });
-
-  it('does not invite a new note here: the Trail reads, Home records', () => {
-    const { queryByText } = render(
-      <InputSheetProvider>
-        <Trail days={groupByDay([note], TZ)} timeZone={TZ} />
-      </InputSheetProvider>,
-    );
-
-    expect(queryByText('Add a Daily Note')).toBeNull();
   });
 });

@@ -14,10 +14,6 @@ export const EMPTY = {
   /** A day ahead: the only one where the absence is of *plans*. */
   futureQuiet: 'Nothing planned yet.',
   lanes: 'Waves gather here as you drop.',
-  /** The empty Trail: the first step. */
-  trail: 'Your trail starts with the first ripple.',
-  /** A shelf with nothing on it. */
-  shelf: 'Nothing shelved here.',
 } as const;
 
 /**

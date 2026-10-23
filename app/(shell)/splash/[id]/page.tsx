@@ -1,33 +1,23 @@
 import { notFound, redirect } from 'next/navigation';
 
-import { monthHref } from '@/features/home/scope';
-import { monthName } from '@/features/sessions/shelves';
+import { initialsOf } from '@/features/home/grid';
+import { monthHref, monthName } from '@/features/home/scope';
 import { SplashPage, type Origin } from '@/features/splash/splash-page';
 import { summarizeOrphan, summarizeSplash } from '@/features/splash/summary';
 import { flowInstant } from '@/lib/flow-key';
 import { signOwnMedia } from '@/lib/media';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
-import { getMySessions } from '@/lib/queries/sessions';
 import { getMySplashes } from '@/lib/queries/splashes';
 import { getMyTrail } from '@/lib/queries/trail';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
-import { customSessions } from '@/features/sessions/shelves';
 
 const MONTH = /^\d{4}-\d{2}$/;
 
-/** Where the back chip points, from `?from=`: a month, a shelf, the Locker. */
-function originOf(
-  from: string | undefined,
-  sessions: { id: string; title: string }[],
-  today: string,
-): Origin {
+/** Where the back chip points, from `?from=`: a month, a lane page, or any path on the site. */
+function originOf(from: string | undefined, today: string): Origin {
   if (from && MONTH.test(from)) return { label: monthName(from), href: monthHref(from) };
-  if (from?.startsWith('session:')) {
-    const session = sessions.find((s) => s.id === from.slice('session:'.length));
-    if (session) return { label: session.title, href: `/sessions/${session.id}` };
-  }
-  if (from === 'locker') return { label: 'Locker', href: '/locker' };
+  if (from === '/' || from?.startsWith('/?')) return { label: 'Home', href: from };
   if (from?.startsWith('/')) return { label: 'Back', href: from };
   return { label: monthName(today.slice(0, 7)), href: monthHref(today.slice(0, 7)) };
 }
@@ -48,11 +38,10 @@ export default async function SplashRoute({ params, searchParams }: PageProps<'/
   const now = new Date();
   const today = todayIn(profile.timezone);
 
-  const [ripples, categories, boards, sessions] = await Promise.all([
+  const [ripples, categories, boards] = await Promise.all([
     getMyTrail(supabase, profile.id, profile.timezone),
     getMyCategories(supabase),
     getMySplashes(supabase, profile.id),
-    getMySessions(supabase, profile.id),
   ]);
 
   const board = boards.find((b) => b.id === id) ?? null;
@@ -85,8 +74,6 @@ export default async function SplashRoute({ params, searchParams }: PageProps<'/
       .map((r) => [r.id, r.media.map((path) => signed[path] ?? null)]),
   );
 
-  const custom = customSessions(sessions);
-
   return (
     // Wide: the page takes both halves, the blocks on the right (review).
     <main className="mx-auto flex w-full max-w-xl flex-1 flex-col px-6 lg:max-w-5xl">
@@ -96,10 +83,10 @@ export default async function SplashRoute({ params, searchParams }: PageProps<'/
         photos={photos}
         lockedIds={(lockRows ?? []).map((row) => row.ripple_id)}
         categories={categories}
-        sessions={custom}
-        origin={originOf(typeof from === 'string' ? from : undefined, custom, today)}
+        origin={originOf(typeof from === 'string' ? from : undefined, today)}
         timeZone={profile.timezone}
         today={today}
+        initials={initialsOf(profile.display_name)}
       />
     </main>
   );

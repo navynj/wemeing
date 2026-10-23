@@ -11,8 +11,11 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { Equal, Plus } from 'lucide-react';
+import Link from 'next/link';
+import { Plus } from 'lucide-react';
 
+import { OutlineChip } from '@/components/ui/chips/category-chip';
+import { useAxisLock } from '@/components/ui/use-axis-lock';
 import { CommitRing } from '@/components/ui/waves';
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
 import { monthKey } from '@/features/splash/summary';
@@ -38,6 +41,8 @@ const PLUS_PX = 44;
 const WINDOW_STEP = 31;
 /** The fewest rows rendered at first, so a month that has barely begun still scrolls. */
 const WINDOW_MIN = 21;
+/** The narrowest a column gets when six share a phone's width: six always show at once. */
+const MIN_COLUMN_PX = 40;
 /** A day row's least height, a gap's height (a run of empty days, compressed), and the mark's diameter with the ring's bound. */
 const ROW_PX = 56;
 const GAP_PX = 28;
@@ -107,10 +112,13 @@ export const LaneGrid = forwardRef<
     /** `?m=`: the month to scroll the grid to; the newest day of it lands under the headers. */
     scrollToMonth: string | null;
     onPick: (id: string) => void;
-    /** A lane's header: its detail, the titles on it (review). */
-    onLaneTap: (laneId: string) => void;
-    onEditLanes: () => void;
     onCreateLane: () => void;
+    /**
+     * The Lane view (the grid) or the Date view (round 3): the same scroller,
+     * rail, window, `?m=` target and ring; in the Date view a day's posts are
+     * pills, one per line, and there are no lane columns.
+     */
+    view?: 'lane' | 'date';
   }
 >(function LaneGrid(
   {
@@ -122,13 +130,15 @@ export const LaneGrid = forwardRef<
     initials,
     scrollToMonth,
     onPick,
-    onLaneTap,
-    onEditLanes,
     onCreateLane,
+    view = 'lane',
   },
   ref,
 ) {
   const scroller = useRef<HTMLDivElement>(null);
+  // One axis per gesture: a drag never drifts diagonally (round 3).
+  useAxisLock(scroller);
+  const dateView = view === 'date';
   const reducedMotion = usePrefersReducedMotion();
   const [viewportWidth, setViewportWidth] = useState<number | null>(null);
   // The ring as it plays: set once its mark has been brought into view.
@@ -142,10 +152,21 @@ export const LaneGrid = forwardRef<
 
   const orphans = cards.some((card) => isOrphanCard(card, categories));
   const columns = categories.length + (orphans ? 1 : 0);
-  const even = columns <= EVEN_COLUMNS_MAX;
-  const template = `${RAIL_PX}px repeat(${Math.max(columns, 1)}, ${
-    even ? 'minmax(0, 1fr)' : `${FIXED_COLUMN_PX}px`
-  }) ${PLUS_PX}px`;
+  const even = dateView || columns <= EVEN_COLUMNS_MAX;
+  // Every mark carries its short title (round 3). Past six lanes a column
+  // keeps a sixth of the room and the rest scroll sideways, so six lanes
+  // always show at once; unmeasured, a column falls back to its fixed width.
+  const titled = !dateView;
+  const share =
+    viewportWidth !== null
+      ? Math.max(MIN_COLUMN_PX, Math.floor((viewportWidth - RAIL_PX - PLUS_PX) / EVEN_COLUMNS_MAX))
+      : FIXED_COLUMN_PX;
+  const template = dateView
+    ? `${RAIL_PX}px minmax(0, 1fr)`
+    : `${RAIL_PX}px repeat(${Math.max(columns, 1)}, ${
+        even ? 'minmax(0, 1fr)' : `${share}px`
+      }) ${PLUS_PX}px`;
+  const byLaneId = useMemo(() => new Map(categories.map((lane) => [lane.id, lane])), [categories]);
 
   // Each day's cards by lane, so a cell is one lookup.
   const byCell = useMemo(() => {
@@ -183,8 +204,16 @@ export const LaneGrid = forwardRef<
   const limit = Math.max(grown, needed);
   const days = allDays.slice(0, limit);
   // A day with something on it is a row; a run of empty days is one gap.
-  const named = (d: IsoDate): boolean =>
-    categories.some((lane) => byCell.has(`${d}|${lane.id}`)) || byCell.has(`${d}|`);
+  const byDay = useMemo(() => {
+    const map = new Map<IsoDate, Card[]>();
+    for (const card of cards) {
+      const list = map.get(card.day);
+      if (list) list.push(card);
+      else map.set(card.day, [card]);
+    }
+    return map;
+  }, [cards]);
+  const named = (d: IsoDate): boolean => byDay.has(d);
   const rows: ({ kind: 'day'; day: IsoDate } | { kind: 'gap'; from: IsoDate; to: IsoDate })[] = [];
   for (const day of days) {
     if (named(day)) {
@@ -230,9 +259,7 @@ export const LaneGrid = forwardRef<
       let scrollTop = el.scrollTop;
       let scrollLeft = el.scrollLeft;
       let scrolled = false;
-      const first = ids[0]
-        ? el.querySelector<HTMLElement>(`[data-mark="${CSS.escape(ids[0])}"]`)
-        : null;
+      const first = ids[0] ? el.querySelector<HTMLElement>(markSelector(ids[0])) : null;
       if (first) {
         const { top: markTop, left: markLeft } = offsetIn(first, el);
         if (markTop < scrollTop + header) scrollTop = markTop - header - 8;
@@ -252,7 +279,7 @@ export const LaneGrid = forwardRef<
       }
       const rect = el.getBoundingClientRect();
       for (const id of ids) {
-        const mark = el.querySelector<HTMLElement>(`[data-mark="${CSS.escape(id)}"]`);
+        const mark = el.querySelector<HTMLElement>(markSelector(id));
         if (!mark) continue;
         const at = offsetIn(mark, el);
         spots.set(id, {
@@ -317,54 +344,59 @@ export const LaneGrid = forwardRef<
           </span>
         </div>
 
-        {/* The lane headers: sticky at the top, on the water so rows pass beneath. */}
-        <div
-          data-grid-header
-          className="bg-main-900 sticky top-0 left-0 z-30 flex items-start justify-start pt-1 pl-5"
-          style={{ gridColumn: 1 }}
-        >
-          <button
-            type="button"
-            aria-label="Edit lanes"
-            data-edit-lanes
-            onClick={onEditLanes}
-            className="flex h-7 w-7 items-center justify-center text-white"
-          >
-            <Equal aria-hidden size={18} />
-          </button>
-        </div>
-        {categories.map((lane) => (
-          <button
-            key={lane.id}
-            type="button"
-            data-lane-header={lane.id}
-            onClick={() => onLaneTap(lane.id)}
-            className="bg-main-900 sticky top-0 z-20 flex flex-col items-center gap-0.5 px-0.5 pb-2 text-white"
-          >
-            <span aria-hidden className="text-2xl/none">
-              {lane.icon}
-            </span>
-            <span className="max-w-full truncate text-[11px]/tight font-semibold">{lane.name}</span>
-          </button>
-        ))}
-        {orphans ? (
-          <div data-lane-header="" className="bg-main-900 sticky top-0 z-20 pb-2" />
-        ) : null}
-        <div className="bg-main-900 sticky top-0 z-20 flex items-start justify-center pb-2">
-          <button
-            type="button"
-            aria-label="New lane"
-            data-new-lane
-            onClick={onCreateLane}
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-white/40 text-white/60"
-          >
-            <Plus aria-hidden size={14} />
-          </button>
-        </div>
+        {/* The lane headers: sticky at the top, on the water so rows pass
+            beneath. A header opens its lane's page (round 3). The Date view
+            has no columns, so no headers. */}
+        {dateView ? null : (
+          <>
+            <div
+              data-grid-header
+              className="bg-main-900 sticky top-0 left-0 z-30"
+              style={{ gridColumn: 1 }}
+            />
+            {categories.map((lane) => (
+              <Link
+                key={lane.id}
+                href={`/lane/${lane.id}`}
+                data-lane-header={lane.id}
+                className="bg-main-900 sticky top-0 z-20 flex flex-col items-center gap-0.5 px-0.5 pb-2 text-white"
+              >
+                <span aria-hidden className="text-2xl/none">
+                  {lane.icon}
+                </span>
+                <span className="max-w-full truncate text-[11px]/tight font-semibold">
+                  {lane.name}
+                </span>
+              </Link>
+            ))}
+            {orphans ? (
+              <div data-lane-header="" className="bg-main-900 sticky top-0 z-20 pb-2" />
+            ) : null}
+            <div className="bg-main-900 sticky top-0 z-20 flex items-start justify-center pb-2">
+              <button
+                type="button"
+                aria-label="New lane"
+                data-new-lane
+                onClick={onCreateLane}
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-white/40 text-white/60"
+              >
+                <Plus aria-hidden size={14} />
+              </button>
+            </div>
+          </>
+        )}
 
         {rows.map((row, index) => {
           if (row.kind === 'gap') {
-            return <GapRow key={row.from} from={row.from} to={row.to} columns={columns} />;
+            return (
+              <GapRow
+                key={row.from}
+                from={row.from}
+                to={row.to}
+                columns={dateView ? 0 : columns}
+                plus={!dateView}
+              />
+            );
           }
           const { day } = row;
           // The month is named on its first named day.
@@ -379,9 +411,31 @@ export const LaneGrid = forwardRef<
                 icon={icon}
                 dived={waterIds.has(card.splash.id)}
                 ring={ringAt?.id === card.splash.id ? ringAt.seq : null}
+                titled={titled}
                 onPick={onPick}
               />
             ));
+          if (dateView) {
+            return (
+              <DayRow key={day} day={day} monthChanges={monthChanges}>
+                <div data-cell="date" className="flex min-w-0 flex-col gap-1.5 py-2 pr-4">
+                  {(byDay.get(day) ?? []).map((card) => {
+                    const laneId = cardLane(card.splash);
+                    return (
+                      <Pill
+                        key={card.splash.id}
+                        card={card}
+                        lane={laneId ? (byLaneId.get(laneId) ?? null) : null}
+                        dived={waterIds.has(card.splash.id)}
+                        ring={ringAt?.id === card.splash.id ? ringAt.seq : null}
+                        onPick={onPick}
+                      />
+                    );
+                  })}
+                </div>
+              </DayRow>
+            );
+          }
           return (
             <DayRow key={day} day={day} monthChanges={monthChanges}>
               {categories.map((lane, at) => (
@@ -438,7 +492,17 @@ function DayRow({
 }
 
 /** A run of empty days, compressed to one short row of empty ropes: the rail says nothing. */
-function GapRow({ from, to, columns }: { from: IsoDate; to: IsoDate; columns: number }) {
+function GapRow({
+  from,
+  to,
+  columns,
+  plus,
+}: {
+  from: IsoDate;
+  to: IsoDate;
+  columns: number;
+  plus: boolean;
+}) {
   return (
     <>
       <div
@@ -448,10 +512,11 @@ function GapRow({ from, to, columns }: { from: IsoDate; to: IsoDate; columns: nu
         className="bg-main-900 sticky left-0 z-10"
         style={{ height: GAP_PX }}
       />
+      {columns === 0 ? <div /> : null}
       {Array.from({ length: columns }, (_, at) => (
         <Cell key={at} lane="" first={at === 0} />
       ))}
-      <Cell lane="+" />
+      {plus ? <Cell lane="+" /> : null}
     </>
   );
 }
@@ -510,6 +575,7 @@ function Mark({
   icon,
   dived,
   ring,
+  titled,
   onPick,
 }: {
   card: Card;
@@ -517,11 +583,13 @@ function Mark({
   dived: boolean;
   /** The ring's sequence number while it plays here, else null. */
   ring: number | null;
+  /** The short title beneath the mark, two lines at most (round 3). */
+  titled: boolean;
   onPick: (id: string) => void;
 }) {
   const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
   const surface = !icon ? 'border border-white/60' : dived ? 'bg-white/20' : 'bg-white';
-  return (
+  const disc = (
     <span className="relative flex items-center justify-center">
       {ring !== null ? (
         <span
@@ -554,6 +622,94 @@ function Mark({
       </button>
     </span>
   );
+  if (!titled) return disc;
+  return (
+    <span className="flex w-full min-w-0 flex-col items-center gap-1 px-1">
+      {disc}
+      <button
+        type="button"
+        tabIndex={-1}
+        data-mark-title={card.splash.id}
+        onClick={() => onPick(card.splash.id)}
+        className={`line-clamp-2 w-full text-center text-[10px]/tight font-medium break-words text-white ${
+          dived ? 'opacity-60' : ''
+        }`}
+      >
+        {title}
+      </button>
+    </span>
+  );
+}
+
+/**
+ * A post in the Date view (round 3): one pill per line, full width — the
+ * icon on a disc, the title, the lane as a chip — translucent like a mark
+ * when it is not on top, the ring around its icon when Home says so.
+ */
+function Pill({
+  card,
+  lane,
+  dived,
+  ring,
+  onPick,
+}: {
+  card: Card;
+  lane: MyCategory | null;
+  dived: boolean;
+  ring: number | null;
+  onPick: (id: string) => void;
+}) {
+  const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
+  return (
+    <button
+      type="button"
+      data-pill={card.splash.id}
+      data-dived={dived ? '' : undefined}
+      data-ring={ring !== null ? '' : undefined}
+      onClick={() => onPick(card.splash.id)}
+      className={`flex w-full min-w-0 items-center gap-2.5 rounded-full py-1.5 pr-2 pl-1.5 text-left ${
+        dived ? 'bg-white/15 text-white' : 'text-ink bg-white'
+      }`}
+    >
+      <span className="relative flex shrink-0 items-center justify-center">
+        {ring !== null ? (
+          <span
+            key={ring}
+            aria-hidden
+            data-commit-ripple
+            className="pointer-events-none absolute inset-0 flex items-center justify-center text-white"
+          >
+            <span className="flex shrink-0">
+              <CommitRing size={RING_PX} contentSize={MARK_PX} gap={6} once />
+            </span>
+          </span>
+        ) : null}
+        <span
+          aria-hidden
+          className={`relative flex items-center justify-center rounded-full text-sm/none ${
+            dived ? 'bg-white/20' : 'bg-pool-100'
+          }`}
+          style={{ width: MARK_PX, height: MARK_PX }}
+        >
+          {lane?.icon ?? ''}
+        </span>
+      </span>
+      <span
+        className={`min-w-0 flex-1 truncate text-sm font-semibold ${
+          card.splash.title.trim() ? '' : 'opacity-50'
+        }`}
+      >
+        {title}
+      </span>
+      {lane ? <OutlineChip icon={lane.icon} name={lane.name} className="opacity-90" /> : null}
+    </button>
+  );
+}
+
+/** The element a post shows as on either view: its mark, or its pill. */
+function markSelector(id: string): string {
+  const escaped = CSS.escape(id);
+  return `[data-mark="${escaped}"], [data-pill="${escaped}"]`;
 }
 
 /** An element's position within the scroller's content. */

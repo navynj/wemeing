@@ -1,17 +1,11 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/',
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),
-}));
-vi.mock('@/features/sessions/actions', () => ({
-  titleMonth: () => Promise.resolve({ ok: true }),
-  createSession: () => Promise.resolve({ ok: true, session: {} }),
-  updateSession: () => Promise.resolve({ ok: true, session: {} }),
-  deleteSession: () => Promise.resolve({ ok: true }),
 }));
 const pins: [string, boolean][] = [];
 const deleted: string[] = [];
@@ -69,6 +63,8 @@ const TODAY = '2026-09-25';
 const scrolled: ScrollToOptions[] = [];
 beforeEach(() => {
   scrolled.length = 0;
+  window.localStorage.clear();
+  window.sessionStorage.clear();
   Element.prototype.scrollTo = function scrollTo(
     this: Element,
     options?: ScrollToOptions | number,
@@ -183,7 +179,16 @@ function Deleter({ id }: { id: string }) {
 }
 
 function cards(posts: SplashSummary[]): Card[] {
-  return posts.map((p) => placeCard(p, p.ghostTitle ?? '', TZ)).sort(byNewest);
+  return posts
+    .map((p) =>
+      placeCard(
+        p,
+        p.ghostTitle ?? '',
+        TZ,
+        p.blocks.map((_, i) => ({ id: `${p.id}-r${i}`, note: `${p.id} ${i}`, createdAt: '' })),
+      ),
+    )
+    .sort(byNewest);
 }
 
 function ground(
@@ -193,6 +198,7 @@ function ground(
   categories = LANES,
   month: string | null = null,
   board: 'stair' | 'flip' = 'stair',
+  topParam: string | null = null,
 ) {
   return render(
     <InputSheetProvider>
@@ -203,14 +209,11 @@ function ground(
         cards={cards(posts)}
         pinned={posts.filter((p) => p.pinnedAt)}
         categories={categories}
-        sessions={[]}
-        counts={{}}
-        customCounts={{}}
-        earliestYear={2026}
         today={TODAY}
         timeZone={TZ}
         initials="YL"
         scrollToMonth={month}
+        topParam={topParam}
         board={board}
       />
     </InputSheetProvider>,
@@ -371,21 +374,22 @@ describe('the lane grid', () => {
     );
   });
 
-  it('shares the width among seven lanes or fewer, and fixes the columns past that', () => {
-    const seven = Array.from({ length: 7 }, (_, i) => lane(`l${i}`, `Lane ${i}`, '🌊', i));
-    const { container: even } = ground([], null, null, seven);
+  it('shares the width among six lanes or fewer, and scrolls the columns from the seventh', () => {
+    const six = Array.from({ length: 6 }, (_, i) => lane(`l${i}`, `Lane ${i}`, '🌊', i));
+    const { container: even } = ground([], null, null, six);
     const grid = even.querySelector<HTMLElement>('[data-lane-grid]')!;
     expect(grid.getAttribute('data-columns')).toBe('even');
     expect(grid.querySelector<HTMLElement>('[data-grid]')!.style.gridTemplateColumns).toContain(
-      'repeat(7, minmax(0, 1fr))',
+      'repeat(6, minmax(0, 1fr))',
     );
     cleanup();
-    const eight = [...seven, lane('l7', 'Lane 7', '🌊', 7)];
-    const { container: fixed } = ground([], null, null, eight);
+    const seven = [...six, lane('l6', 'Lane 6', '🌊', 6)];
+    const { container: fixed } = ground([], null, null, seven);
     const wide = fixed.querySelector<HTMLElement>('[data-lane-grid]')!;
     expect(wide.getAttribute('data-columns')).toBe('fixed');
+    // Unmeasured in jsdom, a column falls back to its fixed width.
     expect(wide.querySelector<HTMLElement>('[data-grid]')!.style.gridTemplateColumns).toContain(
-      'repeat(8, 56px)',
+      'repeat(7, 56px)',
     );
     // The rail and the headers stay put: sticky inside the one scroller.
     expect(wide.querySelector('[data-day-row]')!.className).toContain('sticky left-0');
@@ -393,25 +397,32 @@ describe('the lane grid', () => {
     expect(wide.style.touchAction).toBe('pan-x pan-y');
   });
 
-  it('opens a lane\u2019s detail from its header: its titles as a list, newest first', () => {
-    const { container, getByLabelText, getByRole } = ground();
-    fireEvent.click(container.querySelector('[data-lane-header="c-food"]')!);
-    const sheet = getByRole('dialog', { name: 'Food' });
-    expect(sheet.textContent).toContain('2 posts');
-    const posts = [...sheet.querySelectorAll('[data-lane-post]')].map((p) => p.textContent);
-    expect(posts[0]).toContain('Toy Story 5');
-    expect(posts[0]).toContain('Sep 20');
-    expect(posts[1]).toContain('Beef Short Rib Soup');
-    expect(sheet.querySelector('[data-lane-post="late"]')!.getAttribute('href')).toBe(
-      '/splash/late?from=2026-09',
+  it('writes the short title under each mark, at six lanes and at eight', () => {
+    const five = [...LANES, lane('l3', 'Lane 3', '🌊', 3), lane('l4', 'Lane 4', '🌊', 4)];
+    const { container } = ground(POSTS, null, null, five);
+    const title = container.querySelector<HTMLElement>('[data-mark-title="late"]')!;
+    expect(title.textContent).toBe('Toy Story 5');
+    expect(title.className).toContain('text-[10px]');
+    expect(title.className).toContain('line-clamp-2');
+    cleanup();
+    const eight = [...five, ...[5, 6, 7].map((i) => lane(`l${i}`, `Lane ${i}`, '🌊', i))];
+    const { container: fixed } = ground(POSTS, null, null, eight);
+    expect(fixed.querySelector('[data-lane-grid]')!.getAttribute('data-columns')).toBe('fixed');
+    expect(fixed.querySelector('[data-mark-title="late"]')!.textContent).toBe('Toy Story 5');
+  });
+
+  it('links each lane header to its lane page', () => {
+    const { container } = ground();
+    expect(container.querySelector('[data-lane-header="c-food"]')!.getAttribute('href')).toBe(
+      '/lane/c-food',
     );
-    fireEvent.click(getByLabelText('Close'));
     expect(container.querySelector('[data-lane-detail]')).toBeNull();
   });
 
-  it('opens the lanes sheet from the = above the rail, and the new-lane sheet from the +', () => {
+  it('opens lane management from the header\u2019s lane glyph, and the new-lane sheet from the +', () => {
     const { container, getByLabelText, getByRole } = ground();
-    fireEvent.click(container.querySelector('[data-grid-header] [data-edit-lanes]')!);
+    expect(container.querySelector('[data-grid-header] [data-edit-lanes]')).toBeNull();
+    fireEvent.click(container.querySelector('[data-home-header] [data-manage-lanes]')!);
     expect(getByRole('dialog', { name: 'Edit lanes' })).toBeTruthy();
     fireEvent.click(getByLabelText('Close'));
     fireEvent.click(getByLabelText('New lane'));
@@ -460,7 +471,7 @@ describe('the diving board, a staircase', () => {
     expect(card.textContent).toContain('Toy Story 5');
     expect(card.textContent).toContain('YL');
     expect(card.querySelector('[data-card-link]')!.getAttribute('href')).toBe(
-      '/splash/late?from=2026-09',
+      `/splash/late?from=${encodeURIComponent('/?top=late')}`,
     );
     const behind = container.querySelector('[data-stack-card="mid"] [data-card-title]')!;
     expect(behind.className).not.toContain('text-3xl');
@@ -530,13 +541,13 @@ describe('the diving board, a staircase', () => {
   it('offers open, pin and delete from the top card\u2019s menu; pin shows on the bar at once', async () => {
     pins.length = 0;
     const { container, getByRole } = ground(POSTS.filter((p) => !p.pinnedAt));
-    expect(container.querySelector('[data-pinned-bar]')).toBeNull();
+    expect(container.querySelector('[data-pinned-cards]')).toBeNull();
     fireEvent.click(topCard(container).querySelector('[data-card-menu-button]')!);
     const menu = container.querySelector('[data-card-menu]')!;
     expect(menu.querySelector('a[href="/splash/late?from=2026-09"]')!.textContent).toBe('Open');
     fireEvent.click(getByRole('menuitem', { name: 'Pin' }));
     await waitFor(() =>
-      expect(container.querySelector('[data-pinned-chip="late"]')).not.toBeNull(),
+      expect(container.querySelector('[data-pinned-card="late"]')).not.toBeNull(),
     );
     await waitFor(() => expect(pins).toEqual([['late', true]]));
   });
@@ -556,11 +567,12 @@ describe('the diving board, a staircase', () => {
     await waitFor(() => expect(deleted).toEqual(['late']));
   });
 
-  it('opens the post sheet from the compose disc at the nav\u2019s right: white, a blue plus', () => {
+  it('opens the post sheet from the compose disc outside the stack: white, a blue plus; no nav', () => {
     const { container } = ground();
     expect(container.querySelector('[data-drop-bar]')).toBeNull();
+    expect(container.querySelector('[data-ground-nav]')).toBeNull();
     expect(container.querySelector('[data-stack] [data-compose]')).toBeNull();
-    const compose = container.querySelector('[data-ground-nav] [data-compose]')!;
+    const compose = container.querySelector('[data-board-column] [data-compose]')!;
     expect(compose.className).toContain('bg-white');
     expect(compose.className).toContain('text-main-900');
     expect(container.querySelector('[data-sheet-open]')).toBeNull();
@@ -735,7 +747,7 @@ describe('the post just dropped', () => {
     const { container } = ground(POSTS, null, 'aug');
     expect(markIds(container)).not.toContain('aug');
     expect(container.querySelector('[data-stack-card="aug"]')).toBeNull();
-    expect(container.querySelector('[data-pinned-bar]')).toBeNull();
+    expect(container.querySelector('[data-pinned-cards]')).toBeNull();
   });
 });
 
@@ -747,21 +759,175 @@ describe('?m= as a scroll target', () => {
   });
 });
 
-describe('the pinned bar (H21g)', () => {
-  it('sits in ink between the grid and the stack, a chip per pinned post', () => {
-    const { container } = ground();
-    const bar = container.querySelector('[data-pinned-bar]')!;
-    expect(bar.className).toContain('bg-ink');
-    const chip = bar.querySelector('[data-pinned-chip="aug"]')!;
-    expect(chip.textContent).toContain('Whistler');
+describe('pinned posts as cards (round 3)', () => {
+  const pinnedPosts = (): SplashSummary[] =>
+    POSTS.map((p) =>
+      ['aug', 'soup'].includes(p.id) ? { ...p, pinnedAt: '2026-09-01T00:00:00Z' } : p,
+    );
+
+  it('sits under the header and above the grid on a phone, a card per pinned post', () => {
+    const { container } = ground(pinnedPosts());
+    const strip = container.querySelector('[data-pinned-cards]')!;
+    const cardsIn = strip.querySelectorAll('[data-pinned-card]');
+    expect(cardsIn).toHaveLength(2);
+    const card = strip.querySelector<HTMLElement>('[data-pinned-card="aug"]')!;
+    expect(card.className).toContain('bg-white/15');
+    expect(card.className).toContain('rounded-[24px]');
+    expect(card.textContent).toContain('Whistler');
+    expect(card.textContent).toContain('Place');
+    expect(card.textContent).toContain('YL');
+    const header = container.querySelector('[data-home-header]')!;
     const grid = container.querySelector('[data-lane-grid]')!;
-    const board = container.querySelector('[data-diving-board]')!;
-    expect(grid.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(bar.compareDocumentPosition(board) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(header.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(strip.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Several: the next card peeks at the right edge.
+    expect(card.closest('li')!.className).toContain('w-[calc(100%-2.5rem)]');
   });
 
   it('is absent when nothing is pinned', () => {
     const { container } = ground(POSTS.filter((p) => !p.pinnedAt));
-    expect(container.querySelector('[data-pinned-bar]')).toBeNull();
+    expect(container.querySelector('[data-pinned-cards]')).toBeNull();
+  });
+
+  it('brings a tapped pinned card\u2019s post to the top, with the ring at its mark', async () => {
+    const { container } = ground(pinnedPosts());
+    await grown(container);
+    fireEvent.click(container.querySelector('[data-pinned-card="aug"]')!);
+    await settled(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('aug');
+    await ringed(container, 'aug');
+  });
+
+  it('sits above the stack on the right on a wide screen, not above the grid', () => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      configurable: true,
+      value: (query: string) => ({
+        matches: query.includes('min-width'),
+        media: query,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        onchange: null,
+        dispatchEvent: () => false,
+      }),
+    });
+    const { container } = ground(pinnedPosts());
+    const strip = container.querySelector('[data-pinned-cards]')!;
+    expect(strip.closest('[data-board-column]')).not.toBeNull();
+    const board = container.querySelector('[data-diving-board]')!;
+    expect(strip.compareDocumentPosition(board) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
+describe('the header and the Date view (round 3)', () => {
+  it('has the lane glyph and the Lane | Date toggle, no Home title and no =', () => {
+    const { container, queryByText } = ground();
+    const header = container.querySelector('[data-home-header]')!;
+    expect(header.querySelector('[data-manage-lanes] [data-lane-icon]')).not.toBeNull();
+    expect(queryByText('Home')).toBeNull();
+    const lanes = header.querySelector('[data-view-option="lane"]')!;
+    expect(lanes.getAttribute('aria-selected')).toBe('true');
+    expect(lanes.className).toContain('bg-white');
+    expect(lanes.className).toContain('text-main-900');
+  });
+
+  it('switches to the Date view and remembers it on this device', () => {
+    const { container } = ground();
+    fireEvent.click(container.querySelector('[data-view-option="date"]')!);
+    expect(window.localStorage.getItem('weming.home-view')).toBe('date');
+    expect(container.querySelector('[data-pill]')).not.toBeNull();
+    expect(container.querySelector('[data-lane-header]')).toBeNull();
+    cleanup();
+    const { container: again } = ground();
+    expect(again.querySelector('[data-view-option="date"]')!.getAttribute('aria-selected')).toBe(
+      'true',
+    );
+    expect(again.querySelector('[data-mark]')).toBeNull();
+  });
+
+  it('lists every post exactly once under its day, newest first, a pill per line', async () => {
+    window.localStorage.setItem('weming.home-view', 'date');
+    const { container } = ground();
+    await grown(container);
+    const pills = [...container.querySelectorAll('[data-pill]')].map((p) =>
+      p.getAttribute('data-pill'),
+    );
+    expect([...pills].sort()).toEqual(['aug', 'early', 'late', 'mid', 'soup']);
+    expect(pills).toEqual(['late', 'mid', 'soup', 'early', 'aug']);
+    const late = container.querySelector('[data-pill="late"]')!;
+    expect(late.textContent).toContain('Toy Story 5');
+    expect(late.textContent).toContain('Food');
+    let row: Element | null = late.closest('[data-cell]');
+    while (row && !row.hasAttribute('data-day-row')) row = row.previousElementSibling;
+    expect(row!.getAttribute('data-day-row')).toBe('2026-09-20');
+  });
+
+  it('rings the top card\u2019s pill, and a tapped pill comes to the top', async () => {
+    window.localStorage.setItem('weming.home-view', 'date');
+    const { container } = ground();
+    await waitFor(() =>
+      expect(container.querySelector('[data-pill="late"][data-ring]')).not.toBeNull(),
+    );
+    fireEvent.click(container.querySelector('[data-pill="soup"]')!);
+    await settled(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('soup');
+    await waitFor(() =>
+      expect(container.querySelector('[data-pill="soup"][data-ring]')).not.toBeNull(),
+    );
+  });
+
+  it('puts a dropped post\u2019s pill under today with the ring', async () => {
+    window.localStorage.setItem('weming.home-view', 'date');
+    const fresh = post('fresh', 'Just dropped', [block('f', '2026-09-25', 'c-place')]);
+    const { container } = ground(POSTS, fresh);
+    await waitFor(() =>
+      expect(container.querySelector('[data-pill="fresh"][data-ring]')).not.toBeNull(),
+    );
+    let row: Element | null = container
+      .querySelector('[data-pill="fresh"]')!
+      .closest('[data-cell]');
+    while (row && !row.hasAttribute('data-day-row')) row = row.previousElementSibling;
+    expect(row!.getAttribute('data-day-row')).toBe(TODAY);
+  });
+});
+
+describe('coming back from a post\u2019s page', () => {
+  it('opens with the post the page sent it back to on top', () => {
+    const { container } = ground(POSTS, null, null, LANES, null, 'stair', 'soup');
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('soup');
+  });
+
+  it('links the top card to its page with the way back to it', () => {
+    const { container } = ground();
+    expect(topCard(container).querySelector('[data-card-link]')!.getAttribute('href')).toBe(
+      `/splash/late?from=${encodeURIComponent('/?top=late')}`,
+    );
+  });
+
+  it('finds the card that was on top in this tab when opened bare', async () => {
+    window.sessionStorage.setItem('weming.home-top', 'early');
+    const { container } = ground();
+    await waitFor(() => expect(topCard(container).getAttribute('data-stack-card')).toBe('early'));
+  });
+});
+
+describe('the top card\u2019s ripples as a thread (round 3)', () => {
+  it('gives each ripple its own avatar and draws one line fewer than ripples', () => {
+    const { container } = ground();
+    fireEvent.click(container.querySelector('[data-mark="early"]')!);
+    return settled(container).then(() => {
+      const thread = topCard(container).querySelector('[data-ripple-thread]')!;
+      expect(thread.querySelectorAll('[data-thread-avatar]')).toHaveLength(3);
+      expect(thread.querySelectorAll('[data-thread-line]')).toHaveLength(2);
+    });
+  });
+
+  it('draws an avatar and no line for a single ripple', () => {
+    const { container } = ground();
+    const thread = topCard(container).querySelector('[data-ripple-thread]')!;
+    expect(thread.querySelectorAll('[data-thread-avatar]')).toHaveLength(1);
+    expect(thread.querySelectorAll('[data-thread-line]')).toHaveLength(0);
   });
 });

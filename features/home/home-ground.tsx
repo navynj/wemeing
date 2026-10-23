@@ -1,29 +1,28 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CalendarDays, ChevronDown, Home, Plus, ShelvingUnit } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
+import { useWide } from '@/components/ui/use-wide';
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
+import { CategorySheet } from '@/features/lanes/category-sheet';
+import { LanesSheet } from '@/features/lanes/lanes-sheet';
 import { deleteRipple } from '@/features/ripple-sheet/actions';
 import { deleteSplash, setSplashPinned } from '@/features/splash/actions';
-import { CategorySheet } from '@/features/lanes/category-sheet';
-import { LaneDetailSheet } from '@/features/lanes/lane-detail-sheet';
-import { LanesSheet } from '@/features/lanes/lanes-sheet';
-import { SessionsSheet } from '@/features/sessions/sessions-sheet';
-import type { Session } from '@/features/sessions/shelves';
 import type { SplashSummary } from '@/features/splash/summary';
 import type { MyCategory } from '@/lib/queries/profile';
 import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
 
 import { FlipBoard } from './diving-board-flip';
-import { byNewest, cardLane, newestIn, placeCard, type Card } from './grid';
+import { byNewest, newestIn, placeCard, type Card } from './grid';
 import { LaneGrid, type GridHandle, type Ring } from './lane-grid';
-import { PinnedBar } from './pinned-bar';
+import { LaneIcon } from './lane-icon';
+import { PinnedCards } from './pinned-cards';
 import { StairBoard } from './stair-board';
 import { useFlip } from './use-flip';
+import { useHomeView, ViewToggle } from './view-toggle';
 
 /**
  * Which board Home shows (review, 2026-10-22): the **stair** — read cards
@@ -36,66 +35,64 @@ export const BOARD: Board = 'stair';
 
 /** How long the commit ripple is given at a new post's mark once the real one has landed. */
 const RING_MS = 1800;
+/** The post on top, remembered for this tab, so coming back finds it again (round 3). */
+const TOP_KEY = 'weming.home-top';
 
 /**
- * Home, the water ground (SPEC 5, H22; `_docs/mockups/home-grid-stack.png`):
- * one solid #0507C9 surface in two linked halves. Above, the lane grid — a
- * map of recent records, lanes across and days down. Below, the diving
- * board — the posts as a staircase around the top card, read cards above
- * and unread below (or, on the page-turn board, a pile beneath). The ring
- * plays at the mark of whichever card comes to the top; tapping a mark
- * brings its card there. Between them the pinned bar, when anything is
- * pinned; beneath, the ground's nav — Home, Locker, Sessions — with the
- * compose disc at its right.
+ * Home, the water ground (SPEC 5, H22; round 3): one solid #0507C9 surface
+ * in two linked halves. Above, the **Lane view** — the grid, lanes across
+ * and days down — or the **Date view** — the days as a list, each day's
+ * posts as pills — chosen by the header's toggle and remembered per device.
+ * Below, the diving board — the posts as a staircase around the top card.
+ * The ring plays at the mark or pill of whichever card the stack is
+ * heading to; tapping a mark, a pill or a pinned card brings its card up.
  *
- * The title opens the ground's menu: the Locker, the sessions sheet and the
- * lanes sheet. The Home dropdown's pool switching is P3's; nothing here
- * anticipates it.
+ * The header: the lane glyph at the left opens lane management; the
+ * toggle at the centre. Pinned posts are cards under the header on a
+ * phone, above the stack on a wide screen. Compose is the white disc at
+ * the bottom right. Coming back from a post's page finds the same card on
+ * top.
  *
  * A post just dropped is on the grid and on top of the stack before the
- * server has it (CLAUDE.md, the principle); lanes edited in the lanes sheet
- * read edited at once; a post deleted a moment ago is gone.
+ * server has it (CLAUDE.md, the principle); lanes edited read edited at
+ * once; a post deleted a moment ago is gone.
  */
 export function HomeGround({
   cards,
   pinned,
   categories,
-  sessions,
-  counts,
-  customCounts,
-  earliestYear,
   today,
   timeZone,
   initials,
   scrollToMonth,
+  topParam = null,
+  manageLanes = false,
   board = BOARD,
 }: {
   /** Newest first. */
   cards: Card[];
   pinned: SplashSummary[];
   categories: MyCategory[];
-  sessions: Session[];
-  /** Posts per month, for the sessions sheet. */
-  counts: Record<string, number>;
-  customCounts: Record<string, number>;
-  earliestYear: number;
   today: IsoDate;
   timeZone: string;
   initials: string;
   /** `?m=`: the month the ground opens on, its newest post on top. */
   scrollToMonth: string | null;
+  /** `?top=`: the post to open with on top, where a post's page sends Home back to. */
+  topParam?: string | null;
+  /** `?manage=lanes`: open with lane management up, from a lane page. */
+  manageLanes?: boolean;
   board?: Board;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [sessionsOpen, setSessionsOpen] = useState(false);
   const [newLane, setNewLane] = useState(false);
-  const [editingLanes, setEditingLanes] = useState(false);
-  const [laneDetail, setLaneDetail] = useState<string | null>(null);
+  const [editingLanes, setEditingLanes] = useState(manageLanes);
+  const [view, setView] = useHomeView();
+  const wide = useWide();
   const { openSheet, pendingDrop, clearDropped, dropMessage, pendingDeletes, markDeleted } =
     useInputSheet();
   const router = useRouter();
   const lanes = useOptimisticAction(categories);
-  // Pinned from the card's menu shows on the bar at once (CLAUDE.md, the principle).
+  // Pinned from the card's menu shows at once (CLAUDE.md, the principle).
   const pins = useOptimisticAction(pinned);
   const pinnedIds = useMemo(() => new Set(pins.value.map((p) => p.id)), [pins.value]);
   const pin = (card: Card, on: boolean): void =>
@@ -137,17 +134,46 @@ export function HomeGround({
   }, [landed, clearDropped]);
 
   const ids = useMemo(() => shown.map((card) => card.splash.id), [shown]);
-  // What opens on top: the month's newest post under `?m=`, else the newest.
+  // What opens on top: the post a page sent Home back to, else the month's
+  // newest under `?m=`, else the newest.
   const [initialTop] = useState(
-    () => (scrollToMonth ? newestIn(shown, scrollToMonth)?.splash.id : null) ?? ids[0] ?? null,
+    () =>
+      (topParam && ids.includes(topParam) ? topParam : null) ??
+      (scrollToMonth ? newestIn(shown, scrollToMonth)?.splash.id : null) ??
+      ids[0] ??
+      null,
   );
   const flip = useFlip(ids, initialTop, board === 'stair' ? -1 : 1);
-  const { topId, bringForward } = flip;
+  const { heading, bringForward, jumpTo } = flip;
   const goTo = bringForward;
 
-  // The ring: at the mark of whichever card comes to the top, at a drop,
-  // and on open at the post on top — which is also what scrolls the grid
-  // to it (review: under `?m=` that is the month's post, not the newest).
+  // A bare `/` reached by the browser's back button finds the card that was
+  // on top in this tab, put back at once rather than flipped to (review).
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    if (topParam || scrollToMonth) return;
+    let remembered: string | null = null;
+    try {
+      remembered = window.sessionStorage.getItem(TOP_KEY);
+    } catch {
+      remembered = null;
+    }
+    if (remembered && remembered !== initialTop && ids.includes(remembered)) jumpTo(remembered);
+  }, [topParam, scrollToMonth, initialTop, ids, jumpTo]);
+  useEffect(() => {
+    if (!heading) return;
+    try {
+      window.sessionStorage.setItem(TOP_KEY, heading);
+    } catch {
+      // Not remembered, then.
+    }
+  }, [heading]);
+
+  // The ring: at the mark of whichever card the stack is heading to — from
+  // the moment a flip is committed to, not once it lands (review) — at a
+  // drop, and on open at the post on top, which also scrolls to it.
   const [ring, setRing] = useState<Ring | null>(() =>
     initialTop ? { id: initialTop, seq: 0 } : null,
   );
@@ -156,12 +182,12 @@ export function HomeGround({
     seq.current += 1;
     setRing({ id, seq: seq.current });
   };
-  const previousTop = useRef(topId);
+  const previousHeading = useRef(heading);
   useEffect(() => {
-    if (topId && topId !== previousTop.current) ringAt(topId);
-    previousTop.current = topId;
-    // The top changing is the event; the rest is read when it fires.
-  }, [topId]);
+    if (heading && heading !== previousHeading.current) ringAt(heading);
+    previousHeading.current = heading;
+    // The heading changing is the event; the rest is read when it fires.
+  }, [heading]);
 
   // A post just dropped lands on top of the stack, on the spring, ringed.
   const droppedId = pendingDrop?.splash.id ?? null;
@@ -180,9 +206,19 @@ export function HomeGround({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollToMonth]);
 
-  // Every mark but the top card's reads translucent (review): the one solid
-  // mark is the post being read.
-  const waterIds = useMemo(() => new Set(ids.filter((id) => id !== topId)), [ids, topId]);
+  // Every mark but the one the stack is heading to reads translucent: the
+  // one solid mark is the post being read.
+  const waterIds = useMemo(() => new Set(ids.filter((id) => id !== heading)), [ids, heading]);
+
+  const pinnedCards = useMemo(() => {
+    const byId = new Map(shown.map((card) => [card.splash.id, card]));
+    return pins.value
+      .filter((p) => !pendingDeletes.includes(p.id))
+      .map((p) => byId.get(p.id) ?? placeCard(p, '', timeZone));
+  }, [pins.value, pendingDeletes, shown, timeZone]);
+  const pinnedStrip = (
+    <PinnedCards cards={pinnedCards} categories={lanes.value} initials={initials} onPick={goTo} />
+  );
 
   return (
     <div data-home-ground className="water-ground flex min-h-0 flex-1 flex-col">
@@ -194,8 +230,22 @@ export function HomeGround({
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
         <div className="flex min-h-0 flex-1 flex-col lg:min-w-0 lg:flex-1">
-          <header className="relative flex shrink-0 items-center px-6 pt-4 pb-1">
-              Home
+          {/* The header (round 3): lane management at the left, the view
+              toggle at the centre. No settings page exists, so no gear. */}
+          <header data-home-header className="flex shrink-0 items-center gap-3 px-4 pt-3 pb-3">
+            <button
+              type="button"
+              aria-label="Lanes"
+              data-manage-lanes
+              onClick={() => setEditingLanes(true)}
+              className="flex h-9 w-9 shrink-0 items-center justify-center text-white"
+            >
+              <LaneIcon size={20} />
+            </button>
+            {/* The toggle fills the header's width beside the glyph (review). */}
+            <div className="min-w-0 flex-1">
+              <ViewToggle view={view} onChange={setView} />
+            </div>
           </header>
 
           {dropMessage || lanes.message ? (
@@ -204,8 +254,11 @@ export function HomeGround({
             </p>
           ) : null}
 
+          {wide ? null : pinnedStrip}
+
           <LaneGrid
             ref={grid}
+            view={view}
             cards={shown}
             categories={lanes.value}
             today={today}
@@ -214,21 +267,15 @@ export function HomeGround({
             initials={initials}
             scrollToMonth={scrollToMonth}
             onPick={goTo}
-            onLaneTap={setLaneDetail}
-            onEditLanes={() => setEditingLanes(true)}
             onCreateLane={() => setNewLane(true)}
           />
-
-          <div className="shrink-0 px-6">
-            <PinnedBar
-              pinned={pins.value.filter((p) => !pendingDeletes.includes(p.id))}
-              categories={lanes.value}
-              month={today.slice(0, 7)}
-            />
-          </div>
         </div>
 
-        <div className="flex shrink-0 flex-col lg:min-h-0 lg:min-w-0 lg:flex-1 lg:py-10">
+        <div
+          data-board-column
+          className="flex shrink-0 flex-col lg:min-h-0 lg:min-w-0 lg:flex-1 lg:py-10"
+        >
+          {wide ? pinnedStrip : null}
           {board === 'stair' ? (
             <StairBoard
               cards={shown}
@@ -242,79 +289,26 @@ export function HomeGround({
           ) : (
             <FlipBoard cards={shown} flip={flip} categories={lanes.value} initials={initials} />
           )}
-        </div>
 
-        {/* The bottom nav on the ground (review): Home, Locker and Sessions
-          as tabs at the left — white, the active one full and the others
-          faded as one item (SPEC 7, chrome) — and compose at the right, a
-          white disc with the blue plus: on the water, white carries the
-          action (H21c). A tab appears only when its screen ships. */}
-        <nav
-          data-ground-nav
-          aria-label="Home"
-          className="flex shrink-0 items-center justify-between px-6 pt-2 lg:w-20 lg:flex-col lg:px-0 lg:py-10"
-          style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }}
-        >
-          <div className="flex items-center gap-7 text-white lg:flex-col lg:gap-8">
-            <Link
-              href="/"
-              aria-current="page"
-              data-ground-tab="home"
-              className="flex flex-col items-center gap-1 font-semibold"
-            >
-              <Home aria-hidden size={20} strokeWidth={2.25} />
-              <span className="text-xs/none">Home</span>
-            </Link>
-            {/* <Link
-              href="/locker"
-              data-ground-tab="locker"
-              className="flex flex-col items-center gap-1 font-medium opacity-50"
-            >
-              <ShelvingUnit aria-hidden size={20} />
-              <span className="text-xs/none">Locker</span>
-            </Link>
+          {/* Compose: a white disc with the blue plus, at the bottom right
+              outside the stack — on the water, white carries the action. */}
+          <div
+            className="flex shrink-0 justify-end px-6 pt-2 lg:px-0"
+            style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }}
+          >
             <button
               type="button"
-              data-ground-tab="sessions"
-              aria-haspopup="dialog"
-              onClick={() => setSessionsOpen(true)}
-              className="flex flex-col items-center gap-1 font-medium opacity-50"
+              aria-label="Drop a splash"
+              data-compose
+              onClick={openSheet}
+              className="text-main-900 flex h-12 w-12 items-center justify-center rounded-full bg-white"
             >
-              <CalendarDays aria-hidden size={20} />
-              <span className="text-xs/none">Sessions</span>
-            </button> */}
+              <Plus aria-hidden size={24} />
+            </button>
           </div>
-          <button
-            type="button"
-            aria-label="Drop a splash"
-            data-compose
-            onClick={openSheet}
-            className="text-main-900 flex h-12 w-12 items-center justify-center rounded-full bg-white"
-          >
-            <Plus aria-hidden size={24} />
-          </button>
-        </nav>
+        </div>
       </div>
 
-      {sessionsOpen ? (
-        <SessionsSheet
-          sessions={sessions}
-          counts={counts}
-          customCounts={customCounts}
-          categories={lanes.value}
-          earliestYear={earliestYear}
-          today={today}
-          onClose={() => setSessionsOpen(false)}
-        />
-      ) : null}
-
-      {laneDetail ? (
-        <LaneDetailSheet
-          lane={lanes.value.find((lane) => lane.id === laneDetail) ?? lanes.value[0]}
-          cards={shown.filter((card) => cardLane(card.splash) === laneDetail)}
-          onClose={() => setLaneDetail(null)}
-        />
-      ) : null}
       {newLane ? (
         <CategorySheet category={null} apply={lanes.run} onClose={() => setNewLane(false)} />
       ) : null}
@@ -323,7 +317,10 @@ export function HomeGround({
           categories={lanes.value}
           apply={lanes.run}
           message={lanes.message}
-          onClose={() => setEditingLanes(false)}
+          onClose={() => {
+            setEditingLanes(false);
+            if (manageLanes) router.replace('/');
+          }}
         />
       ) : null}
     </div>

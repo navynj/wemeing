@@ -17,7 +17,6 @@ const CLOCK = /^\d{2}:\d{2}$/;
 /** Every path a post touches. The post pages and the ground re-read. */
 function revalidateSplash(id: string | null = null): void {
   revalidatePath('/');
-  revalidatePath('/sessions');
   revalidatePath('/locker');
   revalidatePath('/lanes');
   if (id) revalidatePath(`/splash/${id}`);
@@ -217,19 +216,6 @@ export async function setSplashPinned(id: string, pinned: boolean): Promise<Done
     .eq('id', id);
   if (error) return { ok: false, message: error.message };
   revalidateSplash(id);
-  return { ok: true };
-}
-
-/**
- * Shelves a post on a custom session, or takes it off one (H21e). At most
- * one: this replaces whatever shelf it was on, and the copy says so.
- */
-export async function setSplashSession(id: string, sessionId: string | null): Promise<Done> {
-  const supabase = await createClient();
-  const { error } = await supabase.from('splashes').update({ session_id: sessionId }).eq('id', id);
-  if (error) return { ok: false, message: error.message };
-  revalidateSplash(id);
-  if (sessionId) revalidatePath(`/sessions/${sessionId}`);
   return { ok: true };
 }
 

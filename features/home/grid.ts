@@ -3,11 +3,12 @@ import type { MyCategory } from '@/lib/queries/profile';
 import { todayIn, type IsoDate } from '@/lib/time';
 
 /**
- * With this many lanes or fewer, the columns share the width evenly and the
- * group is centred; with more, each column is `FIXED_COLUMN_PX` wide and the
- * columns scroll sideways under the fixed date rail (H22).
+ * At most this many lanes show at once (round 3): with this many or fewer
+ * the columns share the width evenly; with more, each column keeps this
+ * share of the width and the columns scroll sideways under the fixed date
+ * rail. Every mark carries its short title beneath it either way.
  */
-export const EVEN_COLUMNS_MAX = 7;
+export const EVEN_COLUMNS_MAX = 6;
 export const FIXED_COLUMN_PX = 56;
 
 /** The grid's one unit: a post as a card on the diving board and a mark on the grid. */
@@ -17,9 +18,14 @@ export type Card = {
   day: IsoDate;
   /** Order within the day: its latest block that day, else the day's end. */
   instant: number;
-  /** Every block's words, oldest first, as the card reads them. */
+  /** Every block's words, oldest first, as one text: the pinned card's excerpt. */
   body: string;
+  /** Every block with words, oldest first: the card's thread, one entry per ripple. */
+  ripples: CardRipple[];
 };
+
+/** A ripple as a card reads it: its words, and when it was written. */
+export type CardRipple = { id: string; note: string; createdAt: string };
 
 /**
  * Where a post sits (H22): on the last day of its display range, else the
@@ -29,12 +35,19 @@ export type Card = {
  * a declared-date post above everything written after it), so the grid and
  * the stack read the same key.
  */
-export function placeCard(splash: SplashSummary, body: string, timeZone: string): Card {
+export function placeCard(
+  splash: SplashSummary,
+  body: string,
+  timeZone: string,
+  ripples: CardRipple[] = body
+    ? [{ id: splash.id, note: body, createdAt: splash.latestCreatedAt }]
+    : [],
+): Card {
   const day = splash.range?.end ?? todayIn(timeZone, new Date(splash.createdAt));
   const onDay = splash.blocks.filter((block) => block.day === day);
   const instant =
     onDay.length > 0 ? onDay[onDay.length - 1].instant : Date.parse(splash.latestCreatedAt);
-  return { splash, day, instant, body };
+  return { splash, day, instant, body, ripples };
 }
 
 /** Newest first: the later day, then the later moment, then the later-made post. */

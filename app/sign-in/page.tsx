@@ -17,7 +17,7 @@ export default async function SignInPage({ searchParams }: PageProps<'/sign-in'>
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-8 px-6 text-center">
       <div className="space-y-3">
-        <h1 className="text-main-900 text-3xl font-semibold">During</h1>
+        <h1 className="text-main-900 text-3xl font-semibold">WeMeing</h1>
         <p className="text-pool-500 max-w-xs">
           A one-line diary that assembles itself, for a few close friends.
         </p>

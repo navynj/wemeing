@@ -102,16 +102,12 @@ describe('Lanes after the exclusion constraint (H20c)', () => {
   });
 });
 
-describe('the six-lane preset (H20i)', () => {
-  it('is Place / Mood / Music / Media / Food / Day, with Day as the residual', () => {
-    expect(PRESET_CATEGORIES.map((c) => c.name)).toEqual([
-      'Place',
-      'Mood',
-      'Music',
-      'Media',
-      'Food',
-      'Day',
-    ]);
+describe('the five-lane preset (H20i, review)', () => {
+  it('is Place / Mood / Media / Food / Day, with Day as the residual', () => {
+    expect(PRESET_CATEGORIES.map((c) => c.name)).toEqual(['Place', 'Mood', 'Media', 'Food', 'Day']);
+    // Music folded into Media; Food is a plate, not ramen.
+    expect(PRESET_CATEGORIES.some((c) => c.name === 'Music')).toBe(false);
+    expect(PRESET_CATEGORIES.find((c) => c.name === 'Food')!.icon).toBe('🍽️');
     expect(RESIDUAL_CATEGORY).toBe('Day');
     expect(PRESET_CATEGORIES.some((c) => c.name === 'Focus')).toBe(false);
     expect(PRESET_CATEGORIES.some((c) => c.name === 'Listening')).toBe(false);

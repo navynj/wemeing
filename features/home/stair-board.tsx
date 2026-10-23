@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useRef } from 'react';
+import { useRef } from 'react';
 import { motion, useTransform, type PanInfo } from 'motion/react';
 
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
@@ -330,58 +330,6 @@ function Step({
           </motion.div>
         ) : null}
       </motion.div>
-      {/* The ladder glyph hung over the read card's edge: a hint, not a control
-          (review), fading in with the edge it hangs on. */}
-      {edgeSide === 'up' && (stair === 'up' || moving) ? (
-        <motion.div style={{ opacity: touchesTop ? edgeOpacity : 1 }}>
-          <LadderGlyph />
-        </motion.div>
-      ) : null}
     </motion.div>
-  );
-}
-
-/**
- * A small pool ladder hooked over the upper stair card's top edge near its
- * right end (review, to the reference): both rails bend the same way at
- * the bottom, over the card's edge, as a ladder hangs over a pool wall — each
- * curling a little past a quarter turn — and climb from there up into the water in perspective, drawing together as they go, three rungs between them,
- * white where they grip the card, turning the water's blue and then
- * to nothing as they rise — a ladder going under. Outlined, round caps, the same size
- * at every width, undoing the card's own scale; the card beneath is the tap.
- */
-function LadderGlyph() {
-  const fade = useId();
-  return (
-    <svg
-      aria-hidden
-      data-ladder-glyph
-      width={28}
-      height={26}
-      viewBox="0 0 28 26"
-      fill="none"
-      stroke={`url(#${fade})`}
-      strokeWidth={2.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="pointer-events-none absolute right-7 origin-bottom-right"
-      style={{ top: -20, transform: `scale(${1 / STEP_SCALE})` }}
-    >
-      <defs>
-        <linearGradient id={fade} x1="0" y1="1" x2="0" y2="0">
-          {/* White at the hooks, turning the water's blue as it rises — the
-              blue kept light enough to read on the water, so the three rungs
-              all show — and gone at the top. */}
-          <stop offset="0" stopColor="#ffffff" stopOpacity="1" />
-          <stop offset="0.4" stopColor="#ffffff" stopOpacity="0.9" />
-          <stop offset="0.8" stopColor="#6b6ddc" stopOpacity="0.9" />
-          <stop offset="1" stopColor="#0507c9" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      {/* Both rails bend the same way at the bottom, over the card's edge,
-          as a ladder hangs over a pool wall; above it they climb toward the
-          water in perspective, drawing together as they go. */}
-      <path d="M9.5 2L8 20a4 4 0 0 0 6.8 2.8M15.5 2L19 20a4 4 0 0 0 6.8 2.8M9.1 9h6.8M8.7 14.5h7.9M8.2 20h9.6" />
-    </svg>
   );
 }

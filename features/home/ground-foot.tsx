@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Home, Plus, Users } from 'lucide-react';
+import { Home, Plus, WavesLadder } from 'lucide-react';
 
 /**
  * The ground's foot (H23): Home and Pool at the left, compose at the right
@@ -34,7 +34,8 @@ export function GroundFoot({
   );
   const pool = (
     <>
-      <Users aria-hidden size={22} strokeWidth={2.25} />
+      {/* The pool's own glyph: a ladder into the water. */}
+      <WavesLadder aria-hidden size={22} strokeWidth={2.25} />
       <span className="text-xs/none">Pool</span>
     </>
   );

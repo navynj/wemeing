@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useId, useRef } from 'react';
 import { motion, useTransform, type PanInfo } from 'motion/react';
 
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
@@ -253,9 +253,10 @@ function Step({
 
   const onTop = to === 0;
   const stair = to === 0 ? 'top' : to < 0 ? 'up' : 'down';
-  // A moving card keeps the face it had until it lands: a card sliding up
-  // out of the top keeps its words, rather than going blank in flight.
-  const shown = moving ? (from === 0 ? 'top' : from < 0 ? 'up' : 'down') : stair;
+  // In flight, the card leaving the top keeps its full face and the card
+  // arriving there has it from the first frame (review: a title that
+  // arrives late reads as a bug); every other card keeps the face it had.
+  const shown = moving ? (from === 0 || to === 0 ? 'top' : from < 0 ? 'up' : 'down') : stair;
   const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
 
   return (
@@ -321,13 +322,16 @@ function Step({
 }
 
 /**
- * A small pool ladder standing on the upper stair card's top edge near its
- * right end (review, to the reference): two rails leaning in toward the
- * top and hooking outward there like handrails, three rungs between them
- * shortening with the rails, outlined, white, round caps. The same size at every width, undoing the card's own scale; the
- * card beneath is the tap.
+ * A small pool ladder hooked over the upper stair card's top edge near its
+ * right end (review, to the reference): both rails bend the same way at
+ * the bottom, over the card's edge, as a ladder hangs over a pool wall, and
+ * climb straight from there up into the water, three rungs between them,
+ * white where they grip the card and fading to nothing as they rise — a
+ * ladder going under. Outlined, round caps, the same size
+ * at every width, undoing the card's own scale; the card beneath is the tap.
  */
 function LadderGlyph() {
+  const fade = useId();
   return (
     <svg
       aria-hidden
@@ -336,16 +340,23 @@ function LadderGlyph() {
       height={44}
       viewBox="0 0 24 44"
       fill="none"
-      stroke="currentColor"
+      stroke={`url(#${fade})`}
       strokeWidth={2.5}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="pointer-events-none absolute right-7 origin-bottom-right text-white"
-      style={{ top: -44, transform: `scale(${1 / STEP_SCALE})` }}
+      className="pointer-events-none absolute right-7 origin-bottom-right"
+      style={{ top: -30, transform: `scale(${1 / STEP_SCALE})` }}
     >
-      {/* In slight perspective, as the reference draws it: the rails lean in
-          toward the top and the rungs shorten with them. */}
-      <path d="M3 43L7 13a5 5 0 0 0-5-6M21 43l-4-30a5 5 0 0 1 5-6M4 36h16M5 28h14M6 20h12" />
+      <defs>
+        <linearGradient id={fade} x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stopColor="#ffffff" stopOpacity="1" />
+          <stop offset="0.55" stopColor="#ffffff" stopOpacity="0.8" />
+          <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {/* Both rails bend the same way at the bottom, over the card's edge,
+          as a ladder hangs over a pool wall; above it they climb straight. */}
+      <path d="M8 2v28a6 6 0 0 1-6 6M19 2v28a6 6 0 0 1-6 6M8 9h11M8 17h11M8 25h11" />
     </svg>
   );
 }

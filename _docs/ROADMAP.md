@@ -36,6 +36,8 @@ Daily personal use, small fixes, no new surfaces unless use demands them.
 
 ## P2: Link world
 
+**Blocker before P2 ships: scope the Link read path.** Today a linked friend can read every unlocked ripple of mine (0001's "ripples are readable by author, and by links unless locked"), which was never intended. Production had no links when this was found (2026-10-23, H23), so nothing has leaked. `tests/rls.test.ts` holds the intended rule as an expected failure — a linked friend reads no ripple outside a shared pool — and it fails the day the path is scoped, which is the signal to drop `.fails` and retire the tests that assert the old behaviour.
+
 - Link + invite link (mutual), friends strip with live ring + elapsed
 - The audience chip returns to the ripple sheet; Splash shared by two (H20d, H20g)
 - Friend rail on the far right, sharing the time axis; Realtime updates when a friend drops

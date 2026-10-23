@@ -25,6 +25,9 @@ const BEN_OLD_POST = '0e100000-0000-0000-0000-0000000000b1';
 let ana: string;
 let ben: string;
 let cal: string;
+let dee: string | undefined;
+let anaLoneBlock: string;
+let anaPostsBefore: number;
 let pool: string;
 let token: string;
 let tripsLane: string;
@@ -65,6 +68,18 @@ beforeAll(async () => {
   await post(ana, ANA_OLD_POST, ANA_TRIPS, 'Whistler');
   await post(ana, ANA_DAY_POST, ANA_DAY, 'a quiet day');
   await post(ben, BEN_OLD_POST, BEN_TRIPS, 'Squamish');
+  // A lone block in a linked lane: a post of one on Home, but no post row.
+  const lone = await asUser(ana)
+    .from('ripples')
+    .insert({ author_id: ana, category_id: ANA_TRIPS, note: 'a lone line' })
+    .select('id')
+    .single();
+  anaLoneBlock = lone.data!.id;
+  const before = await asAdmin()
+    .from('splashes')
+    .select('id', { count: 'exact', head: true })
+    .eq('owner_id', ana);
+  anaPostsBefore = before.count!;
 
   const { data, error } = await asUser(ana).rpc('create_pool', {
     p_name: 'Weekend crew',
@@ -99,7 +114,7 @@ afterAll(async () => {
   // The pool first: it takes its lanes, members, links, placements and joint
   // splashes (with their ripples) with it.
   for (const id of pools) await admin.from('pools').delete().eq('id', id);
-  for (const id of [ana, ben, cal].filter(Boolean)) {
+  for (const id of [ana, ben, cal, dee].filter((x): x is string => Boolean(x))) {
     await admin.from('ripples').delete().eq('author_id', id);
     await admin.from('splashes').delete().eq('owner_id', id);
     await admin.auth.admin.deleteUser(id);
@@ -133,6 +148,23 @@ describe('outside the pool', () => {
 });
 
 describe('placement', () => {
+  it('never creates or modifies a record of mine when history is on', async () => {
+    // 0012: joining places existing posts only. The lone block stays lone.
+    const posts = await asAdmin()
+      .from('splashes')
+      .select('id', { count: 'exact', head: true })
+      .eq('owner_id', ana);
+    expect(posts.count).toBe(anaPostsBefore);
+    const block = await asAdmin()
+      .from('ripples')
+      .select('splash_id')
+      .eq('id', anaLoneBlock)
+      .single();
+    expect(block.data!.splash_id).toBeNull();
+    const seen = await asUser(ben).from('ripples').select('id').eq('id', anaLoneBlock);
+    expect(seen.data).toEqual([]);
+  });
+
   it('places earlier posts in linked lanes when history is on, and only those', async () => {
     const { data } = await asUser(ben).from('splashes').select('id').eq('owner_id', ana);
     const ids = (data ?? []).map((s) => s.id);
@@ -210,8 +242,6 @@ describe('writing', () => {
       p_pool: pool,
       p_pool_lane: tripsLane,
       p_title: 'Tofino plan',
-      p_icon: null,
-      p_declared_start: null,
     });
     expect(made.error).toBeNull();
 
@@ -246,12 +276,10 @@ describe('writing', () => {
     });
     pools.push(other.data!);
     const { error } = await asUser(cal).rpc('create_joint_splash', {
-      p_id: null,
+      p_id: '0e200000-0000-0000-0000-000000000003',
       p_pool: other.data!,
       p_pool_lane: tripsLane,
       p_title: 'stolen lane',
-      p_icon: null,
-      p_declared_start: null,
     });
     expect(error?.code).toBe('42501');
   });
@@ -296,6 +324,45 @@ describe('invites', () => {
       p_include_history: false,
     });
     expect(join.error?.code).toBe('42501');
+  });
+});
+
+describe('the creator’s account', () => {
+  it('can go without taking the pool or anyone’s joint ripples', async () => {
+    dee = await person('Dee', '0e000000-0000-0000-0000-0000000000d1');
+    const made = await asUser(dee).rpc('create_pool', {
+      p_name: 'Dee’s pool',
+      p_kind: 'study',
+      p_lanes: [{ name: 'Notes', my_category_id: null }],
+      p_include_history: false,
+    });
+    const deePool = made.data!;
+    pools.push(deePool);
+    const lanes = await asUser(dee).from('pool_lanes').select('id').eq('pool_id', deePool);
+    const invite = await asUser(dee).rpc('create_invite', { p_pool: deePool });
+    await asUser(ben).rpc('join_pool', {
+      p_token: invite.data![0].token,
+      p_links: [{ pool_lane_id: lanes.data![0].id, my_category_id: BEN_TRIPS }],
+      p_include_history: false,
+    });
+    const joint = '0e200000-0000-0000-0000-000000000002';
+    await asUser(ben).rpc('create_joint_splash', {
+      p_id: joint,
+      p_pool: deePool,
+      p_pool_lane: lanes.data![0].id,
+      p_title: 'Reading list',
+    });
+    await asUser(ben)
+      .from('ripples')
+      .insert({ author_id: ben, category_id: BEN_TRIPS, note: 'Ben reads', splash_id: joint });
+
+    await asAdmin().auth.admin.deleteUser(dee);
+    dee = undefined;
+
+    const pool = await asUser(ben).from('pools').select('owner_id').eq('id', deePool).single();
+    expect(pool.data).toEqual({ owner_id: null });
+    const words = await asUser(ben).from('ripples').select('note').eq('splash_id', joint);
+    expect(words.data).toEqual([{ note: 'Ben reads' }]);
   });
 });
 

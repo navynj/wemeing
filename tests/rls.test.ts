@@ -73,6 +73,24 @@ describe('the Link path', () => {
   });
 });
 
+/**
+ * ROADMAP blocker for P2: the Link read path must be scoped. Today a linked
+ * friend reads every unlocked ripple of mine, which was never intended
+ * (raised 2026-10-23, H23). Production has no links, so nothing leaks yet.
+ *
+ * `it.fails` holds the intended rule while the policy still contradicts it:
+ * this passes while the leak exists and FAILS the moment the path is scoped,
+ * which is the signal to drop `.fails` and retire the Link-path tests above
+ * that assert the old behaviour.
+ */
+describe('the Link path, as it must become before P2', () => {
+  it.fails('hides from a linked friend every ripple outside a shared pool', async () => {
+    // Yoonji and Mina are Linked and share no pool.
+    const { data } = await asUser(MINA).from('ripples').select('id').eq('author_id', YOONJI);
+    expect(data).toEqual([]);
+  });
+});
+
 describe('lock state', () => {
   it('does not expose audience rows to a linked friend', async () => {
     // Reading the absence of a lock row would be enough to infer the presence

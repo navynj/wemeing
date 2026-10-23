@@ -223,7 +223,7 @@ export type Database = {
       pool_invites: {
         Row: {
           created_at: string
-          created_by: string
+          created_by: string | null
           expires_at: string
           id: string
           pool_id: string
@@ -232,7 +232,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          created_by: string
+          created_by?: string | null
           expires_at?: string
           id?: string
           pool_id: string
@@ -241,7 +241,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           expires_at?: string
           id?: string
           pool_id?: string
@@ -351,7 +351,7 @@ export type Database = {
           invite_code: string | null
           kind: Database["public"]["Enums"]["pool_kind"] | null
           name: string
-          owner_id: string
+          owner_id: string | null
           visibility: Database["public"]["Enums"]["pool_visibility"]
         }
         Insert: {
@@ -362,7 +362,7 @@ export type Database = {
           invite_code?: string | null
           kind?: Database["public"]["Enums"]["pool_kind"] | null
           name: string
-          owner_id: string
+          owner_id?: string | null
           visibility?: Database["public"]["Enums"]["pool_visibility"]
         }
         Update: {
@@ -373,7 +373,7 @@ export type Database = {
           invite_code?: string | null
           kind?: Database["public"]["Enums"]["pool_kind"] | null
           name?: string
-          owner_id?: string
+          owner_id?: string | null
           visibility?: Database["public"]["Enums"]["pool_visibility"]
         }
         Relationships: [
@@ -800,8 +800,8 @@ export type Database = {
       }
       create_joint_splash: {
         Args: {
-          p_declared_start: string
-          p_icon: string
+          p_declared_start?: string
+          p_icon?: string
           p_id: string
           p_pool: string
           p_pool_lane: string

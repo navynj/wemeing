@@ -485,7 +485,16 @@ function Step({
                 type="button"
                 data-step-card={card.splash.id}
                 aria-label={`Bring ${title} to the top`}
-                onClick={() => bringForward(card.splash.id)}
+                // On a phone the lower bands are too thin to aim at (review):
+                // a tap anywhere in the lower stair brings up the next card.
+                // Sideways, each spine is wide enough to be its own target.
+                onClick={() =>
+                  bringForward(
+                    !horizontal && stairSide === 'down'
+                      ? (flip.ids[n + 1] ?? card.splash.id)
+                      : card.splash.id,
+                  )
+                }
                 className={`absolute z-10 cursor-pointer ${
                   horizontal ? 'inset-0' : `inset-x-0 ${stairSide === 'up' ? 'top-0' : 'bottom-0'}`
                 }`}

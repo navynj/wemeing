@@ -493,12 +493,19 @@ describe('the diving board, a staircase', () => {
     await ringed(container, 'late');
   });
 
-  it('brings the second lower card to the top, moving two cards into the upper stair', async () => {
+  it('brings up the next card on a tap anywhere in the lower stair, the bands being too thin to aim at', async () => {
     const { container } = ground();
-    fireEvent.click(container.querySelector('[data-step-card="soup"]')!);
+    fireEvent.click(container.querySelector('[data-step-card="early"]')!);
+    await settled(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('mid');
+    expect(stair(container, 'up')).toEqual(['late']);
+  });
+
+  it('brings a deeper card up from its mark, one read card above and the rest at their marks', async () => {
+    const { container } = ground();
+    fireEvent.click(container.querySelector('[data-mark="soup"]')!);
     await settled(container);
     expect(topCard(container).getAttribute('data-stack-card')).toBe('soup');
-    // One read card above, the one read last; the rest wait at their marks.
     expect(stair(container, 'up')).toEqual(['mid']);
     expect(water(container)).not.toContain('soup');
     expect(water(container)).toContain('mid');
@@ -685,6 +692,15 @@ describe('the staircase sideways, on a wide screen', () => {
     expect(title.style.textOrientation).toBe('mixed');
     expect(spine.style.width).toBe('44px');
     expect(spine.textContent).toContain('📍');
+  });
+
+  it('brings the clicked spine\u2019s own card to the top', async () => {
+    // jsdom cannot measure the board, so one right-hand spine shows here.
+    wide();
+    const { container } = ground();
+    fireEvent.click(container.querySelector('[data-step-card="mid"]')!);
+    await settled(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('mid');
   });
 
   it('flips with the arrow keys when the stack has focus', async () => {

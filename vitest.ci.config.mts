@@ -35,6 +35,7 @@ const NEEDS_LOCAL_STACK = [
   'tests/splash-crud.test.ts',
   'tests/date-only-span.test.ts',
   'tests/sessions.test.ts',
+  'tests/pools-rls.test.ts',
 ];
 
 export default defineConfig({

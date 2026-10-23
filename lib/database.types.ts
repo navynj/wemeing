@@ -39,6 +39,7 @@ export type Database = {
           created_at: string
           id: string
           my_category_id: string
+          pool_id: string
           pool_lane_id: string
           user_id: string
         }
@@ -46,6 +47,7 @@ export type Database = {
           created_at?: string
           id?: string
           my_category_id: string
+          pool_id: string
           pool_lane_id: string
           user_id: string
         }
@@ -53,6 +55,7 @@ export type Database = {
           created_at?: string
           id?: string
           my_category_id?: string
+          pool_id?: string
           pool_lane_id?: string
           user_id?: string
         }
@@ -63,6 +66,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "my_categories"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lane_mappings_pool_lane_fkey"
+            columns: ["pool_lane_id", "pool_id"]
+            isOneToOne: false
+            referencedRelation: "pool_lanes"
+            referencedColumns: ["id", "pool_id"]
           },
           {
             foreignKeyName: "lane_mappings_pool_lane_id_fkey"
@@ -210,8 +220,54 @@ export type Database = {
           },
         ]
       }
+      pool_invites: {
+        Row: {
+          created_at: string
+          created_by: string
+          expires_at: string
+          id: string
+          pool_id: string
+          revoked_at: string | null
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          expires_at?: string
+          id?: string
+          pool_id: string
+          revoked_at?: string | null
+          token: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          id?: string
+          pool_id?: string
+          revoked_at?: string | null
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pool_invites_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pool_invites_pool_id_fkey"
+            columns: ["pool_id"]
+            isOneToOne: false
+            referencedRelation: "pools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pool_lanes: {
         Row: {
+          description: string | null
           icon: string | null
           id: string
           name: string
@@ -219,6 +275,7 @@ export type Database = {
           position: number
         }
         Insert: {
+          description?: string | null
           icon?: string | null
           id?: string
           name: string
@@ -226,6 +283,7 @@ export type Database = {
           position?: number
         }
         Update: {
+          description?: string | null
           icon?: string | null
           id?: string
           name?: string
@@ -244,17 +302,26 @@ export type Database = {
       }
       pool_members: {
         Row: {
+          include_history: boolean
           joined_at: string
+          keep_on_leave: boolean | null
+          left_at: string | null
           pool_id: string
           user_id: string
         }
         Insert: {
+          include_history?: boolean
           joined_at?: string
+          keep_on_leave?: boolean | null
+          left_at?: string | null
           pool_id: string
           user_id: string
         }
         Update: {
+          include_history?: boolean
           joined_at?: string
+          keep_on_leave?: boolean | null
+          left_at?: string | null
           pool_id?: string
           user_id?: string
         }
@@ -281,27 +348,33 @@ export type Database = {
           created_at: string
           ephemeral: boolean
           id: string
-          invite_code: string
+          invite_code: string | null
+          kind: Database["public"]["Enums"]["pool_kind"] | null
           name: string
           owner_id: string
+          visibility: Database["public"]["Enums"]["pool_visibility"]
         }
         Insert: {
           born_from_splash?: string | null
           created_at?: string
           ephemeral?: boolean
           id?: string
-          invite_code: string
+          invite_code?: string | null
+          kind?: Database["public"]["Enums"]["pool_kind"] | null
           name: string
           owner_id: string
+          visibility?: Database["public"]["Enums"]["pool_visibility"]
         }
         Update: {
           born_from_splash?: string | null
           created_at?: string
           ephemeral?: boolean
           id?: string
-          invite_code?: string
+          invite_code?: string | null
+          kind?: Database["public"]["Enums"]["pool_kind"] | null
           name?: string
           owner_id?: string
+          visibility?: Database["public"]["Enums"]["pool_visibility"]
         }
         Relationships: [
           {
@@ -554,18 +627,69 @@ export type Database = {
           },
         ]
       }
+      splash_placements: {
+        Row: {
+          created_at: string
+          pool_id: string
+          pool_lane_id: string
+          shared: boolean
+          splash_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          pool_id: string
+          pool_lane_id: string
+          shared?: boolean
+          splash_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          pool_id?: string
+          pool_lane_id?: string
+          shared?: boolean
+          splash_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "splash_placements_pool_id_fkey"
+            columns: ["pool_id"]
+            isOneToOne: false
+            referencedRelation: "pools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "splash_placements_pool_lane_fkey"
+            columns: ["pool_lane_id", "pool_id"]
+            isOneToOne: false
+            referencedRelation: "pool_lanes"
+            referencedColumns: ["id", "pool_id"]
+          },
+          {
+            foreignKeyName: "splash_placements_splash_id_fkey"
+            columns: ["splash_id"]
+            isOneToOne: false
+            referencedRelation: "splashes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       splashes: {
         Row: {
           created_at: string
+          created_by: string | null
           declared_end: string | null
           declared_lane_id: string | null
           declared_start: string | null
           ends_at: string | null
           icon: string | null
           id: string
-          owner_id: string
+          owner_id: string | null
           pinned_at: string | null
           pool_id: string | null
+          pool_lane_id: string | null
           prompt: string | null
           session_id: string | null
           title: string
@@ -573,15 +697,17 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          created_by?: string | null
           declared_end?: string | null
           declared_lane_id?: string | null
           declared_start?: string | null
           ends_at?: string | null
           icon?: string | null
           id?: string
-          owner_id: string
+          owner_id?: string | null
           pinned_at?: string | null
           pool_id?: string | null
+          pool_lane_id?: string | null
           prompt?: string | null
           session_id?: string | null
           title: string
@@ -589,15 +715,17 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          created_by?: string | null
           declared_end?: string | null
           declared_lane_id?: string | null
           declared_start?: string | null
           ends_at?: string | null
           icon?: string | null
           id?: string
-          owner_id?: string
+          owner_id?: string | null
           pinned_at?: string | null
           pool_id?: string | null
+          pool_lane_id?: string | null
           prompt?: string | null
           session_id?: string | null
           title?: string
@@ -607,6 +735,13 @@ export type Database = {
           {
             foreignKeyName: "splashes_created_by_fkey"
             columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "splashes_created_by_fkey1"
+            columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -626,6 +761,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "splashes_pool_lane_fkey"
+            columns: ["pool_lane_id", "pool_id"]
+            isOneToOne: false
+            referencedRelation: "pool_lanes"
+            referencedColumns: ["id", "pool_id"]
+          },
+          {
             foreignKeyName: "splashes_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false
@@ -639,18 +781,100 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _invite_pool: { Args: { p_token: string }; Returns: string }
+      _place_history: { Args: { pid: string; uid: string }; Returns: undefined }
+      _require_member: { Args: { pid: string }; Returns: string }
+      _require_uid: { Args: never; Returns: string }
+      _set_links: {
+        Args: { p_links: Json; pid: string; uid: string }
+        Returns: undefined
+      }
+      _splash_lane: { Args: { sid: string }; Returns: string }
       can_see_ripple: { Args: { rid: string }; Returns: boolean }
+      create_invite: {
+        Args: { p_pool: string }
+        Returns: {
+          expires_at: string
+          token: string
+        }[]
+      }
+      create_joint_splash: {
+        Args: {
+          p_declared_start: string
+          p_icon: string
+          p_id: string
+          p_pool: string
+          p_pool_lane: string
+          p_title: string
+        }
+        Returns: string
+      }
+      create_pool: {
+        Args: {
+          p_include_history: boolean
+          p_kind: Database["public"]["Enums"]["pool_kind"]
+          p_lanes: Json
+          p_name: string
+        }
+        Returns: string
+      }
+      delete_joint_splash: { Args: { p_splash: string }; Returns: undefined }
+      invite_lanes: {
+        Args: { p_token: string }
+        Returns: {
+          description: string
+          icon: string
+          id: string
+          lane_position: number
+          name: string
+        }[]
+      }
+      invite_preview: {
+        Args: { p_token: string }
+        Returns: {
+          member_initials: string[]
+          pool_name: string
+        }[]
+      }
+      is_current_member: { Args: { pid: string }; Returns: boolean }
       is_linked: { Args: { other: string }; Returns: boolean }
+      join_pool: {
+        Args: { p_include_history: boolean; p_links: Json; p_token: string }
+        Returns: string
+      }
+      lane_is_mine_in: { Args: { plid: string }; Returns: boolean }
+      leave_pool: {
+        Args: { p_keep: boolean; p_pool: string }
+        Returns: undefined
+      }
+      member_visible: { Args: { pid: string; uid: string }; Returns: boolean }
       record_ripple_view: { Args: { rid: string }; Returns: undefined }
+      revoke_invite: { Args: { p_invite: string }; Returns: undefined }
       ripple_author: { Args: { rid: string }; Returns: string }
+      ripple_in_my_pools: { Args: { rid: string }; Returns: boolean }
       ripple_is_locked: { Args: { rid: string }; Returns: boolean }
       ripple_span: {
         Args: { ended: string; started: string }
         Returns: unknown
       }
+      set_lane_links: {
+        Args: { p_links: Json; p_pool: string }
+        Returns: undefined
+      }
+      shares_pool: { Args: { other: string }; Returns: boolean }
+      splash_in_my_pools: { Args: { sid: string }; Returns: boolean }
+      splash_owner: { Args: { sid: string }; Returns: string }
+      splash_writable: { Args: { sid: string }; Returns: boolean }
     }
     Enums: {
       audience_target: "list" | "pool" | "lock"
+      pool_kind:
+        | "couple_diary"
+        | "study"
+        | "running_crew"
+        | "faith_group"
+        | "friends"
+      pool_visibility: "private" | "open"
       ripple_mode: "drop" | "timed"
       session_kind: "monthly" | "custom"
       splash_type: "free" | "prompted"
@@ -785,6 +1009,14 @@ export const Constants = {
   public: {
     Enums: {
       audience_target: ["list", "pool", "lock"],
+      pool_kind: [
+        "couple_diary",
+        "study",
+        "running_crew",
+        "faith_group",
+        "friends",
+      ],
+      pool_visibility: ["private", "open"],
       ripple_mode: ["drop", "timed"],
       session_kind: ["monthly", "custom"],
       splash_type: ["free", "prompted"],

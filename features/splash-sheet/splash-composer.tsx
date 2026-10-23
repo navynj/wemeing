@@ -135,6 +135,8 @@ export function SplashComposer({
         session_id: null,
         pinned_at: null,
         pool_id: null,
+        pool_lane_id: null,
+        created_by: null,
         type: 'free',
         prompt: null,
         ends_at: null,

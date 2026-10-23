@@ -30,6 +30,9 @@ const TABLES = [
   'pool_lanes',
   'lane_mappings',
   'splashes',
+  'splash_placements',
+  'pool_invites',
+  'sessions',
 ];
 
 /** Env first, then .env.local, so this runs against whatever is linked. */

@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import { readFileSync } from 'node:fs';
 import { act, cleanup, fireEvent, render, waitFor, within } from '@testing-library/react';
 import { useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -33,11 +32,10 @@ vi.mock('@/features/lanes/actions', () => ({
 }));
 const deletes: { id: string; resolve: (outcome: unknown) => void }[] = [];
 
+import { byNewest, placeCard, type Card } from '@/features/home/grid';
 import { HomeGround } from '@/features/home/home-ground';
 import { InputSheetProvider, useInputSheet } from '@/features/input-sheet/sheet-provider';
-import { monthCounts, monthSeats, scrubberMonths } from '@/features/sessions/shelves';
 import {
-  summarizeOrphan,
   summarizeSplash,
   type Splash,
   type SplashBlock,
@@ -49,12 +47,15 @@ const TZ = 'America/Vancouver';
 const NOW = new Date('2026-09-25T20:00:00.000Z');
 const TODAY = '2026-09-25';
 
-const scrolled: { rope: Element | null; row: Element | null }[] = [];
+const scrolled: ScrollToOptions[] = [];
 beforeEach(() => {
   scrolled.length = 0;
-  Element.prototype.scrollIntoView = function scrollIntoView(this: Element) {
-    scrolled.push({ rope: null, row: this });
-  };
+  Element.prototype.scrollTo = function scrollTo(
+    this: Element,
+    options?: ScrollToOptions | number,
+  ) {
+    if (typeof options === 'object') scrolled.push(options);
+  } as Element['scrollTo'];
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
     configurable: true,
@@ -150,318 +151,370 @@ function Dropper({ splash, month }: { splash: SplashSummary; month: string }) {
   return null;
 }
 
+/** The sheet host lives in the shell; here the provider's state stands in for it. */
+function SheetProbe() {
+  const { sheet } = useInputSheet();
+  return sheet ? <span data-sheet-open={sheet.kind} /> : null;
+}
+
 function Deleter({ id }: { id: string }) {
   const { markDeleted } = useInputSheet();
   useEffect(() => markDeleted(id), [id, markDeleted]);
   return null;
 }
 
+function cards(posts: SplashSummary[]): Card[] {
+  return posts.map((p) => placeCard(p, p.ghostTitle ?? '', TZ)).sort(byNewest);
+}
+
 function ground(
-  month = '2026-09',
   posts = POSTS,
   dropped: SplashSummary | null = null,
   deleted: string | null = null,
   categories = LANES,
+  month: string | null = null,
 ) {
   return render(
     <InputSheetProvider>
-      {dropped ? <Dropper splash={dropped} month={month} /> : null}
+      {dropped ? <Dropper splash={dropped} month={month ?? '2026-09'} /> : null}
       {deleted ? <Deleter id={deleted} /> : null}
+      <SheetProbe />
       <HomeGround
-        month={month}
-        months={scrubberMonths(posts, TODAY, TZ)}
-        counts={monthCounts(posts, TZ)}
-        seats={monthSeats(posts, month, TZ)}
+        cards={cards(posts)}
         pinned={posts.filter((p) => p.pinnedAt)}
         categories={categories}
         sessions={[]}
+        counts={{}}
         customCounts={{}}
         earliestYear={2026}
         today={TODAY}
         timeZone={TZ}
+        initials="YL"
+        scrollToMonth={month}
       />
     </InputSheetProvider>,
   );
 }
 
-const rowOf = (container: HTMLElement, laneId: string): HTMLElement =>
-  container.querySelector<HTMLElement>(`[data-lane-row="${laneId}"]`)!;
-const seatIds = (root: Element): (string | null)[] =>
-  [...root.querySelectorAll('[data-seat]')].map((el) => el.getAttribute('data-seat'));
+const markIds = (root: Element): (string | null)[] =>
+  [...root.querySelectorAll('[data-mark]')].map((el) => el.getAttribute('data-mark'));
+const cellOf = (mark: Element): HTMLElement => mark.closest<HTMLElement>('[data-cell]')!;
+const rowOf = (mark: Element): HTMLElement => {
+  // A row is the rail cell and the cells after it, up to the next rail cell.
+  let el: Element | null = cellOf(mark);
+  while (el && !el.hasAttribute('data-day-row')) el = el.previousElementSibling;
+  return el as HTMLElement;
+};
+const topCard = (root: Element): HTMLElement =>
+  root.querySelector<HTMLElement>('[data-stack-card][data-slot="0"]')!;
+const tabs = (root: Element): (string | null)[] =>
+  [...root.querySelectorAll('[data-stack-card]')]
+    .filter((el) => el.getAttribute('data-slot') !== '0' && el.getAttribute('data-slot') !== '-1')
+    .sort((a, b) => Number(a.getAttribute('data-slot')) - Number(b.getAttribute('data-slot')))
+    .map((el) => el.getAttribute('data-stack-card'));
+const flipped = (root: Element): Promise<void> => waitFor(() => expectSettled(root));
+/** The ring arrives once the mark has been brought into view. */
+const ringed = (root: Element, id: string): Promise<void> =>
+  waitFor(() => expect(root.querySelector(`[data-mark="${id}"][data-ring]`)).not.toBeNull());
+/** The window reaches every day once the grid has measured where its end is. */
+const grown = (root: Element): Promise<void> =>
+  waitFor(() => expect(root.querySelector('[data-day-row="2026-08-17"]')).not.toBeNull());
+function expectSettled(root: Element): void {
+  for (const el of root.querySelectorAll('[data-stack-card]')) {
+    expect(el.getAttribute('data-slot')).toBe(el.getAttribute('data-to'));
+  }
+}
 
-describe('the water ground (H21c)', () => {
-  it('is the blue ground, with white pills that draw their waves on a blue disc', () => {
+describe('the water ground (H22)', () => {
+  it('is the blue ground: the grid above, the diving board below, white carrying content', () => {
     const { container } = ground();
     expect(container.querySelector('[data-home-ground]')!.className).toContain('water-ground');
-    const css = readFileSync('app/globals.css', 'utf8');
-    const rule = css.slice(
-      css.indexOf('.water-ground {'),
-      css.indexOf('}', css.indexOf('.water-ground {')),
-    );
-    expect(rule).toContain('background-color: var(--color-main-900)');
-    expect(rule).toContain('--wave-ink: #ffffff');
-
-    const pill = container.querySelector<HTMLElement>('[data-splash-pill]')!;
-    expect(pill.className).toContain('bg-white');
-    const mark = pill.querySelector<HTMLElement>('[data-wave-mark]')!;
-    expect(mark.className).toContain('bg-main-900');
-    expect(mark.style.getPropertyValue('--wave-ink')).toBe('#ffffff');
+    const grid = container.querySelector('[data-lane-grid]')!;
+    const board = container.querySelector('[data-diving-board]')!;
+    expect(grid.compareDocumentPosition(board) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    for (const mark of container.querySelectorAll('[data-mark]')) {
+      expect(mark.className).toContain('bg-white');
+    }
+    expect(container.querySelector('[data-avatar]')!.textContent).toBe('YL');
   });
 
-  it('draws a lone block as the inverse pill: blue, a white/50 border, a white disc', () => {
-    const lone = summarizeOrphan(block('r-lone', '2026-09-14', 'c-day', 'alone'), TZ, NOW);
-    const { container } = ground('2026-09', [...POSTS, lone]);
-    const pill = container.querySelector<HTMLElement>('[data-splash-pill="r-lone"]')!;
-    expect(pill.hasAttribute('data-lone')).toBe(true);
-    expect(pill.className).toContain('bg-main-900');
-    expect(pill.className).toContain('border-white/50');
-    const mark = pill.querySelector<HTMLElement>('[data-wave-mark]')!;
-    expect(mark.className).toMatch(/(^| )bg-white( |$)/);
-    expect(mark.style.getPropertyValue('--wave-ink')).toBe('var(--color-main-900)');
-  });
-
-  it('draws a post that is only a title, with no block yet, as the inverse pill too', () => {
-    const bare = post('s-bare', 'Just a title', [], {
-      declared_start: '2026-09-16',
-      declared_lane_id: 'c-day',
-    });
-    const { container } = ground('2026-09', [...POSTS, bare]);
-    const pill = container.querySelector<HTMLElement>('[data-splash-pill="s-bare"]')!;
-    expect(pill.hasAttribute('data-lone')).toBe(true);
-    expect(pill.className).toContain('bg-main-900');
-    expect(pill.className).toContain('border-white/50');
-    const mark = pill.querySelector<HTMLElement>('[data-wave-mark]')!;
-    expect(mark.className).toMatch(/(^| )bg-white( |$)/);
+  it('shows the title as text with its menu, and nothing of Pools or Friends', () => {
+    const { container, queryByText } = ground();
+    expect(container.querySelector('[data-home-menu-button]')!.textContent).toBe('Home');
+    expect(queryByText(/pool|friends|my lanes/i)).toBeNull();
+    expect(container.querySelector('[data-tab-bar]')).toBeNull();
+    expect(container.querySelector('[data-month-scrubber]')).toBeNull();
   });
 });
 
-describe('lane rows', () => {
-  it('seats every post of the month exactly once, on the row of its lane, in lane order', () => {
+describe('the lane grid', () => {
+  it('places every post exactly once, on its lane\u2019s column and its day\u2019s row', async () => {
     const { container } = ground();
-    const rows = [...container.querySelectorAll('[data-lane-row]')];
-    expect(rows.map((r) => r.getAttribute('data-lane-row'))).toEqual([
+    await grown(container);
+    const ids = markIds(container);
+    expect([...ids].sort()).toEqual(['aug', 'early', 'late', 'mid', 'soup']);
+    expect(cellOf(container.querySelector('[data-mark="late"]')!).getAttribute('data-cell')).toBe(
+      'c-food',
+    );
+    expect(rowOf(container.querySelector('[data-mark="late"]')!).getAttribute('data-day-row')).toBe(
+      '2026-09-20',
+    );
+    // A post sits on the last day of its range (H22): Arnak's third block.
+    expect(
+      rowOf(container.querySelector('[data-mark="early"]')!).getAttribute('data-day-row'),
+    ).toBe('2026-09-05');
+    expect(cellOf(container.querySelector('[data-mark="early"]')!).getAttribute('data-cell')).toBe(
+      'c-day',
+    );
+  });
+
+  it('reads newest day first, with the year and month only where the month changes', async () => {
+    const { container } = ground();
+    await grown(container);
+    const rows = [...container.querySelectorAll('[data-day-row]')].map((r) =>
+      r.getAttribute('data-day-row'),
+    );
+    expect(rows[0]).toBe('2026-09-25');
+    expect(rows[1]).toBe('2026-09-24');
+    expect(rows).toContain('2026-08-17');
+    const labelled = [...container.querySelectorAll('[data-day-row]')]
+      .filter((r) => r.querySelector('[data-month-label]'))
+      .map((r) => r.getAttribute('data-day-row'));
+    expect(labelled).toEqual(['2026-09-25', '2026-08-31']);
+    expect(container.querySelector('[data-day-row="2026-09-25"]')!.textContent).toContain('FRI');
+  });
+
+  it('heads each column with its emoji over its name, in lane order, a rope down each', () => {
+    const { container } = ground();
+    const headers = [...container.querySelectorAll('[data-lane-header]')];
+    expect(headers.map((h) => h.getAttribute('data-lane-header'))).toEqual([
       'c-food',
       'c-place',
       'c-day',
     ]);
-    expect(seatIds(rowOf(container, 'c-food'))).toEqual(['late', 'soup']);
-    expect(seatIds(rowOf(container, 'c-place'))).toEqual(['mid']);
-    expect(seatIds(rowOf(container, 'c-day'))).toEqual(['early']);
-    expect(seatIds(container)).toHaveLength(4);
+    expect(headers[0].textContent).toBe('🍜Food');
+    const row = container.querySelector('[data-day-row="2026-09-24"]')!;
+    const cells = [row.nextElementSibling, row.nextElementSibling!.nextElementSibling];
+    for (const cell of cells) expect(cell!.querySelector('[data-rope]')).not.toBeNull();
   });
 
-  it('reads newest first from the left along a rope', () => {
-    const { container } = ground();
-    const food = rowOf(container, 'c-food');
-    expect(seatIds(food)).toEqual(['late', 'soup']);
-    expect(within(food).getByText('Beef Short Rib Soup & Alfa Tea')).toBeTruthy();
+  it('renders an empty month as rows of empty ropes, with no copy', () => {
+    const { container, queryByText } = ground([]);
+    expect(container.querySelectorAll('[data-day-row]').length).toBeGreaterThanOrEqual(21);
+    expect(container.querySelector('[data-mark]')).toBeNull();
+    expect(queryByText(/quiet|fresh page|nothing/i)).toBeNull();
+    expect(container.querySelector('[data-diving-board] [data-stack]')).toBeNull();
+    expect(container.querySelector('[data-drop-bar]')).not.toBeNull();
   });
 
-  it('labels each row with its emoji over its name, the rope outside the strip', () => {
-    const { container } = ground();
-    const place = rowOf(container, 'c-place');
-    const label = place.querySelector('[data-lane-label]')!;
-    expect(label.textContent).toBe('📍Place');
-    expect(place.querySelector('[data-rope]')).not.toBeNull();
-    expect(place.querySelector('[data-lane-rope] [data-rope]')).toBeNull();
-    expect(place.querySelector('[data-lane-rope]')!.className).toContain('overflow-x-auto');
-    expect(place.querySelector('[data-seat]')!.className).toContain('shrink-0');
+  it('stacks two posts on one lane and day within the row', () => {
+    const twin = post('twin', 'Second soup', [block('t', '2026-09-08', 'c-food')]);
+    const { container } = ground([...POSTS, twin]);
+    const cell = cellOf(container.querySelector('[data-mark="soup"]')!);
+    expect(markIds(cell).sort()).toEqual(['soup', 'twin']);
   });
 
-  it('keeps every row with an empty rope in a month with nothing: no copy, no collapse', () => {
-    const { container, queryByText } = ground('2026-07');
-    expect(container.querySelectorAll('[data-lane-row]')).toHaveLength(3);
-    expect(container.querySelectorAll('[data-rope]')).toHaveLength(4);
-    expect(container.querySelectorAll('[data-seat]')).toHaveLength(0);
-    expect(queryByText('A fresh page of water.')).toBeNull();
-  });
-
-  it('seats a post by its declared lane over the lane its blocks took', () => {
+  it('places a post by its declared lane over the lane its blocks took', () => {
     const declared = post('decl', 'Declared', [block('d', '2026-09-10', 'c-day')], {
       declared_lane_id: 'c-place',
     });
-    const { container } = ground('2026-09', [...POSTS, declared]);
-    expect(seatIds(rowOf(container, 'c-place'))).toContain('decl');
-    expect(seatIds(rowOf(container, 'c-day'))).not.toContain('decl');
-  });
-
-  it('gives posts on no lane of mine one unlabelled row at the end, only when any', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const stray = post('stray', 'Elsewhere', [block('x', '2026-09-09', 'c-gone')]);
-    const { container } = ground('2026-09', [...POSTS, stray]);
-    const rows = [...container.querySelectorAll('[data-lane-row]')];
-    expect(rows.map((r) => r.getAttribute('data-lane-row'))).toEqual([
-      'c-food',
+    const { container } = ground([declared]);
+    expect(cellOf(container.querySelector('[data-mark="decl"]')!).getAttribute('data-cell')).toBe(
       'c-place',
-      'c-day',
-      '',
-    ]);
-    expect(rows[3].querySelector('[data-lane-label]')!.textContent).toBe('');
-    expect(seatIds(rows[3])).toEqual(['stray']);
-    expect(warn).toHaveBeenCalled();
-    warn.mockRestore();
-    cleanup();
-    const { container: clean } = ground();
-    expect(clean.querySelectorAll('[data-lane-row]')).toHaveLength(3);
-  });
-
-  it('ends with the seat of a new lane on an empty rope, which opens the lane sheet', () => {
-    const { container, getByLabelText, getByRole } = ground();
-    const rows = container.querySelector('[data-lane-rows]')!;
-    expect(rows.lastElementChild!.hasAttribute('data-new-lane-row')).toBe(true);
-    expect(rows.lastElementChild!.querySelector('[data-rope]')).not.toBeNull();
-    fireEvent.click(getByLabelText('New lane'));
-    expect(getByRole('dialog', { name: 'New lane' })).toBeTruthy();
-  });
-
-  it('links a pill to its post’s page, naming the month it came from', () => {
-    const { container } = ground();
-    expect(container.querySelector('[data-seat="late"] a')!.getAttribute('href')).toBe(
-      '/splash/late?from=2026-09',
     );
   });
 
-  it('scrolls on its own with twelve lanes: the rows area is the scroll container, the + inside it', () => {
-    const twelve = Array.from({ length: 12 }, (_, i) => lane(`c-${i}`, `Lane ${i}`, '🌊', i));
-    const { container } = ground('2026-09', [], null, null, twelve);
-    const area = container.querySelector<HTMLElement>('[data-lane-area]')!;
-    expect(area.className).toContain('overflow-y-auto');
-    expect(area.className).toContain('min-h-0');
-    expect(area.className).toContain('flex-1');
-    // Every flex ancestor up to the ground lets it shrink, so the overflow lands here.
-    for (
-      let el = area.parentElement;
-      el && !el.hasAttribute('data-home-ground');
-      el = el.parentElement
-    ) {
-      expect(el.className).toContain('min-h-0');
-    }
-    expect(container.querySelector('[data-home-ground]')!.className).toContain('min-h-0');
-    expect(container.querySelectorAll('[data-lane-row]')).toHaveLength(12);
-    expect(area.querySelector('[data-new-lane-row]')).not.toBeNull();
-    expect(area.className).toMatch(/\bpb-/);
-    expect(container.querySelector('[data-fixed-stack]')!.className).toContain('shrink-0');
-    // A vertical drag from a rope scrolls the rows: the rope claims no touch axis.
-    for (const rope of container.querySelectorAll('[data-lane-rope]')) {
-      expect(rope.className).not.toMatch(/touch-pan/);
-      expect(rope.className).toContain('overscroll-x-contain');
-    }
+  it('gives a post on no lane of mine one unlabelled column at the end, only when any', () => {
+    const { container: plain } = ground();
+    expect(plain.querySelector('[data-lane-header=""]')).toBeNull();
+    const stray = post('stray', 'Stray', [block('x', '2026-09-09', 'c-gone')]);
+    const { container } = ground([stray]);
+    expect(container.querySelector('[data-lane-header=""]')).not.toBeNull();
+    expect(cellOf(container.querySelector('[data-mark="stray"]')!).getAttribute('data-cell')).toBe(
+      '',
+    );
   });
 
-  it('fades its bottom edge into the water while there is more below, and not at the end', async () => {
-    const { container } = ground();
-    const area = container.querySelector<HTMLElement>('[data-lane-area]')!;
-    const fade = container.querySelector<HTMLElement>('[data-lane-fade]')!;
-    expect(fade.className).toContain('h-8');
-    Object.defineProperty(area, 'scrollHeight', { configurable: true, value: 1200 });
-    Object.defineProperty(area, 'clientHeight', { configurable: true, value: 500 });
-    area.scrollTop = 0;
-    fireEvent.scroll(area);
-    await waitFor(() => expect(fade.className).toContain('opacity-100'));
-    area.scrollTop = 700;
-    fireEvent.scroll(area);
-    await waitFor(() => expect(fade.className).toContain('opacity-0'));
+  it('shares the width among seven lanes or fewer, and fixes the columns past that', () => {
+    const seven = Array.from({ length: 7 }, (_, i) => lane(`l${i}`, `Lane ${i}`, '🌊', i));
+    const { container: even } = ground([], null, null, seven);
+    const grid = even.querySelector<HTMLElement>('[data-lane-grid]')!;
+    expect(grid.getAttribute('data-columns')).toBe('even');
+    expect(grid.querySelector<HTMLElement>('[data-grid]')!.style.gridTemplateColumns).toContain(
+      'repeat(7, minmax(0, 1fr))',
+    );
+    cleanup();
+    const eight = [...seven, lane('l7', 'Lane 7', '🌊', 7)];
+    const { container: fixed } = ground([], null, null, eight);
+    const wide = fixed.querySelector<HTMLElement>('[data-lane-grid]')!;
+    expect(wide.getAttribute('data-columns')).toBe('fixed');
+    expect(wide.querySelector<HTMLElement>('[data-grid]')!.style.gridTemplateColumns).toContain(
+      'repeat(8, 56px)',
+    );
+    // The rail and the headers stay put: sticky inside the one scroller.
+    expect(wide.querySelector('[data-day-row]')!.className).toContain('sticky left-0');
+    expect(wide.querySelector('[data-lane-header]')!.className).toContain('sticky top-0');
+    expect(wide.style.touchAction).toBe('pan-x pan-y');
+  });
+
+  it('opens the lanes sheet from a lane header, and the new-lane sheet from the +', () => {
+    const { container, getByLabelText, getByRole } = ground();
+    fireEvent.click(container.querySelector('[data-lane-header="c-food"]')!);
+    expect(getByRole('dialog', { name: 'Edit lanes' })).toBeTruthy();
+    fireEvent.click(getByLabelText('Close'));
+    fireEvent.click(getByLabelText('New lane'));
+    expect(getByRole('dialog', { name: 'New lane' })).toBeTruthy();
   });
 });
 
-describe('the post just dropped', () => {
-  it('is seated on its lane’s rope at once, scrolled into view, with the ripple at it', () => {
-    const fresh = post('fresh', 'Just dropped', [block('f', '2026-09-25', 'c-place')]);
-    const { container } = ground('2026-09', POSTS, fresh);
-    expect(seatIds(rowOf(container, 'c-place'))).toEqual(['fresh', 'mid']);
-    expect(container.querySelector('[data-seat="fresh"] [data-commit-ripple]')).not.toBeNull();
+describe('the diving board', () => {
+  it('reads the newest post as the top card, with its mark ringed on first render', async () => {
+    const { container } = ground();
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('late');
+    await ringed(container, 'late');
     expect(container.querySelectorAll('[data-commit-ripple]')).toHaveLength(1);
-    // Its row was brought into view before the ring painted.
-    expect(scrolled.some((s) => s.row?.getAttribute('data-lane-row') === 'c-place')).toBe(true);
     for (const ring of container.querySelectorAll<HTMLElement>('.commit-ring')) {
       expect(ring.style.animationIterationCount).toBe('1');
     }
   });
 
-  it('takes a deleted post off the ground and the pinned bar at once', () => {
-    const { container } = ground('2026-08', POSTS, null, 'aug');
-    expect(seatIds(container)).toEqual([]);
+  it('peeks the next older cards as tabs, each its emoji and title', () => {
+    const { container } = ground();
+    expect(tabs(container)).toEqual(['mid', 'soup']);
+    const tab = container.querySelector('[data-tab="mid"]')!;
+    expect(tab.textContent).toContain('📍');
+    expect(tab.textContent).toContain('coffee went cold');
+  });
+
+  it('reads the top card: date with weekday, lane chip, emoji and title, initials, body', () => {
+    const { container } = ground();
+    const card = topCard(container);
+    expect(card.querySelector('[data-card-date]')!.textContent).toBe('Sep 20 (SUN)');
+    expect(card.textContent).toContain('Food');
+    expect(card.textContent).toContain('🍜');
+    expect(card.textContent).toContain('Toy Story 5');
+    expect(card.textContent).toContain('YL');
+    expect(card.querySelector('[data-card-link]')!.getAttribute('href')).toBe(
+      '/splash/late?from=2026-09',
+    );
+  });
+
+  it('brings a tapped tab forward, moving the ring to its mark', async () => {
+    const { container } = ground();
+    fireEvent.click(container.querySelector('[data-tab="soup"]')!);
+    await flipped(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('soup');
+    await ringed(container, 'soup');
+    expect(container.querySelectorAll('[data-ring]')).toHaveLength(1);
+    expect(tabs(container)).toEqual(['early', 'aug']);
+  });
+
+  it('brings a tapped mark\u2019s card to the top, and scrolls the grid to the mark', async () => {
+    const { container } = ground();
+    await grown(container);
+    fireEvent.click(container.querySelector('[data-mark="aug"]')!);
+    await flipped(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('aug');
+    await ringed(container, 'aug');
+    // Round again: the newest follows the oldest.
+    expect(tabs(container)).toEqual(['late', 'mid']);
+  });
+
+  it('opens the post sheet from the drop bar', () => {
+    const { container } = ground();
+    expect(container.querySelector('[data-sheet-open]')).toBeNull();
+    fireEvent.click(container.querySelector('[data-drop-bar]')!);
+    expect(container.querySelector('[data-sheet-open="splash"]')).not.toBeNull();
+  });
+
+  it('keeps its height whatever is on top, so the grid never moves', async () => {
+    const { container } = ground();
+    const stack = container.querySelector<HTMLElement>('[data-stack]')!;
+    const height = stack.style.height;
+    fireEvent.click(container.querySelector('[data-tab="mid"]')!);
+    await flipped(container);
+    expect(stack.style.height).toBe(height);
+  });
+});
+
+describe('the post just dropped', () => {
+  it('is on the grid at once with the ring, and lands on top of the stack', async () => {
+    const fresh = post('fresh', 'Just dropped', [block('f', '2026-09-25', 'c-place')]);
+    const { container } = ground(POSTS, fresh);
+    expect(cellOf(container.querySelector('[data-mark="fresh"]')!).getAttribute('data-cell')).toBe(
+      'c-place',
+    );
+    await flipped(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('fresh');
+    await ringed(container, 'fresh');
+    expect(container.querySelectorAll('[data-commit-ripple]')).toHaveLength(1);
+  });
+
+  it('takes a deleted post off the grid, the stack and the pinned bar at once', () => {
+    const { container } = ground(POSTS, null, 'aug');
+    expect(markIds(container)).not.toContain('aug');
+    expect(container.querySelector('[data-stack-card="aug"]')).toBeNull();
     expect(container.querySelector('[data-pinned-bar]')).toBeNull();
   });
 });
 
-describe('the fixed stack beneath the rows', () => {
-  it('keeps the scrubber, its = and the lane icon row, and nothing of Pools or Friends', () => {
-    const { container, getByLabelText, queryByText } = ground();
-    const stack = container.querySelector('[data-fixed-stack]')!;
-    const months = [...stack.querySelectorAll('[data-scrub-month]')];
-    expect(months.map((m) => m.getAttribute('data-scrub-month'))).toEqual(['2026-09', '2026-08']);
-    expect(months[0].getAttribute('aria-current')).toBe('true');
-    expect(months[0].className).toBe(months[1].className);
-    expect(months[0].querySelector('[data-month-count]')!.textContent).toBe('4');
-    expect(stack.querySelector('[data-manage-sessions]')).not.toBeNull();
-    expect(
-      stack
-        .querySelector('[data-month-scrubber]')!
-        .compareDocumentPosition(stack.querySelector('[data-lane-icon-row]')!) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(getByLabelText('Edit lanes').querySelector('[data-lane-icon]')).not.toBeNull();
-    expect(container.querySelector('[data-lane-icon] path[d*="M4 20"]')).not.toBeNull();
-    expect(queryByText(/pool|friends|my lanes/i)).toBeNull();
-    expect(container.querySelector('[data-lane-header]')).toBeNull();
-    expect(container.querySelector('[data-lane-ropes]')).toBeNull();
-  });
-
-  it('opens the sessions sheet from the =, unchanged', () => {
-    const { container, getByLabelText, getByRole } = ground();
-    fireEvent.click(getByLabelText('Manage sessions'));
+describe('the menu', () => {
+  it('reaches the Locker, the sessions sheet and the lanes sheet', () => {
+    const { container, getByRole } = ground();
+    fireEvent.click(container.querySelector('[data-home-menu-button]')!);
+    const menu = container.querySelector('[data-home-menu]')!;
+    expect(menu.className).toContain('bg-ink');
+    expect(menu.querySelector('a[href="/locker"]')!.textContent).toBe('Locker');
+    fireEvent.click(within(menu as HTMLElement).getByText('Sessions'));
     expect(
       getByRole('dialog', { name: 'Sessions' }).querySelector('[data-session-schedule]'),
     ).not.toBeNull();
-    fireEvent.click(getByLabelText('Close'));
-    expect(container.querySelector('[data-sessions-sheet]')).toBeNull();
-  });
-
-  it('sits every other month back at 0.3, the scoped one at full strength', () => {
-    const { container } = ground('2026-08');
-    const items = [...container.querySelectorAll<HTMLElement>('[data-scrub-month]')].map((m) =>
-      m.closest('li')!,
+    fireEvent.click(getByRole('button', { name: 'Close' }));
+    fireEvent.click(container.querySelector('[data-home-menu-button]')!);
+    fireEvent.click(
+      within(container.querySelector('[data-home-menu]') as HTMLElement).getByText('Lanes'),
     );
-    expect(items[1].style.opacity).toBe('1');
-    expect(items[0].style.opacity).toBe('0.3');
+    expect(getByRole('dialog', { name: 'Edit lanes' })).toBeTruthy();
   });
+});
 
-  it('scopes rather than scrolls: each month is a link to the ground at that month', () => {
-    const { container } = ground();
-    expect(container.querySelector('[data-scrub-month="2026-08"]')!.getAttribute('href')).toBe(
-      '/?m=2026-08',
-    );
+describe('?m= as a scroll target', () => {
+  it('opens with the month\u2019s newest post on top, and scrolls the grid to the month', () => {
+    const { container } = ground(POSTS, null, null, LANES, '2026-08');
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('aug');
+    expect(scrolled.length).toBeGreaterThan(0);
   });
 });
 
 describe('the pinned bar (H21g)', () => {
-  it('sits in ink with a chip per pinned post, whatever month is scoped', () => {
-    for (const month of ['2026-09', '2026-08']) {
-      const { container } = ground(month);
-      const bar = container.querySelector('[data-pinned-bar]')!;
-      expect(bar.className).toContain('bg-ink');
-      const chip = bar.querySelector('[data-pinned-chip="aug"]')!;
-      expect(chip.textContent).toContain('Whistler');
-      expect(chip.getAttribute('href')).toBe(`/splash/aug?from=${month}`);
-      cleanup();
-    }
+  it('sits in ink between the grid and the stack, a chip per pinned post', () => {
+    const { container } = ground();
+    const bar = container.querySelector('[data-pinned-bar]')!;
+    expect(bar.className).toContain('bg-ink');
+    const chip = bar.querySelector('[data-pinned-chip="aug"]')!;
+    expect(chip.textContent).toContain('Whistler');
+    const grid = container.querySelector('[data-lane-grid]')!;
+    const board = container.querySelector('[data-diving-board]')!;
+    expect(grid.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(bar.compareDocumentPosition(board) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('is absent when nothing is pinned', () => {
-    const { container } = ground(
-      '2026-09',
-      POSTS.filter((p) => !p.pinnedAt),
-    );
+    const { container } = ground(POSTS.filter((p) => !p.pinnedAt));
     expect(container.querySelector('[data-pinned-bar]')).toBeNull();
   });
 });
 
-describe('the lanes sheet from the lane icon', () => {
+const openLanes = (container: HTMLElement): void => {
+  fireEvent.click(container.querySelector('[data-home-menu-button]')!);
+  fireEvent.click(container.querySelector('[data-home-menu] [data-edit-lanes]')!);
+};
+
+describe('the lanes sheet from the menu', () => {
   it('edits every lane’s icon and name in one sheet', async () => {
     savedLanes.length = 0;
-    const { getByLabelText, getByRole, getByText, container } = ground();
-    fireEvent.click(getByLabelText('Edit lanes'));
+    const { getByRole, getByText, container } = ground();
+    openLanes(container);
     const sheet = getByRole('dialog', { name: 'Edit lanes' });
     expect(sheet.querySelectorAll('[data-lane-row]')).toHaveLength(3);
     expect((getByText('Save') as HTMLButtonElement).disabled).toBe(true);
@@ -480,8 +533,8 @@ describe('the lanes sheet from the lane icon', () => {
 
   it('reorders the lanes by dragging a grip, keeping up with a fast drag, and saves the order', async () => {
     orders.length = 0;
-    const { getByLabelText, getByRole, getByText } = ground();
-    fireEvent.click(getByLabelText('Edit lanes'));
+    const { getByLabelText, getByRole, getByText, container } = ground();
+    openLanes(container);
     const sheet = getByRole('dialog', { name: 'Edit lanes' });
     const order = (): (string | null)[] =>
       [...sheet.querySelectorAll('[data-lane-row]')].map((r) => r.getAttribute('data-lane-row'));
@@ -504,8 +557,8 @@ describe('the lanes sheet from the lane icon', () => {
 
   it('deletes an empty lane at once, and brings one with records back with the refusal', async () => {
     deletes.length = 0;
-    const { getByLabelText, getByRole, getByText } = ground();
-    fireEvent.click(getByLabelText('Edit lanes'));
+    const { getByLabelText, getByRole, getByText, container } = ground();
+    openLanes(container);
     const sheet = getByRole('dialog', { name: 'Edit lanes' });
     fireEvent.click(getByLabelText('Delete Day'));
     fireEvent.click(getByText('Delete'));

@@ -65,44 +65,6 @@ export function scrubberMonths(
   return monthsBetween(earliest, latest).reverse();
 }
 
-/** Which way a lane's rope reads: the newest post at the left, or the oldest. */
-export const ROPE_ORDER: 'newest-first' | 'oldest-first' = 'newest-first';
-
-export type LaneRowSeats = { lane: MyCategory; seats: Seat[] };
-
-/**
- * The ground's rows (Home, lane rows): every seat on the row of its post's
- * lane — the declared lane where one is declared, else the lane its blocks
- * took most (`representativeLane`, which is `laneIds[0]`; `laneTags` puts the
- * declared lane first, so the two agree whenever a lane is declared). Rows
- * follow the author's lane order; within a row the rope reads by
- * `ROPE_ORDER` on the same key the month's seats sort on.
- *
- * A seat whose lane is not among the author's lanes (a post with no lane at
- * all, or a lane that is gone) is an orphan: it gets a row of its own at the
- * end, unlabelled, rather than a wrong label.
- */
-export function seatsByLane(
-  seats: Seat[],
-  categories: MyCategory[],
-): { rows: LaneRowSeats[]; orphans: Seat[] } {
-  const ordered = ROPE_ORDER === 'newest-first' ? [...seats].reverse() : seats;
-  const rows = categories.map((lane) => ({
-    lane,
-    seats: ordered.filter(({ splash }) => seatLane(splash) === lane.id),
-  }));
-  const orphans = ordered.filter(({ splash }) => {
-    const lane = seatLane(splash);
-    return lane === null || !categories.some((c) => c.id === lane);
-  });
-  return { rows, orphans };
-}
-
-/** The lane a post sits on: its declared lane, else its representative one. */
-function seatLane(splash: SplashSummary): string | null {
-  return splash.declaredLaneId ?? representativeLane(splash);
-}
-
 /** A custom shelf's posts, oldest first by where their range begins. */
 export function sessionSeats(
   summaries: SplashSummary[],

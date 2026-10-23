@@ -1,6 +1,5 @@
 'use client';
 
-import { WAVE_COLOR_CLASS } from './wave-math';
 import { usePrefersReducedMotion } from './use-reduced-motion';
 
 export type CommitRingProps = {
@@ -64,8 +63,10 @@ export function CommitRing({
 
   return (
     <span
-      className={`relative inline-flex items-center justify-center ${WAVE_COLOR_CLASS} ${className}`}
-      style={{ width: size, height: size }}
+      className={`relative inline-flex items-center justify-center ${className}`}
+      // Contrast-determined like every wave (H15c): blue on a page, white on
+      // the water ground, through the surface's --wave-ink.
+      style={{ width: size, height: size, color: 'var(--wave-ink)' }}
     >
       {/* Rings are grouped so their strength is one value, and so it cannot
           reach the content sitting beside them. */}

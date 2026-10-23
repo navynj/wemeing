@@ -561,6 +561,7 @@ export type Database = {
           declared_lane_id: string | null
           declared_start: string | null
           ends_at: string | null
+          icon: string | null
           id: string
           owner_id: string
           pinned_at: string | null
@@ -576,6 +577,7 @@ export type Database = {
           declared_lane_id?: string | null
           declared_start?: string | null
           ends_at?: string | null
+          icon?: string | null
           id?: string
           owner_id: string
           pinned_at?: string | null
@@ -591,6 +593,7 @@ export type Database = {
           declared_lane_id?: string | null
           declared_start?: string | null
           ends_at?: string | null
+          icon?: string | null
           id?: string
           owner_id?: string
           pinned_at?: string | null

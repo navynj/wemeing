@@ -8,6 +8,7 @@ import type { MyCategory } from '@/lib/queries/profile';
 import type { useOptimisticAction } from '@/lib/use-optimistic-action';
 
 import { deleteLane, reorderLanes, saveLane } from './actions';
+import { EmojiInput } from './emoji-input';
 
 /**
  * The lanes sheet: every lane in a row, its icon and its name edited in
@@ -195,12 +196,10 @@ export function LanesSheet({
                 >
                   <GripVertical aria-hidden size={16} />
                 </button>
-                <input
+                <EmojiInput
                   value={row.icon}
-                  onChange={(event) => edit(row.id, { icon: event.target.value })}
-                  aria-label={`Icon for ${row.name || 'this lane'}`}
-                  maxLength={8}
-                  className="bg-pool-100 h-12 w-12 shrink-0 rounded-full text-center text-xl outline-none"
+                  onChange={(icon) => edit(row.id, { icon })}
+                  label={`Icon for ${row.name || 'this lane'}`}
                 />
                 <input
                   value={row.name}

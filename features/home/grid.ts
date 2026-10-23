@@ -33,6 +33,8 @@ export type Card = {
   author?: string;
   /** In a pool: whose it is, for their face (0018). */
   authorId?: string;
+  /** In a pool: their name, written out under the mark and on the row (review). */
+  authorName?: string;
   /** A joint splash (H23): drawn as a band across the columns, each ripple a branch. */
   branches?: Branch[];
   /** On Home: the pools this post is shared to, as monogram chips. */
@@ -58,6 +60,8 @@ export type CardRipple = {
   initials?: string;
   /** In a pool: whose it is, for their face (0018). */
   authorId?: string;
+  /** In a pool: their name, written out in labels (review). */
+  authorName?: string;
 };
 
 /** What a card names as its lane: an emoji and a name. */

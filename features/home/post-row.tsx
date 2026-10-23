@@ -2,7 +2,7 @@
 
 import { CommitRing } from '@/components/ui/waves';
 import { Monogram } from '@/components/ui/monogram';
-import { Initials } from '@/features/people/avatar';
+import { PersonName } from '@/features/people/avatar';
 
 import { postIcon, type Card, type CardLane } from './grid';
 
@@ -86,8 +86,11 @@ export function PostRow({
       ))}
       {card.author ? (
         // In a pool's Date view each row says whose it is (H23).
-        <span data-row-author className="shrink-0 text-[10px] font-medium text-white/70">
-          <Initials id={card.authorId} initials={card.author} />
+        <span
+          data-row-author
+          className="max-w-20 shrink-0 truncate text-[10px] font-medium text-white/70"
+        >
+          <PersonName id={card.authorId} name={card.authorName ?? card.author} />
         </span>
       ) : null}
       {showLane && lane ? (

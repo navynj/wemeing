@@ -48,13 +48,6 @@ export function Avatar({
   );
 }
 
-/** A person's initials as text (a mark's or a row's author label), current with their name. */
-export function Initials({ id, initials }: { id?: string | null; initials: string }) {
-  const { people } = usePeople();
-  const person = id ? people[id] : undefined;
-  return <>{person ? initialsOf(person.name) : initials}</>;
-}
-
 /** A person's name as text, current with their latest edit. */
 export function PersonName({ id, name }: { id?: string | null; name: string }) {
   const { people } = usePeople();

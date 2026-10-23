@@ -446,6 +446,17 @@ describe('re-tapping Pool (review)', () => {
 });
 
 describe('faces (0018)', () => {
+  it('writes authors out by name in the Date view, never as initials', () => {
+    setView('date');
+    const { container } = ground(A);
+    const rows = [...container.querySelectorAll('[data-row-author]')].map((a) => a.textContent);
+    expect(new Set(rows)).toEqual(new Set(['Yoonji Lee', 'Mina']));
+    const subs = [...container.querySelectorAll('[data-joint-sub]')].map(
+      (row) => row.firstElementChild!.textContent,
+    );
+    expect(subs.sort()).toEqual(['Mina', 'Yoonji Lee']);
+  });
+
   const PEOPLE = {
     [ME]: { name: 'Yoonji Lee', photo: 'https://signed/me' },
     [MINA]: { name: 'Mina Kim', photo: 'https://signed/mina' },
@@ -484,7 +495,7 @@ describe('faces (0018)', () => {
     expect(container.querySelector(`[data-member="${GONE}"]`)!.textContent).toContain('GO');
   });
 
-  it('labels a mark with its author’s current initials', () => {
+  it('labels a mark with its author’s current name, written out', () => {
     setView('lane');
     const { container } = faces(A);
     expect(
@@ -492,6 +503,6 @@ describe('faces (0018)', () => {
         .querySelector('[data-mark="s-mina"]')
         ?.closest('[data-cell]')
         ?.querySelector('[data-mark-author]')?.textContent,
-    ).toBe('MK');
+    ).toBe('Mina Kim');
   });
 });

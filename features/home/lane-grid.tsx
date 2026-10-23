@@ -22,7 +22,7 @@ import { monthKey } from '@/features/splash/summary';
 import type { IsoDate } from '@/lib/time';
 
 import { Monogram } from '@/components/ui/monogram';
-import { Avatar, Initials, PersonName } from '@/features/people/avatar';
+import { Avatar, PersonName } from '@/features/people/avatar';
 import { usePeople } from '@/features/people/people-provider';
 
 import {
@@ -777,9 +777,9 @@ function Mark({
         // Whose it is, in a pool's Lane view (H23).
         <span
           data-mark-author
-          className={`text-[10px]/none font-medium text-white/60 ${dived ? 'opacity-60' : ''}`}
+          className={`max-w-full truncate text-[10px]/none font-medium text-white/60 ${dived ? 'opacity-60' : ''}`}
         >
-          <Initials id={card.authorId} initials={card.author} />
+          <PersonName id={card.authorId} name={card.authorName ?? card.author} />
         </span>
       ) : null}
     </span>

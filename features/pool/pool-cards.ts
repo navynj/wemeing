@@ -41,6 +41,7 @@ export function poolCards(
   now: Date = new Date(),
 ): Card[] {
   const initialsOf = new Map(view.members.map((m) => [m.userId, m.initials]));
+  const nameOf = new Map(view.members.map((m) => [m.userId, m.name]));
   // Each post is read in its author's zone (0013): its day is stored, and a
   // span's end day and a timed block's place are the author's too. `timeZone`
   // (mine) only stands in for an author whose profile is unreadable.
@@ -75,6 +76,7 @@ export function poolCards(
         createdAt: r.created_at,
         initials: initialsOf.get(r.author_id) ?? '',
         authorId: r.author_id,
+        authorName: nameOf.get(r.author_id),
       }));
     const href = poolSplashHref(view.pool.id, splash.id);
     if (splash.owner_id === null) {
@@ -112,6 +114,7 @@ export function poolCards(
       lane: lane ? { icon: lane.icon, name: lane.name } : null,
       author,
       authorId: splash.owner_id,
+      authorName: nameOf.get(splash.owner_id),
       href,
       origins,
       // My own post: my pin and my delete, as on Home. Someone else's: neither.

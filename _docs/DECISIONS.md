@@ -452,3 +452,5 @@ A member's column in Swimmers opens nothing.
   - My own splash shared into a pool: never; its pool lane follows my link.
   - The edit sheet shows only that pool's lane chips for joint and Just-mine splashes.
 - **0021:** `rename_pool` belongs to the creator only ("rename은 owner만"). It is offered as a Name field in Pool settings, shown at once and trimmed to 1–60 characters. Current members' origin tags follow the rename.
+
+**In a pool, Swimmers comes first, and a joint band spans the grid only there (review, 2026-10-23).** The pool's toggle reads Swimmers | Lane | Date. A pool with no remembered view opens on Swimmers, and re-tapping Pool walks the views in that order. A joint splash is a full-width band, with its ripple count and its writers' faces, only in Swimmers, where the columns are people. In the Lane view it is a mark in its pool lane's column like any other post. The Date view is unchanged.

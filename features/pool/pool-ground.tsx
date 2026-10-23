@@ -36,10 +36,11 @@ function nextView(view: PoolViewKind): PoolViewKind {
   return VIEWS[(at + 1) % VIEWS.length].value;
 }
 
-// Lane | Swimmers | Date (review): re-tapping Pool walks them in this order.
+// Swimmers | Lane | Date (review): a pool is its people first; re-tapping
+// Pool walks them in this order.
 const VIEWS = [
-  { value: 'lane', label: 'Lane' },
   { value: 'swimmers', label: 'Swimmers' },
+  { value: 'lane', label: 'Lane' },
   { value: 'date', label: 'Date' },
 ] as const satisfies readonly { value: PoolViewKind; label: string }[];
 
@@ -287,6 +288,8 @@ export function PoolGround({
             initials={null}
             scrollToMonth={null}
             onPick={bringForward}
+            // A joint splash spans every column only where columns are people.
+            bands={kind === 'swimmers'}
           />
         </div>
 

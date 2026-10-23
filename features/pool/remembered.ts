@@ -68,12 +68,12 @@ function subscribe(onChange: () => void): () => void {
 
 function readView(): PoolViewKind {
   const value = read(VIEW);
-  return value === 'date' || value === 'swimmers' ? value : 'lane';
+  return value === 'date' || value === 'lane' ? value : 'swimmers';
 }
 
-/** The view every pool shows, kept when switching pools (H23); Lane on the server. */
+/** The view every pool shows, kept when switching pools (H23); Swimmers first (review). */
 export function usePoolView(): [PoolViewKind, (view: PoolViewKind) => void] {
-  const view = useSyncExternalStore(subscribe, readView, () => 'lane' as const);
+  const view = useSyncExternalStore(subscribe, readView, () => 'swimmers' as const);
   const set = (next: PoolViewKind): void => {
     write(VIEW, next);
     window.dispatchEvent(new Event(EVENT));

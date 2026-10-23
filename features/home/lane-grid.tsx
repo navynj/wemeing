@@ -128,6 +128,11 @@ export const LaneGrid = forwardRef<
     /** My avatar opens my profile (0018); absent, it is only a face. */
     onAvatar?: () => void;
     /**
+     * A joint splash as a band across every column (H23): in a pool's
+     * Swimmers view only (review). Off, it is a mark in its own column.
+     */
+    bands?: boolean;
+    /**
      * The Lane view (the grid) or the Date view (round 3): the same scroller,
      * rail, window, `?m=` target and ring; in the Date view a day's posts are
      * pills, one per line, and there are no lane columns.
@@ -146,6 +151,7 @@ export const LaneGrid = forwardRef<
     onPick,
     onCreateLane,
     onAvatar,
+    bands = true,
     view = 'lane',
   },
   ref,
@@ -176,7 +182,8 @@ export const LaneGrid = forwardRef<
   );
 
   const plusColumn = onCreateLane !== undefined;
-  const orphans = cards.some((card) => !card.branches && isOrphanCard(card, categories));
+  const banded = (card: Card): boolean => bands && card.branches !== undefined;
+  const orphans = cards.some((card) => !banded(card) && isOrphanCard(card, categories));
   const columns = categories.length + (orphans ? 1 : 0);
   const even = dateView || columns <= EVEN_COLUMNS_MAX;
   // Every mark carries its short title (round 3). Past six lanes a column
@@ -200,8 +207,8 @@ export const LaneGrid = forwardRef<
   const byCell = useMemo(() => {
     const map = new Map<string, Card[]>();
     for (const card of cards) {
-      // A joint splash is a band, never a mark in a cell (H23).
-      if (card.branches) continue;
+      // A joint splash drawn as a band is never also a mark in a cell (H23).
+      if (bands && card.branches) continue;
       const lane = isOrphanCard(card, categories) ? '' : (cardColumn(card) ?? '');
       const key = `${card.day}|${lane}`;
       const cell = map.get(key);
@@ -209,7 +216,7 @@ export const LaneGrid = forwardRef<
       else map.set(key, [card]);
     }
     return map;
-  }, [cards, categories]);
+  }, [cards, categories, bands]);
 
   // The avatar row is sticky at the left and exactly as wide as the viewport,
   // so it never scrolls sideways with the columns.
@@ -497,7 +504,7 @@ export const LaneGrid = forwardRef<
               );
             }
             // A day holding only joint splashes is named on its first band's rail.
-            const joints = (byDay.get(day) ?? []).filter((card) => card.branches);
+            const joints = (byDay.get(day) ?? []).filter(banded);
             const plain = (byDay.get(day) ?? []).length > joints.length;
             return (
               <Fragment key={day}>

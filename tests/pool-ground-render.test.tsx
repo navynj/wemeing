@@ -213,8 +213,8 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('a joint splash on the grid (H23)', () => {
-  it('renders once as a band, never as a mark in a cell', () => {
-    setView('lane');
+  it('renders once as a band in Swimmers, never as a mark in a cell', () => {
+    setView('swimmers');
     const { container } = ground(A);
     expect(container.querySelectorAll('[data-joint-band="s-joint"]')).toHaveLength(1);
     expect(container.querySelectorAll('[data-cell] [data-mark="s-joint"]')).toHaveLength(0);
@@ -223,8 +223,8 @@ describe('a joint splash on the grid (H23)', () => {
   });
 
   it('counts its ripples and shows who wrote them at its right end, with no branches', () => {
-    for (const view of ['lane', 'swimmers'] as const) {
-      setView(view);
+    {
+      setView('swimmers');
       const { container } = ground(A);
       const band = container.querySelector('[data-joint-band="s-joint"]')!;
       expect(band.querySelector('[data-joint-count]')!.textContent).toBe('2 ripples');
@@ -237,7 +237,7 @@ describe('a joint splash on the grid (H23)', () => {
   });
 
   it('shows four faces, then +n', () => {
-    setView('lane');
+    setView('swimmers');
     const writers = ['u-1', 'u-2', 'u-3', 'u-4', 'u-5', 'u-6'];
     const crowded: PoolView = {
       ...A,
@@ -272,8 +272,15 @@ describe('a joint splash on the grid (H23)', () => {
     expect(container.querySelectorAll('[data-joint-sub]')).toHaveLength(2);
   });
 
-  it('comes to the top of the stack from its band', () => {
+  it('is a mark in its pool lane’s column in the Lane view, not a band (review)', () => {
     setView('lane');
+    const { container } = ground(A);
+    expect(container.querySelector('[data-joint-band]')).toBeNull();
+    expect(container.querySelector('[data-cell="l-media"] [data-mark="s-joint"]')).not.toBeNull();
+  });
+
+  it('comes to the top of the stack from its band', () => {
+    setView('swimmers');
     const { container } = ground(A);
     fireEvent.click(container.querySelector('[data-joint-band="s-joint"]')!);
     expect(container.querySelector('[data-mark="s-joint"]')!.hasAttribute('data-dived')).toBe(
@@ -418,8 +425,7 @@ describe('Just mine in the pool (0014)', () => {
 });
 
 describe('re-tapping Pool (review)', () => {
-  it('cycles Lane → Swimmers → Date → Lane, the toggle following, and keeps the last per device', () => {
-    setView('lane');
+  it('opens on Swimmers, then cycles Lane → Date → Swimmers, the toggle following, and keeps the last per device', () => {
     const { container } = ground(A);
     const tab = container.querySelector('[data-home-foot="phone"] [data-pool-tab]') as HTMLElement;
     const selected = (): string | null =>
@@ -430,18 +436,19 @@ describe('re-tapping Pool (review)', () => {
       [...container.querySelectorAll('[data-view-option]')].map((o) =>
         o.getAttribute('data-view-option'),
       ),
-    ).toEqual(['lane', 'swimmers', 'date']);
-    expect(selected()).toBe('lane');
-    fireEvent.click(tab);
+    ).toEqual(['swimmers', 'lane', 'date']);
+    // Nothing remembered yet: a pool opens on its people (review).
     expect(selected()).toBe('swimmers');
+    fireEvent.click(tab);
+    expect(selected()).toBe('lane');
     fireEvent.click(tab);
     expect(selected()).toBe('date');
     expect(window.localStorage.getItem('weming.pool-view')).toBe('date');
     fireEvent.click(tab);
-    expect(selected()).toBe('lane');
+    expect(selected()).toBe('swimmers');
     // The desktop rail cycles too.
     fireEvent.click(container.querySelector('[data-home-foot="wide"] [data-pool-tab]')!);
-    expect(selected()).toBe('swimmers');
+    expect(selected()).toBe('lane');
   });
 });
 

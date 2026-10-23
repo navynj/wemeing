@@ -10,6 +10,7 @@ import type { MyCategory } from '@/lib/queries/profile';
 import { joinPool } from './actions';
 import { LaneMatch } from './lane-match';
 import {
+  settleDirections,
   joinLabel,
   linkedCount,
   prefillLinks,
@@ -120,7 +121,11 @@ export function JoinFlow({
                 links: lanes.map((lane) => ({
                   poolLaneId: lane.key,
                   myCategoryId: links[lane.key] ?? null,
-                  direction: directions[lane.key] ?? 'both',
+                  direction: settleDirections(
+                    lanes.map((lane) => lane.key),
+                    links,
+                    directions,
+                  )[lane.key],
                 })),
                 includeHistory,
               });

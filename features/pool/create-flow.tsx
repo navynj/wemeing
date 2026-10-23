@@ -10,7 +10,14 @@ import type { MyCategory } from '@/lib/queries/profile';
 import { createPool } from './actions';
 import { LaneMatch } from './lane-match';
 import { LaneEditor, type DraftLane } from './lane-editor';
-import { joinLabel, linkedCount, prefillLinks, type Directions, type Links } from './match';
+import {
+  joinLabel,
+  linkedCount,
+  prefillLinks,
+  settleDirections,
+  type Directions,
+  type Links,
+} from './match';
 import { PrimaryButton, StepPage } from './step-page';
 
 /**
@@ -79,7 +86,11 @@ export function CreateFlow({ categories }: { categories: MyCategory[] }) {
                     icon: lane.icon,
                     description: lane.description,
                     myCategoryId: links[lane.key] ?? null,
-                    direction: directions[lane.key] ?? 'both',
+                    direction: settleDirections(
+                      lanes.map((lane) => lane.key),
+                      links,
+                      directions,
+                    )[lane.key],
                   })),
                   includeHistory,
                 });

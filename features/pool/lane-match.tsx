@@ -6,14 +6,8 @@ import { ChevronDown, X } from 'lucide-react';
 import { EmojiInput } from '@/features/lanes/emoji-input';
 import type { MyCategory } from '@/lib/queries/profile';
 
-import {
-  DEFAULT_DIRECTION,
-  DIRECTION_CAPTION,
-  DIRECTION_GLYPH,
-  nextDirection,
-  type LinkDirection,
-} from './direction';
-import type { Directions, Links, MatchLane } from './match';
+import { DIRECTION_CAPTION, DIRECTION_GLYPH, nextDirection, type LinkDirection } from './direction';
+import { sentBy, settleDirections, type Directions, type Links, type MatchLane } from './match';
 
 /**
  * Step 2 of 2 (1d), shared by create, join and Pool settings: one row per
@@ -56,7 +50,11 @@ export function LaneMatch({
   action: ReactNode;
 }) {
   const [making, setMaking] = useState(false);
-  const direction = (key: string): LinkDirection => directions[key] ?? DEFAULT_DIRECTION;
+  const keys = lanes.map((lane) => lane.key);
+  // What is shown is what is saved: the flows settle the same way.
+  const settled = settleDirections(keys, links, directions);
+  const direction = (key: string): LinkDirection => settled[key];
+  const nameOf = (key: string): string => lanes.find((lane) => lane.key === key)?.name ?? '';
   const unconnected = lanes.filter((lane) => !links[lane.key]);
 
   return (
@@ -77,6 +75,8 @@ export function LaneMatch({
         {lanes.map((lane) => {
           const chosen = links[lane.key] ?? null;
           const off = chosen === null;
+          // Its lane already sends to another pool lane: this one only brings in.
+          const held = sentBy(lane.key, keys, links, settled);
           return (
             <li
               key={lane.key}
@@ -100,19 +100,21 @@ export function LaneMatch({
                   <X size={18} className="text-pool-500/50" />
                 </span>
               ) : (
-                // The link's direction (0017): a tap cycles ↔ → → → ←. Ink,
-                // the selection channel; blue stays for actions.
+                // The link's direction (0017): a tap cycles ↔ ← →. Ink, the
+                // selection channel; blue stays for actions. Held to → while
+                // another row sends this lane.
                 <button
                   type="button"
                   data-match-direction={lane.key}
                   aria-label={`Direction: ${DIRECTION_CAPTION[direction(lane.key)]}`}
+                  disabled={held !== null}
                   onClick={() =>
                     onDirectionsChange({
-                      ...directions,
+                      ...settled,
                       [lane.key]: nextDirection(direction(lane.key)),
                     })
                   }
-                  className="text-ink flex h-9 w-9 items-center justify-center justify-self-center rounded-full bg-white text-lg/none font-semibold"
+                  className="text-ink flex h-9 w-9 items-center justify-center justify-self-center rounded-full bg-white text-lg/none font-semibold disabled:opacity-60"
                 >
                   {DIRECTION_GLYPH[direction(lane.key)]}
                 </button>
@@ -153,6 +155,11 @@ export function LaneMatch({
                   className="text-pool-500 col-span-3 text-center text-[10px]"
                 >
                   {DIRECTION_CAPTION[direction(lane.key)]}
+                  {held !== null ? (
+                    <span data-match-held className="block">
+                      Already shared to {nameOf(held)}
+                    </span>
+                  ) : null}
                 </span>
               )}
             </li>

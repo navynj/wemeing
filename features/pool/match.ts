@@ -1,4 +1,4 @@
-import type { LinkDirection } from './direction';
+import { DEFAULT_DIRECTION, sharesOut, type LinkDirection } from './direction';
 import { RESIDUAL_CATEGORY } from '@/features/auth/preset-categories';
 
 /** A pool lane as step 2 lists it: keyed, because on create it has no id yet. */
@@ -40,4 +40,40 @@ export function linkedCount(links: Links): number {
 export function joinLabel(count: number): string {
   if (count === 0) return 'Join without connecting';
   return `Connect ${count} ${count === 1 ? 'lane' : 'lanes'} and join`;
+}
+
+/**
+ * One sender per lane of mine in a pool (review): a lane's records go into at
+ * most one pool lane, so of the rows connecting the same lane only the first
+ * may send (↔ or ←); any later one brings in only (→). Bringing in from
+ * several pool lanes is fine. Every key comes back with its direction.
+ */
+export function settleDirections(keys: string[], links: Links, directions: Directions): Directions {
+  const sending = new Set<string>();
+  const settled: Directions = {};
+  for (const key of keys) {
+    let direction = directions[key] ?? DEFAULT_DIRECTION;
+    const mine = links[key];
+    if (mine && sharesOut(direction)) {
+      if (sending.has(mine)) direction = 'in';
+      else sending.add(mine);
+    }
+    settled[key] = direction;
+  }
+  return settled;
+}
+
+/** The row already sending this row's lane of mine, which holds this one to → only. */
+export function sentBy(
+  key: string,
+  keys: string[],
+  links: Links,
+  settled: Directions,
+): string | null {
+  const mine = links[key];
+  if (!mine) return null;
+  return (
+    keys.find((other) => other !== key && links[other] === mine && sharesOut(settled[other])) ??
+    null
+  );
 }

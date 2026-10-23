@@ -11,7 +11,7 @@ import { setLaneLinks } from './actions';
 import { DeletePool } from './delete-pool';
 import { InvitePanel } from './invite-panel';
 import { LaneMatch } from './lane-match';
-import type { Directions, Links } from './match';
+import { settleDirections, type Directions, type Links } from './match';
 import { PrimaryButton, StepPage } from './step-page';
 
 /**
@@ -97,7 +97,11 @@ export function PoolSettings({
                   view.lanes.map((lane) => ({
                     poolLaneId: lane.id,
                     myCategoryId: links[lane.id] ?? null,
-                    direction: directions[lane.id] ?? 'both',
+                    direction: settleDirections(
+                      view.lanes.map((lane) => lane.id),
+                      links,
+                      directions,
+                    )[lane.id],
                   })),
                 );
                 setBusy(false);

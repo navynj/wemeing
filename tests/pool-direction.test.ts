@@ -71,13 +71,14 @@ describe('the Audience default from Home (0017)', () => {
 });
 
 describe('the direction control', () => {
-  it('cycles ↔ → → → ← → ↔, each with its caption', () => {
+  it('cycles both → out → in, drawn ↔ ← → with the pool lane at the left', () => {
     expect(nextDirection('both')).toBe('out');
     expect(nextDirection('out')).toBe('in');
     expect(nextDirection('in')).toBe('both');
-    expect(DIRECTION_GLYPH).toEqual({ out: '→', both: '↔', in: '←' });
+    // Arrows point where records go: mine (right) into the pool (left) is ←.
+    expect(DIRECTION_GLYPH).toEqual({ out: '←', both: '↔', in: '→' });
     expect(DIRECTION_CAPTION).toEqual({
-      out: 'Share my records',
+      out: 'Share my records to the pool',
       both: 'Share both ways',
       in: 'Bring pool records to my lane',
     });

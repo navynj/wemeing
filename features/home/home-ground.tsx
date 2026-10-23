@@ -142,7 +142,7 @@ export function HomeGround({
     () => (scrollToMonth ? newestIn(shown, scrollToMonth)?.splash.id : null) ?? ids[0] ?? null,
   );
   const flip = useFlip(ids, initialTop, board === 'stair' ? -1 : 1);
-  const { topId, n, bringForward } = flip;
+  const { topId, bringForward } = flip;
   const goTo = bringForward;
 
   // The ring: at the mark of whichever card comes to the top, at a drop,
@@ -180,8 +180,9 @@ export function HomeGround({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollToMonth]);
 
-  // The upper stair, read: translucent on the grid.
-  const waterIds = useMemo(() => new Set(ids.slice(0, n)), [ids, n]);
+  // Every mark but the top card's reads translucent (review): the one solid
+  // mark is the post being read.
+  const waterIds = useMemo(() => new Set(ids.filter((id) => id !== topId)), [ids, topId]);
 
   return (
     <div data-home-ground className="water-ground flex min-h-0 flex-1 flex-col">

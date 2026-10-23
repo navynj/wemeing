@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, useTransform, type PanInfo } from 'motion/react';
 
+import { useWide } from '@/components/ui/use-wide';
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
 import type { MyCategory } from '@/lib/queries/profile';
 
-import { CARD_PX, CardFace, face } from './card-face';
+import { CARD_PX, CardFace, face, SPINE_PX } from './card-face';
 import { CardMenu } from './card-menu';
 import { cardLane, type Card } from './grid';
 import type { Flip } from './use-flip';
@@ -22,11 +23,13 @@ const DOWN = 3;
 const UP = 1;
 /** The board's box on a phone: the top card and the lower stair; the upper stair rises above it, into the water. */
 export const STACK_PX = CARD_PX + DOWN * STEP_PX;
+/** Sideways, the top card is never narrower than this; fewer cards fan to the right before it would be. */
+const MIN_CARD_WIDTH_PX = 320;
 /**
  * The fills, one family centred on the top card (review): below it the pale
  * tint, then back toward white — as fractions of the water blue mixed into
  * white. Above it the one read card is **frosted glass** under the water:
- * the pale tint at 40% over a blurred backdrop (`.frosted`, with the solid
+ * the pale tint at 50% over a blurred backdrop (`.frosted`, with the solid
  * fallback where blur is unsupported), so the marks and ropes behind soften
  * instead of showing through; no edge line; its words white at 60%.
  */
@@ -38,32 +41,49 @@ const UP_INK = 0.6;
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 
+/** The stair's geometry: the top card's size, which way the stair runs, how many cards show each way. */
+export type Stair = {
+  horizontal: boolean;
+  width: number;
+  height: number;
+  down: number;
+  up: number;
+};
+
 /**
- * Where a card sits `d` steps from the top — negative above (read), zero on
- * top, positive below (unread) — as a continuous function, so one spring on
- * the stack's depth moves every card one step at once. A card a step away
- * is smaller about its centre, so its translate makes up the difference and
- * its visible edge stays exactly one step.
+ * Where a card sits `d` steps from the top — negative before it (read),
+ * zero on top, positive after it (unread) — as a continuous function, so
+ * one spring on the stack's depth moves every card one step at once. A
+ * card a step away is smaller about its centre, so its translate makes up
+ * the difference and its visible edge stays exactly one step. On a phone
+ * the stair runs down the screen; sideways on a wide screen, the read card
+ * to the left toward the water and the unread fanning right.
  */
 export function seat(
   d: number,
-  cardHeight: number = CARD_PX,
+  stair: Stair,
 ): {
+  x: number;
   y: number;
   scale: number;
   opacity: number;
-  height: number;
   background: string;
   ink: number;
 } {
   const steps = Math.abs(d);
   const scale = STEP_SCALE ** steps;
-  const height = cardHeight;
-  const shrink = (height * (1 - scale)) / 2;
-  const y = d >= 0 ? STEP_PX * d + shrink : UP_STEP_PX * d - shrink;
+  let x = 0;
+  let y = 0;
+  if (stair.horizontal) {
+    const shrink = (stair.width * (1 - scale)) / 2;
+    x = d >= 0 ? SPINE_PX * d + shrink : SPINE_PX * d - shrink;
+  } else {
+    const shrink = (stair.height * (1 - scale)) / 2;
+    y = d >= 0 ? STEP_PX * d + shrink : UP_STEP_PX * d - shrink;
+  }
   let opacity: number;
-  if (d >= 0) opacity = steps <= DOWN ? 1 : Math.max(0, 1 - (steps - DOWN) * 2);
-  else opacity = steps <= UP ? 1 : Math.max(0, 1 - (steps - UP) * 2);
+  if (d >= 0) opacity = steps <= stair.down ? 1 : Math.max(0, 1 - (steps - stair.down) * 2);
+  else opacity = steps <= stair.up ? 1 : Math.max(0, 1 - (steps - stair.up) * 2);
   if (d >= 0) {
     // The fill, read off the ramp between its two nearest steps.
     const at = Math.min(steps, DOWN_TINTS.length - 1);
@@ -73,25 +93,26 @@ export function seat(
       DOWN_TINTS[Math.min(low + 1, DOWN_TINTS.length - 1)],
       at - low,
     );
-    return { y, scale, opacity, height, background: face(tint), ink: 1 };
+    return { x, y, scale, opacity, background: face(tint), ink: 1 };
   }
-  // Under the water: on its way up from the top card a white card becomes
+  // Under the water: on its way from the top card a white card becomes
   // the frost.
   const rise = Math.min(1, steps);
   const alpha = lerp(1, UP_FILL, rise);
   const channel = (white: number, frost: number): number => Math.round(lerp(white, frost, rise));
   const ink = lerp(1, UP_INK, rise);
   return {
+    x,
     y,
     scale,
     opacity,
-    height,
     background: `rgba(${channel(255, FROST[0])}, ${channel(255, FROST[1])}, ${channel(255, FROST[2])}, ${alpha.toFixed(3)})`,
     ink,
   };
 }
 
-/** * The diving board as a staircase (H22, review): the top card is the
+/**
+ * The diving board as a staircase (H22, review): the top card is the
  * current step. Unread cards step down below it, each peeking below the one
  * before by a step, smaller and a shade paler, three at most; the one card
  * read last steps up above it by a shorter step — a bookmark — free to sit
@@ -107,6 +128,14 @@ export function seat(
  * down); swipe up on the top card to flip forward, down to flip back. No
  * chevrons, no strips. Under reduced motion the cards take their seats at
  * once and the old and new top crossfade.
+ *
+ * **Sideways on a wide screen** (review): the read card to the left of the
+ * top card, toward the water, the unread fanning to the right — as many as
+ * fit without crossing the right edge. A peeking card is a book spine, 44px
+ * wide: the lane emoji at the top, the title written downward. Click brings
+ * it to the top with the same motion; the arrow keys flip back and forward
+ * when the stack has focus; drag the top card left to flip forward, right
+ * to flip back.
  */
 export function StairBoard({
   cards,
@@ -126,44 +155,77 @@ export function StairBoard({
   onPin: (card: Card, pinned: boolean) => void;
   onDelete: (card: Card) => void;
 }) {
-  const { ids, n, next } = flip;
+  const { ids, n, next, bringForward } = flip;
   const byId = new Map(cards.map((card) => [card.splash.id, card]));
+  const horizontal = useWide();
 
-  // On a wide screen the board fills its half, and the top card grows with
-  // the room (review): the box is measured, the lower stair's steps come
-  // off it, the rest is the card. On a phone the box is the card's own.
+  // The board measures its room. On a phone the box is the card's own and
+  // the stair runs down; on a wide screen the board fills its half, the
+  // stair runs sideways, and the top card takes what the spines leave.
   const box = useRef<HTMLDivElement>(null);
-  const [room, setRoom] = useState<number | null>(null);
+  const [room, setRoom] = useState<{ width: number; height: number } | null>(null);
   useEffect(() => {
     const el = box.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(() => setRoom(el.clientHeight));
+    const observer = new ResizeObserver(() =>
+      setRoom({ width: el.clientWidth, height: el.clientHeight }),
+    );
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-  const cardHeight = Math.max(CARD_PX, (room ?? 0) - DOWN * STEP_PX);
-  const stackHeight = cardHeight + DOWN * STEP_PX;
+  let stair: Stair;
+  if (horizontal) {
+    const width = room?.width ?? 0;
+    const height = room?.height ?? 0;
+    // As many right-hand cards as fit before the top card would be too narrow.
+    const down = Math.max(
+      1,
+      Math.min(DOWN, Math.floor((width - SPINE_PX - MIN_CARD_WIDTH_PX) / SPINE_PX)),
+    );
+    stair = {
+      horizontal: true,
+      width: Math.max(MIN_CARD_WIDTH_PX, width - SPINE_PX * (UP + down)),
+      height: Math.max(CARD_PX, height),
+      down,
+      up: UP,
+    };
+  } else {
+    stair = {
+      horizontal: false,
+      width: room?.width ?? 0,
+      height: Math.max(CARD_PX, (room?.height ?? 0) - DOWN * STEP_PX),
+      down: DOWN,
+      up: UP,
+    };
+  }
+  const stackHeight = horizontal ? stair.height : stair.height + DOWN * STEP_PX;
 
-  // The finger on the top card: up flips forward, down flips back; which is
-  // not known until it has moved, so the grab waits for the first move.
+  // The finger on the top card: up (left, sideways) flips forward, down
+  // (right) flips back; which is not known until it has moved, so the grab
+  // waits for the first move.
   const panned = useRef(false);
   const grabbed = useRef(false);
+  const along = (info: PanInfo): { offset: number; velocity: number } =>
+    horizontal
+      ? { offset: info.offset.x, velocity: info.velocity.x }
+      : { offset: info.offset.y, velocity: info.velocity.y };
   const onPanStart = (): void => {
     panned.current = true;
     grabbed.current = false;
   };
   const onPan = (_: PointerEvent, info: PanInfo): void => {
+    const { offset } = along(info);
     if (!grabbed.current) {
-      if (Math.abs(info.offset.y) < 4) return;
-      const target = info.offset.y < 0 ? ids[n + 1] : ids[n - 1];
+      if (Math.abs(offset) < 4) return;
+      const target = offset < 0 ? ids[n + 1] : ids[n - 1];
       if (!target) return;
       grabbed.current = true;
       flip.grab(target);
     }
-    flip.move(info.offset.y);
+    flip.move(offset);
   };
   const onPanEnd = (_: PointerEvent, info: PanInfo): void => {
-    if (grabbed.current) flip.release(info.velocity.y);
+    if (grabbed.current) flip.release(along(info).velocity);
     window.setTimeout(() => {
       panned.current = false;
     }, 0);
@@ -174,11 +236,19 @@ export function StairBoard({
       event.stopPropagation();
     }
   };
+  // The arrow keys, when the stack has focus: left back, right forward.
+  const onKeyDown = (event: React.KeyboardEvent): void => {
+    const target =
+      event.key === 'ArrowRight' ? ids[n + 1] : event.key === 'ArrowLeft' ? ids[n - 1] : null;
+    if (!target) return;
+    event.preventDefault();
+    bringForward(target);
+  };
 
   // Only what can be seen is rendered: the two stairs around the top, at
   // both ends of the motion in flight.
   const first = Math.max(0, Math.min(n, next) - UP);
-  const last = Math.min(ids.length - 1, Math.max(n, next) + DOWN);
+  const last = Math.min(ids.length - 1, Math.max(n, next) + stair.down);
   const pages: number[] = [];
   for (let i = first; i <= last; i += 1) pages.push(i);
 
@@ -187,12 +257,15 @@ export function StairBoard({
       ref={box}
       data-diving-board
       data-board="stair"
-      className="relative z-10 shrink-0 px-4 lg:min-h-0 lg:flex-1"
+      className="relative z-10 shrink-0 px-4 lg:min-h-0 lg:flex-1 lg:px-0"
     >
       {cards.length > 0 ? (
         <div
           data-stack
-          className="relative select-none"
+          data-axis={horizontal ? 'x' : 'y'}
+          tabIndex={0}
+          onKeyDown={onKeyDown}
+          className="relative outline-none select-none"
           style={{ height: stackHeight, touchAction: 'none' }}
         >
           {pages.map((i) => {
@@ -203,13 +276,13 @@ export function StairBoard({
                 card={card}
                 index={i}
                 flip={flip}
+                stair={stair}
                 lane={categories.find((c) => c.id === cardLane(card.splash)) ?? null}
                 initials={initials}
                 onPanStart={onPanStart}
                 onPan={onPan}
                 onPanEnd={onPanEnd}
                 guard={guard}
-                cardHeight={cardHeight}
                 pinned={pinnedIds.has(card.splash.id)}
                 onPin={(pinned) => onPin(card, pinned)}
                 onDelete={() => onDelete(card)}
@@ -227,13 +300,13 @@ function Step({
   card,
   index,
   flip,
+  stair,
   lane,
   initials,
   onPanStart,
   onPan,
   onPanEnd,
   guard,
-  cardHeight,
   pinned,
   onPin,
   onDelete,
@@ -241,13 +314,13 @@ function Step({
   card: Card;
   index: number;
   flip: Flip;
+  stair: Stair;
   lane: MyCategory | null;
   initials: string;
   onPanStart: () => void;
   onPan: (event: PointerEvent, info: PanInfo) => void;
   onPanEnd: (event: PointerEvent, info: PanInfo) => void;
   guard: (event: React.MouseEvent) => void;
-  cardHeight: number;
   pinned: boolean;
   onPin: (pinned: boolean) => void;
   onDelete: () => void;
@@ -258,48 +331,64 @@ function Step({
   const from = i - n;
   const to = i - next;
   const moving = from !== to;
+  const { horizontal } = stair;
 
   // The card's distance from the top as the stack's depth moves.
   const d = useTransform(p, (v) => (reducedMotion ? to : lerp(from, to, clamp01(v))));
-  const y = useTransform(d, (v) => seat(v, cardHeight).y);
-  const scale = useTransform(d, (v) => seat(v, cardHeight).scale);
+  const y = useTransform(d, (v) => seat(v, stair).y);
+  const x = useTransform(d, (v) => seat(v, stair).x);
+  const scale = useTransform(d, (v) => seat(v, stair).scale);
   const opacity = useTransform([d, p], ([v, pv]) => {
-    const at = seat(v as number, cardHeight).opacity;
+    const at = seat(v as number, stair).opacity;
     if (!reducedMotion || !moving) return at;
     // Reduced motion: the old top fades out as the new one fades in.
     if (from === 0) return at * (1 - clamp01(pv as number));
     if (to === 0) return at * clamp01(pv as number);
     return at;
   });
-  const background = useTransform(d, (v) => seat(v, cardHeight).background);
+  const background = useTransform(d, (v) => seat(v, stair).background);
   // A card moving to or from the top carries both faces and crossfades them
   // on its distance from the top, so nothing switches when it lands.
   const fullOpacity = useTransform(d, (v) => 1 - clamp01(Math.abs(v)));
   const edgeOpacity = useTransform(d, (v) => clamp01(Math.abs(v)));
-  const height = useTransform(d, (v) => seat(v, cardHeight).height);
-  const inkOpacity = useTransform(d, (v) => seat(v, cardHeight).ink);
+  const inkOpacity = useTransform(d, (v) => seat(v, stair).ink);
   // Nearer the top, nearer the eye; a card rising from below over one sliding up.
   const zIndex = useTransform(d, (v) => Math.round((30 - Math.abs(v)) * 10) + (v >= 0 ? 1 : 0));
 
   const onTop = to === 0;
-  const stair = to === 0 ? 'top' : to < 0 ? 'up' : 'down';
+  const stairSide = to === 0 ? 'top' : to < 0 ? 'up' : 'down';
   // Which stair's edge a card shows when it is not on top: by where it is
   // going, or, moving between two stairs, by where it was.
   const touchesTop = moving && (from === 0 || to === 0);
   const side = touchesTop ? (from < 0 || to < 0 ? 'up' : 'down') : from < 0 ? 'up' : 'down';
-  const edgeSide = moving ? side : stair === 'up' ? 'up' : 'down';
-  const frosted = stair === 'up' || (moving && from < 0);
+  const edgeSide = moving ? side : stairSide === 'up' ? 'up' : 'down';
+  const frosted = stairSide === 'up' || (moving && from < 0);
   const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
+  const edge = horizontal
+    ? edgeSide === 'up'
+      ? 'left'
+      : 'right'
+    : edgeSide === 'up'
+      ? 'top'
+      : 'bottom';
 
   return (
     <motion.div
       data-stack-card={card.splash.id}
       data-slot={from}
-      data-stair={stair}
+      data-stair={stairSide}
       data-step={Math.abs(to)}
       data-moving={moving ? (to < from ? 'up' : 'down') : undefined}
-      className="absolute inset-x-0 top-0 origin-center"
-      style={{ y, scale, opacity, zIndex, height }}
+      className={`absolute top-0 origin-center ${horizontal ? '' : 'inset-x-0'}`}
+      style={{
+        x,
+        y,
+        scale,
+        opacity,
+        zIndex,
+        height: stair.height,
+        ...(horizontal ? { left: SPINE_PX, width: stair.width } : {}),
+      }}
       onPanStart={onTop ? onPanStart : undefined}
       onPan={onTop ? onPan : undefined}
       onPanEnd={onTop ? onPanEnd : undefined}
@@ -335,22 +424,27 @@ function Step({
             className="absolute inset-0"
             style={{ opacity: touchesTop ? edgeOpacity : 1 }}
           >
-            {/* A step: its visible edge is a seat, one tap to the top. */}
+            {/* A step: its visible edge is a seat, one tap to the top. Sideways
+                the whole face is, the cards in front covering the rest. */}
             {!moving ? (
               <button
                 type="button"
                 data-step-card={card.splash.id}
                 aria-label={`Bring ${title} to the top`}
                 onClick={() => bringForward(card.splash.id)}
-                className={`absolute inset-x-0 z-10 cursor-pointer ${stair === 'up' ? 'top-0' : 'bottom-0'}`}
-                style={{ height: stair === 'up' ? UP_STEP_PX : STEP_PX }}
+                className={`absolute z-10 cursor-pointer ${
+                  horizontal ? 'inset-0' : `inset-x-0 ${stairSide === 'up' ? 'top-0' : 'bottom-0'}`
+                }`}
+                style={
+                  horizontal ? undefined : { height: stairSide === 'up' ? UP_STEP_PX : STEP_PX }
+                }
               />
             ) : null}
             <CardFace
               card={card}
               lane={lane}
               initials={initials}
-              edge={edgeSide === 'up' ? 'top' : 'bottom'}
+              edge={edge}
               ink={edgeSide === 'up' ? 'white' : 'blue'}
             />
           </motion.div>

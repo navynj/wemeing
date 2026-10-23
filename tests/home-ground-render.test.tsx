@@ -481,7 +481,10 @@ describe('the diving board, a staircase', () => {
     expect(topCard(container).getAttribute('data-stack-card')).toBe('mid');
     expect(stair(container, 'up')).toEqual(['late']);
     expect(stair(container, 'down')).toEqual(['soup', 'early', 'aug']);
-    expect(water(container)).toEqual(['late']);
+    // One solid mark, the top card's; every other translucent.
+    expect(water(container)).not.toContain('mid');
+    expect(water(container)).toContain('late');
+    expect(water(container)).toContain('soup');
     await ringed(container, 'mid');
     expect(container.querySelectorAll('[data-ring]')).toHaveLength(1);
   });
@@ -494,7 +497,7 @@ describe('the diving board, a staircase', () => {
     await settled(container);
     expect(topCard(container).getAttribute('data-stack-card')).toBe('late');
     expect(stair(container, 'up')).toEqual([]);
-    expect(water(container)).toEqual([]);
+    expect(water(container)).not.toContain('late');
     await ringed(container, 'late');
   });
 
@@ -505,7 +508,8 @@ describe('the diving board, a staircase', () => {
     expect(topCard(container).getAttribute('data-stack-card')).toBe('soup');
     // One read card above, the one read last; the rest wait at their marks.
     expect(stair(container, 'up')).toEqual(['mid']);
-    expect(water(container).sort()).toEqual(['late', 'mid']);
+    expect(water(container)).not.toContain('soup');
+    expect(water(container)).toContain('mid');
   });
 
   it('brings a tapped mark\u2019s card to the top with the same motion, read cards above it', async () => {
@@ -516,6 +520,7 @@ describe('the diving board, a staircase', () => {
     expect(topCard(container).getAttribute('data-stack-card')).toBe('aug');
     expect(stair(container, 'up')).toEqual(['early']);
     expect(water(container)).toHaveLength(4);
+    expect(water(container)).not.toContain('aug');
     await ringed(container, 'aug');
     fireEvent.click(container.querySelector('[data-mark="mid"][data-dived]')!);
     await settled(container);
@@ -606,6 +611,67 @@ describe('the diving board, a staircase', () => {
   });
 });
 
+describe('the staircase sideways, on a wide screen', () => {
+  const wide = (): void => {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      configurable: true,
+      value: (query: string) => ({
+        matches: query.includes('min-width'),
+        media: query,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        onchange: null,
+        dispatchEvent: () => false,
+      }),
+    });
+  };
+  const translateX = (el: Element): number =>
+    Number(/translateX\((-?[\d.]+)px\)/.exec((el as HTMLElement).style.transform)?.[1] ?? 0);
+
+  it('runs left to right after a flip forward: the read card left of the top, the stair to its right', async () => {
+    wide();
+    const { container } = ground();
+    expect(container.querySelector('[data-stack]')!.getAttribute('data-axis')).toBe('x');
+    fireEvent.click(container.querySelector('[data-step-card="mid"]')!);
+    await settled(container);
+    const read = container.querySelector('[data-stack-card="late"]')!;
+    expect(read.getAttribute('data-stair')).toBe('up');
+    expect(translateX(read)).toBeLessThan(0);
+    for (const id of stair(container, 'down')) {
+      expect(translateX(container.querySelector(`[data-stack-card="${id}"]`)!)).toBeGreaterThan(0);
+    }
+    expect(translateX(topCard(container))).toBe(0);
+  });
+
+  it('writes a peeking title downward on its 44px spine', () => {
+    wide();
+    const { container } = ground();
+    const spine = container.querySelector<HTMLElement>(
+      '[data-stack-card="mid"] [data-card-spine]',
+    )!;
+    const title = spine.querySelector<HTMLElement>('[data-card-title]')!;
+    expect(title.style.writingMode).toBe('vertical-rl');
+    expect(title.style.textOrientation).toBe('mixed');
+    expect(spine.style.width).toBe('44px');
+    expect(spine.textContent).toContain('📍');
+  });
+
+  it('flips with the arrow keys when the stack has focus', async () => {
+    wide();
+    const { container } = ground();
+    const stack = container.querySelector('[data-stack]')!;
+    fireEvent.keyDown(stack, { key: 'ArrowRight' });
+    await settled(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('mid');
+    fireEvent.keyDown(stack, { key: 'ArrowLeft' });
+    await settled(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('late');
+  });
+});
+
 describe('the post just dropped', () => {
   it('is on the grid at once with the ring, and lands on top of the stack', async () => {
     const fresh = post('fresh', 'Just dropped', [block('f', '2026-09-25', 'c-place')]);
@@ -616,6 +682,7 @@ describe('the post just dropped', () => {
     await settled(container);
     expect(topCard(container).getAttribute('data-stack-card')).toBe('fresh');
     expect(stair(container, 'up')).toEqual([]);
+    expect(water(container)).not.toContain('fresh');
     await ringed(container, 'fresh');
     expect(container.querySelectorAll('[data-commit-ripple]')).toHaveLength(1);
   });

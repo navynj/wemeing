@@ -70,9 +70,9 @@ export type GridHandle = {
  * weekday, the year and month only where the month changes) at one quiet
  * opacity. A post is a white disc carrying its lane's emoji, centred on its
  * column at its day; several on one lane and day stack within the row, and
- * the row grows to hold them. A post in the board's upper stair, read,
- * keeps a translucent mark here (review); tapping any mark brings its card
- * to the top. A run of
+ * the row grows to hold them. The post on top of the board has the one
+ * solid mark; every other reads translucent (review); tapping any mark
+ * brings its card to the top. A run of
  * empty days is one short gap of empty ropes with no date on the rail
  * (review): the past compresses rather than stretching by the calendar,
  * and only a day with something on it is named.
@@ -101,7 +101,7 @@ export const LaneGrid = forwardRef<
     today: IsoDate;
     /** The mark to ring, once per `seq`. */
     ring: Ring | null;
-    /** Posts in the upper stair, read: their marks read translucent (review). */
+    /** Every post but the one on top of the board: their marks read translucent (review). */
     waterIds: ReadonlySet<string>;
     initials: string;
     /** `?m=`: the month to scroll the grid to; the newest day of it lands under the headers. */
@@ -499,9 +499,9 @@ function Cell({
 }
 
 /**
- * A post's mark: a white disc with its lane's emoji, translucent while the
- * post sits read in the board's upper stair, the ring around it when Home
- * says so. A
+ * A post's mark: a white disc with its lane's emoji, solid for the post on
+ * top of the board and translucent for every other, the ring around it
+ * when Home says so. A
  * post on no lane of mine has no emoji to show, so its disc is an outline —
  * a seat with nothing on it, never a blank white coin.
  */

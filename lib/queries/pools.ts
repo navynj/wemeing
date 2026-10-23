@@ -1,4 +1,5 @@
 import { initialsOf } from '@/features/home/grid';
+import { originTag } from '@/features/pool/origin-tag';
 import type { Splash } from '@/features/splash/summary';
 import type { Database } from '@/lib/database.types';
 import type { DuringClient } from '@/lib/queries/profile';
@@ -53,7 +54,8 @@ export type Placement = {
 };
 
 export type PoolView = {
-  pool: Pick<PoolRow, 'id' | 'name'>;
+  /** `ownerId`: the creator, who alone may delete the pool (0015); null once their account is gone. */
+  pool: Pick<PoolRow, 'id' | 'name'> & { ownerId: string | null };
   /** Current members, me first then join order (D7), then former members who kept theirs. */
   members: PoolMember[];
   lanes: PoolLane[];
@@ -179,7 +181,7 @@ export async function getPoolView(
 ): Promise<PoolView | null> {
   const { data: pool, error } = await supabase
     .from('pools')
-    .select('id, name')
+    .select('id, name, owner_id')
     .eq('id', poolId)
     .maybeSingle();
   if (error) throw error;
@@ -249,7 +251,7 @@ export async function getPoolView(
   }
 
   return {
-    pool,
+    pool: { id: pool.id, name: pool.name, ownerId: pool.owner_id },
     members: orderMembers(members.map(toMember), me),
     lanes: lanes.data ?? [],
     myLinks: (links.data ?? []).map((l) => ({
@@ -358,4 +360,56 @@ export async function getJointSplashes(supabase: DuringClient, ids: string[]): P
     .is('owner_id', null);
   if (error) throw error;
   return data;
+}
+
+/**
+ * Where each of my splashes is or was in a pool (0015), one tag per pool:
+ * the live pool and pool lane names while I am in it, so renames show at
+ * once; the placement's frozen snapshot once I have left; and a recorded
+ * origin for every pool since deleted. Only placements still switched on.
+ */
+export async function getMyOriginTags(
+  supabase: DuringClient,
+  me: string,
+): Promise<Map<string, string[]>> {
+  const [placed, origins] = await Promise.all([
+    supabase
+      .from('splash_placements')
+      .select(
+        'splash_id, shared, origin_pool_name, origin_pool_lane_name, origin_pool_lane_icon, pool:pools(name), lane:pool_lanes(name, icon), splash:splashes!inner(owner_id)',
+      )
+      .eq('splash.owner_id', me)
+      .eq('shared', true)
+      .returns<
+        {
+          splash_id: string;
+          origin_pool_name: string | null;
+          origin_pool_lane_name: string | null;
+          origin_pool_lane_icon: string | null;
+          pool: { name: string } | null;
+          lane: { name: string; icon: string | null } | null;
+        }[]
+      >(),
+    supabase
+      .from('splash_origins')
+      .select('splash_id, pool_name, pool_lane_name, pool_lane_icon')
+      .order('recorded_at'),
+  ]);
+  if (placed.error) throw placed.error;
+  if (origins.error) throw origins.error;
+  const tags = new Map<string, string[]>();
+  const add = (id: string, tag: string): void => {
+    tags.set(id, [...(tags.get(id) ?? []), tag]);
+  };
+  for (const p of placed.data) {
+    const live = p.pool && p.lane;
+    const pool = live ? p.pool!.name : p.origin_pool_name;
+    const lane = live ? p.lane!.name : p.origin_pool_lane_name;
+    const icon = live ? p.lane!.icon : p.origin_pool_lane_icon;
+    if (pool && lane) add(p.splash_id, originTag(pool, icon, lane));
+  }
+  for (const o of origins.data) {
+    add(o.splash_id, originTag(o.pool_name, o.pool_lane_icon, o.pool_lane_name));
+  }
+  return tags;
 }

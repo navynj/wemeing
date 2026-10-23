@@ -13,7 +13,12 @@ import { HomeGround } from '@/features/home/home-ground';
 import { scopedMonth } from '@/features/home/scope';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
 import { withPoolBadge } from '@/features/pool/home-badge';
-import { getJointSplashes, getMyPlacements, getMyPoolNames } from '@/lib/queries/pools';
+import {
+  getJointSplashes,
+  getMyOriginTags,
+  getMyPlacements,
+  getMyPoolNames,
+} from '@/lib/queries/pools';
 import { getMySplashes, summarizeSplashes } from '@/lib/queries/splashes';
 import { getMyTrail } from '@/lib/queries/trail';
 import { createClient } from '@/lib/supabase/server';
@@ -45,11 +50,12 @@ export default async function HomePage({ searchParams }: PageProps<'/'>) {
   const requested = one(params.m);
   const month = requested ? scopedMonth(requested, today) : null;
 
-  const [ripples, categories, mine, pools] = await Promise.all([
+  const [ripples, categories, mine, pools, originTags] = await Promise.all([
     getMyTrail(supabase, profile.id, profile.timezone),
     getMyCategories(supabase),
     getMySplashes(supabase, profile.id),
     getMyPoolNames(supabase, profile.id),
+    getMyOriginTags(supabase, profile.id),
   ]);
   // My ripples on joint splashes show here too (H23): the splash, with only
   // my ripples on it, at my ripple's lane. One I can no longer read (a pool
@@ -124,6 +130,11 @@ export default async function HomePage({ searchParams }: PageProps<'/'>) {
         };
       }
       return withPoolBadge(card, jointPool, poolName);
+    })
+    // Where each is or was in a pool, on its card (0015).
+    .map((card) => {
+      const tags = originTags.get(card.splash.id);
+      return tags ? { ...card, origins: tags } : card;
     })
     .sort(byNewest);
   const pinned = summaries

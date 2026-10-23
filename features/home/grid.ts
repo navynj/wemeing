@@ -35,6 +35,8 @@ export type Card = {
   branches?: Branch[];
   /** On Home: the pools this post is shared to, as monogram chips. */
   pools?: string[];
+  /** Where it is or was in a pool (0015): "<Pool> · <emoji> <pool lane>", one per pool. */
+  origins?: string[];
   /** Where the top card opens, when not the post's own page from Home. */
   href?: string;
   /** What the top card's menu offers; both when absent. In a pool, only what is mine to do. */

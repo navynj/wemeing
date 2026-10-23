@@ -63,6 +63,7 @@ export function SplashPage({
   today,
   initials = '',
   audience = null,
+  poolTags = [],
 }: {
   splash: SplashSummary;
   /** Oldest first. */
@@ -77,6 +78,8 @@ export function SplashPage({
   initials?: string;
   /** The Audience chip for the header (H23). */
   audience?: ReactNode;
+  /** Where it is or was in a pool (0015): "<Pool> · <emoji> <pool lane>". */
+  poolTags?: string[];
 }) {
   const router = useRouter();
   const { markDeleted } = useInputSheet();
@@ -271,6 +274,16 @@ export function SplashPage({
             if (result.ok) router.refresh();
           }}
         />
+
+        {poolTags.length > 0 ? (
+          <p data-origin-tags className="text-pool-500 flex flex-wrap gap-x-3 pb-4 text-xs">
+            {poolTags.map((tag) => (
+              <span key={tag} data-origin-tag>
+                {tag}
+              </span>
+            ))}
+          </p>
+        ) : null}
 
         {message ? (
           <p role="alert" className="text-pool-500 pb-4 text-sm">

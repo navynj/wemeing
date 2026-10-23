@@ -16,5 +16,5 @@ export default async function PoolSettingsPage({ params }: PageProps<'/pool/[id]
     getMyCategories(supabase),
   ]);
   if (!view) notFound();
-  return <PoolSettings view={view} categories={categories} />;
+  return <PoolSettings view={view} categories={categories} me={profile.id} />;
 }

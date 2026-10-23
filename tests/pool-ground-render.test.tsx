@@ -85,7 +85,7 @@ const LANE = (id: string, pool: string, name: string, icon: string, position: nu
 
 /** Pool A: two current members and one who left keeping theirs; a placed post each, and a joint splash with two ripples. */
 const A: PoolView = {
-  pool: { id: 'p-a', name: 'Our Pool' },
+  pool: { id: 'p-a', name: 'Our Pool', ownerId: ME },
   members: [
     {
       userId: ME,
@@ -145,7 +145,7 @@ const A: PoolView = {
 
 /** Pool B: nothing of A's. */
 const B: PoolView = {
-  pool: { id: 'p-b', name: 'Study Crew' },
+  pool: { id: 'p-b', name: 'Study Crew', ownerId: ME },
   members: [
     {
       userId: ME,

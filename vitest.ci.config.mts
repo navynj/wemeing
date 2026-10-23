@@ -37,6 +37,7 @@ const NEEDS_LOCAL_STACK = [
   'tests/sessions.test.ts',
   'tests/pools-rls.test.ts',
   'tests/written-on-db.test.ts',
+  'tests/pool-delete.test.ts',
 ];
 
 export default defineConfig({

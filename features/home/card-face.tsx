@@ -136,6 +136,15 @@ export function CardFace({
           {lane ? <OutlineChip icon={lane.icon} name={lane.name} /> : null}
         </span>
       </span>
+      {card.origins && card.origins.length > 0 ? (
+        <span data-origin-tags className="text-pool-500 flex flex-wrap gap-x-3 text-[10px]/tight">
+          {card.origins.map((tag) => (
+            <span key={tag} data-origin-tag>
+              {tag}
+            </span>
+          ))}
+        </span>
+      ) : null}
       <span data-card-body className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         {/* Each ripple an entry of its own, threaded avatar to avatar (round 3). */}
         <RippleThread

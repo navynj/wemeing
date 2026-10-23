@@ -46,6 +46,7 @@ export function PoolSplashPage({
   myLane,
   categories,
   today,
+  tag = null,
 }: {
   poolId: string;
   poolName: string;
@@ -62,6 +63,8 @@ export function PoolSplashPage({
   myLane: string | null;
   categories: Pick<MyCategory, 'id' | 'name' | 'icon'>[];
   today: IsoDate;
+  /** Where it sits in this pool (0015): "<Pool> · <emoji> <pool lane>". */
+  tag?: string | null;
 }) {
   const thread = useOptimisticAction(entries);
   const [body, setBody] = useState('');
@@ -111,6 +114,11 @@ export function PoolSplashPage({
           {icon ? <span aria-hidden>{icon} </span> : null}
           {title || 'Untitled'}
         </h1>
+        {tag ? (
+          <span data-origin-tag className="text-pool-500 text-xs">
+            {tag}
+          </span>
+        ) : null}
         {mine ? (
           <Link
             href={`/splash/${splashId}`}

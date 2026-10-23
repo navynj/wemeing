@@ -8,6 +8,7 @@ import type { MyCategory } from '@/lib/queries/profile';
 import type { PoolView } from '@/lib/queries/pools';
 
 import { setLaneLinks } from './actions';
+import { DeletePool } from './delete-pool';
 import { InvitePanel } from './invite-panel';
 import { LaneMatch } from './lane-match';
 import type { Links } from './match';
@@ -22,9 +23,11 @@ import { PrimaryButton, StepPage } from './step-page';
 export function PoolSettings({
   view,
   categories,
+  me,
 }: {
   view: PoolView;
   categories: Pick<MyCategory, 'id' | 'name' | 'icon'>[];
+  me: string;
 }) {
   const router = useRouter();
   const poolId = view.pool.id;
@@ -98,6 +101,13 @@ export function PoolSettings({
           }
         />
       </section>
+
+      {/* The creator alone deletes the pool (0015). */}
+      {view.pool.ownerId === me ? (
+        <section className="border-pool-100 mt-12 border-t pt-6">
+          <DeletePool poolId={poolId} poolName={view.pool.name} />
+        </section>
+      ) : null}
     </StepPage>
   );
 }

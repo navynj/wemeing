@@ -505,3 +505,23 @@ export async function dropOwnPoolSplash(input: z.infer<typeof OwnDrop>): Promise
   revalidatePool(drop.poolId);
   return { ok: true, id: drop.id };
 }
+
+/**
+ * Delete a pool for everyone (0015), the creator only — the database checks
+ * that and refuses a pool whose creator's account is gone. Nobody's words go
+ * with it: Just-mine splashes move into a new lane of their author's, each
+ * author's joint ripples become one post of theirs, shared splashes stay.
+ */
+export async function deletePool(poolId: string): Promise<Done> {
+  if (!z.uuid().safeParse(poolId).success) return { ok: false, message: 'No such Pool.' };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('delete_pool', { p_pool: poolId });
+  if (error) {
+    return {
+      ok: false,
+      message: error.code === '42501' ? 'Only the Pool’s creator can delete it.' : error.message,
+    };
+  }
+  revalidatePool(poolId);
+  return { ok: true };
+}

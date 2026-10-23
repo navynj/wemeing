@@ -52,7 +52,7 @@ Daily personal use, small fixes, no new surfaces unless use demands them.
 | --- | --- | --- | --- | --- |
 | S12 | Pool phase 1 | 0009–0012 (pools, members, lanes, links, placements, joint splashes, invites; RLS; doors); create (1c) and lane matching (1d); invite links and `/join/[token]`; Home · Pool · + and the pool switcher; the pool's home in Lane, Date and Swimmers; joint splashes as bands with branches; the Audience chip and sheet; leaving | A member reads placed posts and not unplaced ones; a joint splash renders once as a band with a branch per ripple; Swimmers columns equal current members; an expired or revoked link opens nothing | done |
 
-Not in this phase: a pool's kind — the create screen no longer asks it and nothing writes `pools.kind` (kept, nullable, unread); it may return as a template that prefills suggested pool lanes; open pools and search; roles and permissions on pool lanes; bulk placing my earlier records from a chosen date after joining; the follow feed; notifications.
+A pool whose creator's account is gone (`owner_id` null) cannot be deleted for now (0015); who may delete it then waits for roles. Not in this phase: a pool's kind — the create screen no longer asks it and nothing writes `pools.kind` (kept, nullable, unread); it may return as a template that prefills suggested pool lanes; open pools and search; roles and permissions on pool lanes; bulk placing my earlier records from a chosen date after joining; the follow feed; notifications.
 
 ## P3: Pool world, the rest (after the P2 review)
 

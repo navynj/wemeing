@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 
 import { initialsOf } from '@/features/home/grid';
 import { PoolSplashPage } from '@/features/pool/pool-splash-page';
+import { originTag } from '@/features/pool/origin-tag';
 import { authorClock } from '@/features/pool/times';
 import { dayOf } from '@/lib/flow-key';
 import { signRippleMedia } from '@/lib/media';
@@ -70,6 +71,7 @@ export default async function PoolSplashRoute({ params }: PageProps<'/pool/[id]/
       }
       categories={categories}
       today={todayIn(profile.timezone)}
+      tag={lane ? originTag(view.pool.name, lane.icon, lane.name) : null}
     />
   );
 }

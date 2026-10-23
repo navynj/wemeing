@@ -630,9 +630,47 @@ export type Database = {
           },
         ]
       }
+      splash_origins: {
+        Row: {
+          id: string
+          pool_lane_icon: string | null
+          pool_lane_name: string
+          pool_name: string
+          recorded_at: string
+          splash_id: string
+        }
+        Insert: {
+          id?: string
+          pool_lane_icon?: string | null
+          pool_lane_name: string
+          pool_name: string
+          recorded_at?: string
+          splash_id: string
+        }
+        Update: {
+          id?: string
+          pool_lane_icon?: string | null
+          pool_lane_name?: string
+          pool_name?: string
+          recorded_at?: string
+          splash_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "splash_origins_splash_id_fkey"
+            columns: ["splash_id"]
+            isOneToOne: false
+            referencedRelation: "splashes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       splash_placements: {
         Row: {
           created_at: string
+          origin_pool_lane_icon: string | null
+          origin_pool_lane_name: string | null
+          origin_pool_name: string | null
           pool_id: string
           pool_lane_id: string
           shared: boolean
@@ -641,6 +679,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          origin_pool_lane_icon?: string | null
+          origin_pool_lane_name?: string | null
+          origin_pool_name?: string | null
           pool_id: string
           pool_lane_id: string
           shared?: boolean
@@ -649,6 +690,9 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          origin_pool_lane_icon?: string | null
+          origin_pool_lane_name?: string | null
+          origin_pool_name?: string | null
           pool_id?: string
           pool_lane_id?: string
           shared?: boolean
@@ -846,6 +890,7 @@ export type Database = {
         Returns: string
       }
       delete_joint_splash: { Args: { p_splash: string }; Returns: undefined }
+      delete_pool: { Args: { p_pool: string }; Returns: undefined }
       invite_lanes: {
         Args: { p_token: string }
         Returns: {

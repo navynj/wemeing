@@ -10,7 +10,7 @@ import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
 import { FixedAudienceChip } from '@/features/pool/audience-sheet';
 import { SplashAudience } from '@/features/pool/splash-audience';
 import { representativeLane } from '@/features/splash/summary';
-import { getMyLinks, getMyPlacements, getMyPoolNames } from '@/lib/queries/pools';
+import { getMyLinks, getMyOriginTags, getMyPlacements, getMyPoolNames } from '@/lib/queries/pools';
 import { getMySplashes } from '@/lib/queries/splashes';
 import { getMyTrail } from '@/lib/queries/trail';
 import { createClient } from '@/lib/supabase/server';
@@ -32,13 +32,14 @@ export default async function SplashRoute({ params, searchParams }: PageProps<'/
   const now = new Date();
   const today = todayIn(profile.timezone);
 
-  const [ripples, categories, boards, links, pools, placements] = await Promise.all([
+  const [ripples, categories, boards, links, pools, placements, tags] = await Promise.all([
     getMyTrail(supabase, profile.id, profile.timezone),
     getMyCategories(supabase),
     getMySplashes(supabase, profile.id),
     getMyLinks(supabase, profile.id),
     getMyPoolNames(supabase, profile.id),
     getMyPlacements(supabase, profile.id),
+    getMyOriginTags(supabase, profile.id),
   ]);
 
   const board = boards.find((b) => b.id === id) ?? null;
@@ -84,6 +85,7 @@ export default async function SplashRoute({ params, searchParams }: PageProps<'/
         timeZone={profile.timezone}
         today={today}
         initials={initialsOf(profile.display_name)}
+        poolTags={board ? (tags.get(board.id) ?? []) : []}
         audience={
           // Where this post is shared (H23): a switch per pool its lane is
           // linked in. A lone block has no post row to place yet.

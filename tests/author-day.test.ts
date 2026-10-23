@@ -80,7 +80,7 @@ describe('the author’s local day', () => {
 
   it('keeps it there in a pool read from Seoul', () => {
     const view: PoolView = {
-      pool: { id: 'p', name: 'Our Pool' },
+      pool: { id: 'p', name: 'Our Pool', ownerId: 'u-van' },
       members: [
         {
           userId: 'u-van',

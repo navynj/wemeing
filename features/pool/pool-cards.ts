@@ -2,6 +2,8 @@ import { byNewest, placeCard, type Card, type GridColumn } from '@/features/home
 import { summarizeSplash, type SplashSummary } from '@/features/splash/summary';
 import type { PoolRipple, PoolView } from '@/lib/queries/pools';
 
+import { originTag } from './origin-tag';
+
 /** A pool's three views (H23). Lane and Date as on Home; Swimmers by member. */
 export type PoolViewKind = 'lane' | 'date' | 'swimmers';
 
@@ -83,6 +85,7 @@ export function poolCards(
         ...card,
         column: splash.pool_lane_id ?? undefined,
         lane: lane ? { icon: lane.icon, name: lane.name } : null,
+        origins: lane ? [originTag(view.pool.name, lane.icon, lane.name)] : undefined,
         branches: blocks.map((r) => ({
           id: r.id,
           column: kind === 'swimmers' ? r.author_id : (splash.pool_lane_id ?? ''),
@@ -95,6 +98,8 @@ export function poolCards(
     }
     const placement = placementOf.get(splash.id);
     const lane = placement ? laneOf.get(placement.poolLaneId) : undefined;
+    // The tag reads live here: I am in this pool (0015).
+    const origins = lane ? [originTag(view.pool.name, lane.icon, lane.name)] : undefined;
     const author = initialsOf.get(splash.owner_id) ?? '';
     const card = placeCard(summary, thread.map((r) => r.note).join('\n\n'), timeZone, thread);
     const mine = splash.owner_id === me;
@@ -104,6 +109,7 @@ export function poolCards(
       lane: lane ? { icon: lane.icon, name: lane.name } : null,
       author,
       href,
+      origins,
       // My own post: my pin and my delete, as on Home. Someone else's: neither.
       menu: { pin: mine, delete: mine },
     });

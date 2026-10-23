@@ -2,7 +2,8 @@ import { cookies } from 'next/headers';
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { bootstrapProfile } from '@/features/auth/bootstrap-profile';
-import { siteUrl, TIMEZONE_COOKIE } from '@/lib/site';
+import { safeNext } from '@/lib/next-path';
+import { NEXT_COOKIE, siteUrl, TIMEZONE_COOKIE } from '@/lib/site';
 import { createClient } from '@/lib/supabase/server';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -34,7 +35,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     timezone: timezone ? decodeURIComponent(timezone) : 'UTC',
   });
 
-  const response = NextResponse.redirect(home);
+  const next = cookieStore.get(NEXT_COOKIE)?.value;
+  const response = NextResponse.redirect(
+    `${home}${safeNext(next ? decodeURIComponent(next) : null)}`,
+  );
   response.cookies.delete(TIMEZONE_COOKIE);
+  response.cookies.delete(NEXT_COOKIE);
   return response;
 }

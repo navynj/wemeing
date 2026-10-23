@@ -26,3 +26,10 @@ export function authCallbackUrl(): string {
  * site_url rather than an error.
  */
 export const TIMEZONE_COOKIE = 'during-tz';
+
+/**
+ * Carries `?next=` across the OAuth round trip for the same reason: a join
+ * link opened signed out comes back to itself after sign-in (H23). The
+ * callback reads it through `safeNext`, never as given.
+ */
+export const NEXT_COOKIE = 'during-next';

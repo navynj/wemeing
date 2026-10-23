@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 
-import { authCallbackUrl, TIMEZONE_COOKIE } from '@/lib/site';
+import { authCallbackUrl, NEXT_COOKIE, TIMEZONE_COOKIE } from '@/lib/site';
 import { createClient } from '@/lib/supabase/client';
 import { detectTimezone } from '@/lib/time';
 
-export function SignInButton() {
+/** `next`: where to return after sign-in, already checked by `safeNext`. */
+export function SignInButton({ next = null }: { next?: string | null }) {
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
@@ -18,6 +19,10 @@ export function SignInButton() {
       // Only the browser knows the author's zone, and the callback runs on the
       // server. Short-lived, lax so it survives the redirect back from Google.
       document.cookie = `${TIMEZONE_COOKIE}=${encodeURIComponent(detectTimezone())}; path=/; max-age=600; samesite=lax`;
+      // Cleared when absent, so an old link's return cannot outlive it.
+      document.cookie = next
+        ? `${NEXT_COOKIE}=${encodeURIComponent(next)}; path=/; max-age=600; samesite=lax`
+        : `${NEXT_COOKIE}=; path=/; max-age=0; samesite=lax`;
 
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithOAuth({

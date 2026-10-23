@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 
 import type { Database } from '@/lib/database.types';
 import { supabaseAnonKey, supabaseUrl } from '@/lib/env';
+import { safeNext } from '@/lib/next-path';
 import { fetchWithDeadline, isUnreachable, withDeadline } from '@/lib/supabase/fetch';
 
 /** How long a page may wait on the auth server before giving up on it. */
@@ -72,11 +73,15 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   const isPublic = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
 
   if (!user && !isPublic) {
-    return NextResponse.redirect(cleanUrl(request, '/sign-in'));
+    // Where they were headed comes back to them after sign-in (H23): a join
+    // link opened signed out returns to the link. Home needs no note.
+    const url = cleanUrl(request, '/sign-in');
+    if (pathname !== '/') url.searchParams.set('next', `${pathname}${request.nextUrl.search}`);
+    return NextResponse.redirect(url);
   }
 
   if (user && pathname === '/sign-in') {
-    return NextResponse.redirect(cleanUrl(request, '/'));
+    return NextResponse.redirect(cleanUrl(request, safeNext(searchParams.get('next'))));
   }
 
   return response;
@@ -86,8 +91,11 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
  *  produced misleading URLs like /sign-in?code=… */
 function cleanUrl(request: NextRequest, pathname: string): URL {
   const url = request.nextUrl.clone();
-  url.pathname = pathname;
-  url.search = '';
+  // A `next` path may carry its own query; it is relative and checked by
+  // safeNext, so it resolves against this origin and nowhere else.
+  const target = new URL(pathname, request.nextUrl.origin);
+  url.pathname = target.pathname;
+  url.search = target.search;
   return url;
 }
 

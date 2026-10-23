@@ -1,4 +1,5 @@
 import { SignInButton } from '@/features/auth/sign-in-button';
+import { safeNext } from '@/lib/next-path';
 import { authCallbackUrl } from '@/lib/site';
 
 const ERRORS: Record<string, string> = {
@@ -32,7 +33,7 @@ export default async function SignInPage({ searchParams }: PageProps<'/sign-in'>
         </p>
       ) : null}
 
-      <SignInButton />
+      <SignInButton next={typeof params.next === 'string' ? safeNext(params.next) : null} />
     </main>
   );
 }

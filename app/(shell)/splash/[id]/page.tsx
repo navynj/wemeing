@@ -1,8 +1,8 @@
 import { notFound, redirect } from 'next/navigation';
 
 import { initialsOf } from '@/features/home/grid';
-import { monthHref, monthName } from '@/features/home/scope';
-import { SplashPage, type Origin } from '@/features/splash/splash-page';
+import { originOf } from '@/features/splash/origin';
+import { SplashPage } from '@/features/splash/splash-page';
 import { summarizeOrphan, summarizeSplash } from '@/features/splash/summary';
 import { flowInstant } from '@/lib/flow-key';
 import { signOwnMedia } from '@/lib/media';
@@ -11,16 +11,6 @@ import { getMySplashes } from '@/lib/queries/splashes';
 import { getMyTrail } from '@/lib/queries/trail';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
-
-const MONTH = /^\d{4}-\d{2}$/;
-
-/** Where the back chip points, from `?from=`: a month, a lane page, or any path on the site. */
-function originOf(from: string | undefined, today: string): Origin {
-  if (from && MONTH.test(from)) return { label: monthName(from), href: monthHref(from) };
-  if (from === '/' || from?.startsWith('/?')) return { label: 'Home', href: from };
-  if (from?.startsWith('/')) return { label: 'Back', href: from };
-  return { label: monthName(today.slice(0, 7)), href: monthHref(today.slice(0, 7)) };
-}
 
 /**
  * A post's page (SPEC 5, H21c): the white page above the water. Under Home
@@ -83,7 +73,7 @@ export default async function SplashRoute({ params, searchParams }: PageProps<'/
         photos={photos}
         lockedIds={(lockRows ?? []).map((row) => row.ripple_id)}
         categories={categories}
-        origin={originOf(typeof from === 'string' ? from : undefined, today)}
+        origin={originOf(typeof from === 'string' ? from : undefined, today, categories)}
         timeZone={profile.timezone}
         today={today}
         initials={initialsOf(profile.display_name)}

@@ -8,6 +8,7 @@ import { WaveRule } from '@/components/ui/waves/wave-rule';
 import { impressionLineCount } from '@/components/ui/waves';
 import { QuietAffordance } from '@/features/input-sheet/annotation-control';
 import { LaneChips } from '@/features/input-sheet/lane-chips';
+import { EmojiInput } from '@/features/lanes/emoji-input';
 import type { MyCategory } from '@/lib/queries/profile';
 import type { IsoDate } from '@/lib/time';
 
@@ -18,6 +19,8 @@ export const DETAIL_TITLE_CLASS = 'text-3xl font-semibold';
 
 export type HeaderEdit = {
   title: string;
+  /** The post's own icon (0008), or none. */
+  icon: string | null;
   declaredStart: IsoDate | null;
   declaredEnd: IsoDate | null;
   declaredLaneId: string | null;
@@ -46,6 +49,7 @@ export function SplashHeader({
 }) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(splash.title);
+  const [icon, setIcon] = useState(splash.icon ?? '');
   const [editingDate, setEditingDate] = useState(false);
   const [range, setRange] = useState<{ start: IsoDate; end: IsoDate | null } | null>(
     splash.declaredRange
@@ -58,6 +62,7 @@ export function SplashHeader({
 
   const header = (over: Partial<HeaderEdit> = {}): HeaderEdit => ({
     title: title.trim(),
+    icon: splash.icon,
     declaredStart: range?.start ?? null,
     declaredEnd: range?.end ?? null,
     declaredLaneId: splash.declaredLaneId,
@@ -186,42 +191,57 @@ export function SplashHeader({
       </div>
 
       {/* The title, edited where it is read. */}
-      {editingTitle ? (
-        <input
-          value={title}
-          autoFocus
-          aria-label="Title"
-          maxLength={120}
-          onChange={(event) => setTitle(event.target.value)}
-          onBlur={() => {
-            setEditingTitle(false);
-            if (title.trim() !== splash.title.trim()) run(() => onEdit(header()));
+      <div className="flex items-start gap-3">
+        {/* The post's own icon, edited in place (0008): one glyph, saved as it
+          is chosen; emptied, the lane's emoji stands for the post again. */}
+        <EmojiInput
+          value={icon}
+          onChange={(next) => {
+            setIcon(next);
+            if ((next || null) !== splash.icon) run(() => onEdit(header({ icon: next || null })));
           }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') event.currentTarget.blur();
-            if (event.key === 'Escape') {
-              setTitle(splash.title);
-              setEditingTitle(false);
-            }
-          }}
-          className={`text-ink w-full ${DETAIL_TITLE_CLASS} outline-none`}
+          label="Icon"
+          placeholder={categories.find((c) => c.id === splash.laneIds[0])?.icon ?? '🙂'}
         />
-      ) : (
-        <button
-          type="button"
-          aria-label="Edit the title"
-          onClick={() => setEditingTitle(true)}
-          className="text-left"
-        >
-          <h1 data-splash-title className={`text-ink ${DETAIL_TITLE_CLASS}`}>
-            {splash.title.trim() ? (
-              splash.title
-            ) : (
-              <span className="opacity-30">{splash.ghostTitle ?? 'Untitled'}</span>
-            )}
-          </h1>
-        </button>
-      )}
+        <div className="min-w-0 flex-1">
+          {editingTitle ? (
+            <input
+              value={title}
+              autoFocus
+              aria-label="Title"
+              maxLength={120}
+              onChange={(event) => setTitle(event.target.value)}
+              onBlur={() => {
+                setEditingTitle(false);
+                if (title.trim() !== splash.title.trim()) run(() => onEdit(header()));
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') event.currentTarget.blur();
+                if (event.key === 'Escape') {
+                  setTitle(splash.title);
+                  setEditingTitle(false);
+                }
+              }}
+              className={`text-ink w-full ${DETAIL_TITLE_CLASS} outline-none`}
+            />
+          ) : (
+            <button
+              type="button"
+              aria-label="Edit the title"
+              onClick={() => setEditingTitle(true)}
+              className="text-left"
+            >
+              <h1 data-splash-title className={`text-ink ${DETAIL_TITLE_CLASS}`}>
+                {splash.title.trim() ? (
+                  splash.title
+                ) : (
+                  <span className="opacity-30">{splash.ghostTitle ?? 'Untitled'}</span>
+                )}
+              </h1>
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Sized by the title's width, never sizing it. */}
       <span data-wave-underline data-lines={lines} className="flex w-fit max-w-full flex-col">

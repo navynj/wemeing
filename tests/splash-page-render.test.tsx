@@ -93,6 +93,7 @@ const board: Splash = {
   declared_end: '2026-08-20',
   declared_lane_id: 'c-place',
   session_id: null,
+  icon: null,
   pinned_at: null,
   pool_id: null,
   type: 'free',
@@ -354,6 +355,15 @@ describe('the header menu', () => {
     expect(calls.some((c) => c.name === 'deleteSplash')).toBe(false);
   });
 
+  it('edits the post\u2019s own icon in place, saving it with the header', async () => {
+    const { getByLabelText } = page();
+    fireEvent.change(getByLabelText('Icon'), { target: { value: '🏔️' } });
+    await waitFor(() => expect(calls.some((c) => c.name === 'updateSplashHeader')).toBe(true));
+    expect(calls.find((c) => c.name === 'updateSplashHeader')!.args[1]).toMatchObject({
+      icon: '🏔️',
+    });
+  });
+
   it('edits the title in place', async () => {
     const { getByLabelText } = page();
     fireEvent.click(getByLabelText('Edit the title'));
@@ -365,6 +375,7 @@ describe('the header menu', () => {
       's1',
       {
         title: 'Whistler, three nights',
+        icon: null,
         declaredStart: '2026-08-17',
         declaredEnd: '2026-08-20',
         declaredLaneId: 'c-place',

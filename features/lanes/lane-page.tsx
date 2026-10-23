@@ -146,7 +146,7 @@ export function LanePage({ lane, cards }: { lane: MyCategory; cards: Card[] }) {
                           {cardDate(card.day)}
                         </span>
                         <span aria-hidden className="shrink-0 text-base/none">
-                          {saved.value.icon}
+                          {card.splash.icon ?? saved.value.icon}
                         </span>
                         <span
                           className={`min-w-0 truncate text-sm font-semibold ${

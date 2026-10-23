@@ -59,6 +59,14 @@ export function byNewest(a: Card, b: Card): number {
   );
 }
 
+/** The glyph a post shows as (0008): its own icon when set, else its lane's emoji. */
+export function postIcon(
+  splash: Pick<SplashSummary, 'icon'>,
+  lane: Pick<MyCategory, 'icon'> | null,
+): string | null {
+  return splash.icon ?? lane?.icon ?? null;
+}
+
 /** The lane a post's mark sits under: its declared lane, else its representative one. */
 export function cardLane(splash: SplashSummary): string | null {
   return splash.declaredLaneId ?? representativeLane(splash);

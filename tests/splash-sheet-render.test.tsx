@@ -142,6 +142,22 @@ describe('the first line is the title (SPEC 6)', () => {
     expect(drops[0]).toMatchObject({ title: 'Whistler', body: 'sea to sky\n\nfog the whole way' });
   });
 
+  it('takes the post\u2019s own icon, one glyph, and leaves it empty for the lane to stand in', async () => {
+    const view = sheet();
+    const icon = view.getByLabelText('Icon');
+    expect(icon.getAttribute('data-emoji-input')).not.toBeNull();
+    fireEvent.change(icon, { target: { value: '🎬🍿' } });
+    expect((icon as HTMLInputElement).value).toBe('🎬');
+    fireEvent.change(view.getByLabelText('Title'), { target: { value: 'Toy Story 5' } });
+    fireEvent.click(view.drop());
+    await waitFor(() => expect(drops).toHaveLength(1));
+    expect(drops[0]).toMatchObject({ title: 'Toy Story 5', icon: '🎬' });
+    fireEvent.change(view.getByLabelText('Title'), { target: { value: 'No icon' } });
+    fireEvent.click(view.drop());
+    await waitFor(() => expect(drops).toHaveLength(2));
+    expect(drops[1]).toMatchObject({ title: 'No icon', icon: null });
+  });
+
   it('is two fields in one voice: the title large and bold, the content smaller and lighter', () => {
     const { container } = sheet();
     const title = container.querySelector<HTMLTextAreaElement>('[data-sheet-title]')!;

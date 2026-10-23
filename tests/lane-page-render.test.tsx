@@ -50,6 +50,7 @@ function post(id: string, title: string, day: string) {
       declared_end: null,
       declared_lane_id: 'c-food',
       session_id: null,
+      icon: null,
       pinned_at: null,
       pool_id: null,
       type: 'free',

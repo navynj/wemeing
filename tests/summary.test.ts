@@ -39,6 +39,7 @@ function splash(over: Partial<Splash> = {}): Splash {
     declared_end: null,
     declared_lane_id: null,
     session_id: null,
+    icon: null,
     pinned_at: null,
     pool_id: null,
     type: 'free',

@@ -37,6 +37,8 @@ export type SplashSummary = {
   ghostTitle: string | null;
   /** The default lane of a new block (H21f), or none. */
   declaredLaneId: string | null;
+  /** The post's own icon (0008), or none: its lane's emoji stands in. */
+  icon: string | null;
   /** Derived tags: the declared lane first, then every lane the blocks took, by frequency. */
   laneIds: string[];
   declaredRange: DateRange | null;
@@ -167,6 +169,7 @@ export function summarizeSplash(
     title: splash.title,
     ghostTitle: splash.title.trim() ? null : ghostTitle(placed[0]?.note ?? null),
     declaredLaneId: splash.declared_lane_id,
+    icon: splash.icon ?? null,
     laneIds: laneTags(splash.declared_lane_id, blocks),
     declaredRange,
     range: union(declaredRange, derived),
@@ -192,6 +195,7 @@ export function summarizeOrphan(block: SplashBlock, timeZone: string, now: Date)
     title: '',
     ghostTitle: ghostTitle(block.note),
     declaredLaneId: null,
+    icon: null,
     laneIds: [block.category_id],
     declaredRange: null,
     range: { start: day, end: day },

@@ -17,11 +17,14 @@ import { cardLane, type Card } from './grid';
  * card's menu. Absent when nothing is pinned.
  */
 export function PinnedCards({
+  slot,
   cards,
   categories,
   initials,
   onPick,
 }: {
+  /** Which slot this is: under the header (phone) or above the stack (wide); CSS shows one. */
+  slot: 'phone' | 'wide';
   /** Pinned posts, most recently pinned first. */
   cards: Card[];
   categories: MyCategory[];
@@ -33,7 +36,11 @@ export function PinnedCards({
   if (cards.length === 0) return null;
   const several = cards.length > 1;
   return (
-    <nav aria-label="Pinned" data-pinned-cards className="shrink-0">
+    <nav
+      aria-label="Pinned"
+      data-pinned-cards={slot}
+      className={`shrink-0 ${slot === 'phone' ? 'lg:hidden' : 'hidden lg:block'}`}
+    >
       <ol
         ref={strip}
         className="no-scrollbar flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 pb-3"
@@ -61,7 +68,10 @@ export function PinnedCards({
                       {lane.name}
                     </span>
                   ) : null}
-                  <span className="min-w-0 truncate text-sm font-semibold">{title}</span>
+                  <span className="min-w-0 truncate text-sm font-semibold">
+                    {card.splash.icon ? <span aria-hidden>{card.splash.icon} </span> : null}
+                    {title}
+                  </span>
                 </span>
                 {excerpt ? (
                   <span className="flex min-w-0 items-center gap-2 text-xs text-white/70">

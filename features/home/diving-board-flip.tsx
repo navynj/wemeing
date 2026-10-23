@@ -7,7 +7,7 @@ import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motio
 import type { MyCategory } from '@/lib/queries/profile';
 
 import { CARD_PX, CardFace, face, TINT_STEP } from './card-face';
-import { cardDate, cardLane, type Card } from './grid';
+import { cardDate, cardLane, postIcon, type Card } from './grid';
 import type { Flip } from './use-flip';
 
 /** How much of each back card shows above the one in front: its title line. */
@@ -259,7 +259,9 @@ function Page({
           className="text-ink flex min-w-0 flex-1 items-center gap-1.5"
           style={{ opacity: stripWords }}
         >
-          {lane?.icon ? <span aria-hidden>{lane.icon}</span> : null}
+          {postIcon(card.splash, lane) ? (
+            <span aria-hidden>{postIcon(card.splash, lane)}</span>
+          ) : null}
           <span className="min-w-0 flex-1 truncate">{title}</span>
           <span className="text-pool-500 shrink-0 tabular-nums">{cardDate(card.day)}</span>
         </motion.span>

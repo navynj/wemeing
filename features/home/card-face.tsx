@@ -8,7 +8,7 @@ import { RippleThread } from '@/features/splash/ripple-thread';
 import { DETAIL_TITLE_CLASS } from '@/features/splash/splash-header';
 import type { MyCategory } from '@/lib/queries/profile';
 
-import { cardDate, type Card } from './grid';
+import { cardDate, postIcon, type Card } from './grid';
 
 /** The top card's height, fixed so the grid above never moves when the stack changes. */
 export const CARD_PX = 200;
@@ -57,6 +57,8 @@ export function CardFace({
   onClickCapture?: (event: React.MouseEvent) => void;
 }) {
   const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
+  // The post's own icon, else its lane's emoji (0008).
+  const glyph = postIcon(card.splash, lane);
   const inkClass = ink === 'white' ? 'text-white' : 'text-main-900';
   if (edge === 'left' || edge === 'right') {
     // A book spine: the emoji at the top, the title written downward and
@@ -73,7 +75,7 @@ export function CardFace({
           opacity: ink === 'white' ? 'var(--ink-opacity, 0.6)' : undefined,
         }}
       >
-        {lane?.icon ? <span className="text-base/none">{lane.icon}</span> : null}
+        {glyph ? <span className="text-base/none">{glyph}</span> : null}
         <span
           data-card-title
           className={`mt-2 min-h-0 flex-1 overflow-hidden text-sm/none font-semibold text-ellipsis whitespace-nowrap ${
@@ -94,7 +96,7 @@ export function CardFace({
       } ${edge === 'full' ? `${DETAIL_TITLE_CLASS} pr-8 leading-tight` : 'text-sm/none font-semibold'}`}
       style={ink === 'white' ? { opacity: 'var(--ink-opacity, 0.6)' } : undefined}
     >
-      {lane?.icon ? <span aria-hidden>{lane.icon}</span> : null}
+      {glyph ? <span aria-hidden>{glyph}</span> : null}
       <span className={`truncate ${card.splash.title.trim() ? '' : 'opacity-40'}`}>{title}</span>
     </span>
   );

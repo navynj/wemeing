@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 
-import { useWide } from '@/components/ui/use-wide';
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { CategorySheet } from '@/features/lanes/category-sheet';
 import { LanesSheet } from '@/features/lanes/lanes-sheet';
@@ -87,7 +86,6 @@ export function HomeGround({
   const [newLane, setNewLane] = useState(false);
   const [editingLanes, setEditingLanes] = useState(manageLanes);
   const [view, setView] = useHomeView();
-  const wide = useWide();
   const { openSheet, pendingDrop, clearDropped, dropMessage, pendingDeletes, markDeleted } =
     useInputSheet();
   const router = useRouter();
@@ -216,8 +214,17 @@ export function HomeGround({
       .filter((p) => !pendingDeletes.includes(p.id))
       .map((p) => byId.get(p.id) ?? placeCard(p, '', timeZone));
   }, [pins.value, pendingDeletes, shown, timeZone]);
-  const pinnedStrip = (
-    <PinnedCards cards={pinnedCards} categories={lanes.value} initials={initials} onPick={goTo} />
+  // Both slots render from the server and CSS shows one per breakpoint, so
+  // on a wide screen the cards are in the stack's column from the first
+  // frame — never moved there by script after load (review).
+  const pinnedStrip = (slot: 'phone' | 'wide') => (
+    <PinnedCards
+      slot={slot}
+      cards={pinnedCards}
+      categories={lanes.value}
+      initials={initials}
+      onPick={goTo}
+    />
   );
 
   return (
@@ -254,7 +261,7 @@ export function HomeGround({
             </p>
           ) : null}
 
-          {wide ? null : pinnedStrip}
+          {pinnedStrip('phone')}
 
           <LaneGrid
             ref={grid}
@@ -275,7 +282,7 @@ export function HomeGround({
           data-board-column
           className="flex shrink-0 flex-col lg:min-h-0 lg:min-w-0 lg:flex-1 lg:py-10"
         >
-          {wide ? pinnedStrip : null}
+          {pinnedStrip('wide')}
           {board === 'stair' ? (
             <StairBoard
               cards={shown}

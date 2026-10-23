@@ -130,6 +130,7 @@ function post(
       declared_end: null,
       declared_lane_id: null,
       session_id: null,
+      icon: null,
       pinned_at: null,
       pool_id: null,
       type: 'free',
@@ -767,7 +768,7 @@ describe('pinned posts as cards (round 3)', () => {
 
   it('sits under the header and above the grid on a phone, a card per pinned post', () => {
     const { container } = ground(pinnedPosts());
-    const strip = container.querySelector('[data-pinned-cards]')!;
+    const strip = container.querySelector('[data-pinned-cards="phone"]')!;
     const cardsIn = strip.querySelectorAll('[data-pinned-card]');
     expect(cardsIn).toHaveLength(2);
     const card = strip.querySelector<HTMLElement>('[data-pinned-card="aug"]')!;
@@ -792,32 +793,25 @@ describe('pinned posts as cards (round 3)', () => {
   it('brings a tapped pinned card\u2019s post to the top, with the ring at its mark', async () => {
     const { container } = ground(pinnedPosts());
     await grown(container);
-    fireEvent.click(container.querySelector('[data-pinned-card="aug"]')!);
+    fireEvent.click(
+      container.querySelector('[data-pinned-cards="phone"] [data-pinned-card="aug"]')!,
+    );
     await settled(container);
     expect(topCard(container).getAttribute('data-stack-card')).toBe('aug');
     await ringed(container, 'aug');
   });
 
-  it('sits above the stack on the right on a wide screen, not above the grid', () => {
-    Object.defineProperty(window, 'matchMedia', {
-      writable: true,
-      configurable: true,
-      value: (query: string) => ({
-        matches: query.includes('min-width'),
-        media: query,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        onchange: null,
-        dispatchEvent: () => false,
-      }),
-    });
+  it('renders both slots from the start and lets CSS show the one for the width: no move after load', () => {
     const { container } = ground(pinnedPosts());
-    const strip = container.querySelector('[data-pinned-cards]')!;
-    expect(strip.closest('[data-board-column]')).not.toBeNull();
+    const phone = container.querySelector('[data-pinned-cards="phone"]')!;
+    const wide = container.querySelector('[data-pinned-cards="wide"]')!;
+    expect(phone.className).toContain('lg:hidden');
+    expect(wide.className).toContain('hidden lg:block');
+    // The wide slot sits in the stack's column, above the stack.
+    expect(wide.closest('[data-board-column]')).not.toBeNull();
     const board = container.querySelector('[data-diving-board]')!;
-    expect(strip.compareDocumentPosition(board) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(wide.compareDocumentPosition(board) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(phone.closest('[data-board-column]')).toBeNull();
   });
 });
 
@@ -890,6 +884,20 @@ describe('the header and the Date view (round 3)', () => {
       .closest('[data-cell]');
     while (row && !row.hasAttribute('data-day-row')) row = row.previousElementSibling;
     expect(row!.getAttribute('data-day-row')).toBe(TODAY);
+  });
+});
+
+describe('a post\u2019s own icon (0008)', () => {
+  it('stands for the post on its mark, its pill and its card, before its lane\u2019s emoji', () => {
+    const withIcon = POSTS.map((p) => (p.id === 'late' ? { ...p, icon: '🎬' } : p));
+    const { container } = ground(withIcon);
+    expect(container.querySelector('[data-mark="late"]')!.textContent).toBe('🎬');
+    expect(container.querySelector('[data-mark="soup"]')!.textContent).toBe('🍜');
+    expect(topCard(container).querySelector('[data-card-title]')!.textContent).toContain('🎬');
+    cleanup();
+    window.localStorage.setItem('weming.home-view', 'date');
+    const { container: list } = ground(withIcon);
+    expect(list.querySelector('[data-pill="late"]')!.textContent).toContain('🎬');
   });
 });
 

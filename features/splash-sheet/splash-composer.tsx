@@ -10,6 +10,7 @@ import {
   type Annotation,
 } from '@/features/input-sheet/draft';
 import { LaneChips } from '@/features/input-sheet/lane-chips';
+import { EmojiInput } from '@/features/lanes/emoji-input';
 import {
   AddImageAffordance,
   MediaPreviews,
@@ -67,6 +68,8 @@ export function SplashComposer({
   const { categories, timeZone, today } = context;
   const fresh = (): Annotation => ({ date: today, time: null, endDate: null, endTime: null });
   const [titleText, setTitleText] = useState('');
+  // The post's own icon (0008); empty lets the lane's emoji stand for it.
+  const [icon, setIcon] = useState('');
   const [bodyText, setBodyText] = useState('');
   const [laneId, setLaneId] = useState<string | null>(null);
   // Today is in the field from the start (review): the chip opens set to the
@@ -109,6 +112,7 @@ export function SplashComposer({
       declaredStart: null,
       declaredEnd: null,
       declaredLaneId: laneId,
+      icon: icon || null,
       occurredOn: a?.date ?? null,
       occurredTime: a?.time ?? null,
       startInstant,
@@ -127,6 +131,7 @@ export function SplashComposer({
         declared_start: null,
         declared_end: null,
         declared_lane_id: laneId,
+        icon: icon || null,
         session_id: null,
         pinned_at: null,
         pool_id: null,
@@ -160,6 +165,7 @@ export function SplashComposer({
     });
 
     setTitleText('');
+    setIcon('');
     setBodyText('');
     setLaneId(null);
     setAnnotation(fresh());
@@ -174,23 +180,33 @@ export function SplashComposer({
           Not while an IME is composing (Korean, say): that Enter commits
           the character, and moving focus on it would carry the character
           into the body. */}
-      <textarea
-        ref={field}
-        value={titleText}
-        onChange={(event) => setTitleText(event.target.value.replace(/\n/g, ''))}
-        onKeyDown={(event) => {
-          if (event.key !== 'Enter') return;
-          event.preventDefault();
-          if (isComposing(event)) return;
-          bodyField.current?.focus();
-        }}
-        placeholder="Drop your splash"
-        rows={1}
-        autoFocus={autoFocus}
-        aria-label="Title"
-        data-sheet-title
-        className="text-main-900 placeholder:text-main-900 w-full resize-none text-3xl/snug font-semibold outline-none placeholder:opacity-20"
-      />
+      <div className="flex items-start gap-3">
+        {/* The post's own icon: one glyph from the phone's emoji keyboard,
+          shown large; left empty, the lane's emoji stands for the post. */}
+        <EmojiInput
+          value={icon}
+          onChange={setIcon}
+          label="Icon"
+          placeholder={categories.find((c) => c.id === laneId)?.icon ?? '🙂'}
+        />
+        <textarea
+          ref={field}
+          value={titleText}
+          onChange={(event) => setTitleText(event.target.value.replace(/\n/g, ''))}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            if (isComposing(event)) return;
+            bodyField.current?.focus();
+          }}
+          placeholder="Drop your splash"
+          rows={1}
+          autoFocus={autoFocus}
+          aria-label="Title"
+          data-sheet-title
+          className="text-main-900 placeholder:text-main-900 min-w-0 flex-1 resize-none text-3xl/snug font-semibold outline-none placeholder:opacity-20"
+        />
+      </div>
       {/* Backspace at the very start of the body walks the cursor back up
           to the end of the title, the way a notes app does. */}
       <textarea

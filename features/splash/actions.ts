@@ -29,6 +29,8 @@ const Header = z.object({
   declaredEnd: z.string().regex(ISO_DATE).nullable(),
   /** The default lane of a new block (H21f). */
   declaredLaneId: z.uuid().nullable(),
+  /** The post's own icon, one glyph, else its lane's emoji stands for it (0008). */
+  icon: z.string().trim().max(16).nullable(),
 });
 
 export type Header = z.infer<typeof Header>;
@@ -91,6 +93,7 @@ export async function dropSplash(input: Drop): Promise<SplashResult> {
       declared_start: drop.declaredStart,
       declared_end: drop.declaredEnd,
       declared_lane_id: drop.declaredLaneId,
+      icon: drop.icon || null,
       session_id: drop.sessionId,
     })
     .select('*')
@@ -197,6 +200,7 @@ export async function updateSplashHeader(id: string, input: Header): Promise<Spl
       declared_start: header.declaredStart,
       declared_end: header.declaredEnd,
       declared_lane_id: header.declaredLaneId,
+      icon: header.icon || null,
     })
     .eq('id', id)
     .select('*')

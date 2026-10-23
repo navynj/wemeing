@@ -32,6 +32,7 @@ import {
   monthAbbrev,
   weekdayOf,
   type Card,
+  postIcon,
 } from './grid';
 
 /** The date rail's width and the `+` column's, both fixed; the lanes share the rest. */
@@ -408,7 +409,7 @@ export const LaneGrid = forwardRef<
               <Mark
                 key={card.splash.id}
                 card={card}
-                icon={icon}
+                icon={card.splash.icon ?? icon}
                 dived={waterIds.has(card.splash.id)}
                 ring={ringAt?.id === card.splash.id ? ringAt.seq : null}
                 titled={titled}
@@ -691,7 +692,7 @@ function Pill({
           }`}
           style={{ width: MARK_PX, height: MARK_PX }}
         >
-          {lane?.icon ?? ''}
+          {postIcon(card.splash, lane) ?? ''}
         </span>
       </span>
       <span

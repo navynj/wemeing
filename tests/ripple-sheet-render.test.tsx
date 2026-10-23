@@ -65,6 +65,7 @@ function board(over: Partial<SplashSummary>): SplashSummary {
     title: 'During redesign',
     ghostTitle: null,
     declaredLaneId: null,
+    icon: null,
     laneIds: ['c-day'],
     declaredRange: null,
     range: null,

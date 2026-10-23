@@ -105,6 +105,7 @@ export function SplashPage({
         splash: {
           ...current.splash,
           title: edit.title,
+          icon: edit.icon,
           declaredLaneId: edit.declaredLaneId,
           laneIds: laneTags(edit.declaredLaneId, current.blocks),
           declaredRange: edit.declaredStart

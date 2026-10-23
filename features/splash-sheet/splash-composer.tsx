@@ -29,6 +29,7 @@ import { summarizeSplash, type SplashSummary } from '@/features/splash/summary';
 import type { MyCategory } from '@/lib/queries/profile';
 import { wallClockToInstant } from '@/lib/ripple-kind';
 import type { IsoDate } from '@/lib/time';
+import { usePeople } from '@/features/people/people-provider';
 
 import { composeDrop } from './split-title';
 
@@ -85,6 +86,7 @@ export function SplashComposer({
   pool?: PoolScope | null;
 }) {
   const { categories, timeZone, today, links, pools, initials } = context;
+  const { me } = usePeople();
   const fresh = (): Annotation => ({ date: today, time: null, endDate: null, endTime: null });
   const [titleText, setTitleText] = useState('');
   // The post's own icon (0008); empty lets the lane's emoji stand for it.
@@ -230,8 +232,19 @@ export function SplashComposer({
             lane: { icon: poolLane.icon, name: poolLane.name },
             href: poolSplashHref(pool.poolId, id),
             ...(joint
-              ? { branches: body ? [{ id: `${id}-first`, column: poolLane.id, initials }] : [] }
-              : { author: initials }),
+              ? {
+                  branches: body
+                    ? [
+                        {
+                          id: `${id}-first`,
+                          column: poolLane.id,
+                          initials,
+                          authorId: me ?? undefined,
+                        },
+                      ]
+                    : [],
+                }
+              : { author: initials, authorId: me ?? undefined }),
           }
         : null;
 

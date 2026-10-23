@@ -398,7 +398,9 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_path: string | null
           avatar_url: string | null
+          avatar_version: number | null
           created_at: string
           display_name: string
           id: string
@@ -406,7 +408,9 @@ export type Database = {
           timezone: string
         }
         Insert: {
+          avatar_path?: string | null
           avatar_url?: string | null
+          avatar_version?: number | null
           created_at?: string
           display_name: string
           id: string
@@ -414,7 +418,9 @@ export type Database = {
           timezone?: string
         }
         Update: {
+          avatar_path?: string | null
           avatar_url?: string | null
+          avatar_version?: number | null
           created_at?: string
           display_name?: string
           id?: string
@@ -940,6 +946,7 @@ export type Database = {
       splash_in_my_pools: { Args: { sid: string }; Returns: boolean }
       splash_owner: { Args: { sid: string }; Returns: string }
       splash_writable: { Args: { sid: string }; Returns: boolean }
+      visible_avatars: { Args: { uids: string[] }; Returns: string[] }
     }
     Enums: {
       audience_target: "list" | "pool" | "lock"

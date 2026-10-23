@@ -2,6 +2,8 @@ import { SheetHost } from '@/features/input-sheet/sheet-host';
 import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
 import { TimezoneSync } from '@/features/auth/timezone-sync';
 import { initialsOf } from '@/features/home/grid';
+import { PeopleProvider } from '@/features/people/people-provider';
+import { getPeople } from '@/lib/queries/people';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
 import { getMyLinks, getMyPoolNames } from '@/lib/queries/pools';
 import { createClient } from '@/lib/supabase/server';
@@ -32,13 +34,17 @@ export default async function ShellLayout({ children }: LayoutProps<'/'>) {
         initials: initialsOf(profile.display_name),
       }
     : null;
+  // Every face the shell draws, signed once here (0018).
+  const people = profile ? await getPeople(supabase) : {};
   return (
-    <InputSheetProvider>
-      <div className="flex min-h-dvh flex-col">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
-      </div>
-      {context ? <SheetHost context={context} /> : null}
-      {profile ? <TimezoneSync profileZone={profile.timezone} /> : null}
-    </InputSheetProvider>
+    <PeopleProvider me={profile?.id ?? null} people={people}>
+      <InputSheetProvider>
+        <div className="flex min-h-dvh flex-col">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
+        </div>
+        {context ? <SheetHost context={context} /> : null}
+        {profile ? <TimezoneSync profileZone={profile.timezone} /> : null}
+      </InputSheetProvider>
+    </PeopleProvider>
   );
 }

@@ -6,6 +6,7 @@ import { Check, Plus } from 'lucide-react';
 
 import { Monogram } from '@/components/ui/monogram';
 import type { MyPool } from '@/lib/queries/pools';
+import { Avatar } from '@/features/people/avatar';
 
 import { isNewSince } from './remembered';
 import { PoolSheet, SheetTitle } from './sheet';
@@ -58,8 +59,20 @@ export function PoolSwitcher({
                       />
                     ) : null}
                   </span>
-                  <span className="text-pool-500 truncate text-xs">
-                    {pool.members.map((m) => m.initials).join(' · ')}
+                  <span data-switch-members className="flex items-center">
+                    {pool.members
+                      .filter((m) => !m.former)
+                      .map((m, at) => (
+                        <Avatar
+                          key={m.userId}
+                          id={m.userId}
+                          initials={m.initials}
+                          // Solid, so a face never shows the one beneath it (review).
+                          className={`bg-pool-100 text-pool-500 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-medium ring-2 ring-white ${
+                            at > 0 ? '-ml-1' : ''
+                          }`}
+                        />
+                      ))}
                   </span>
                 </span>
                 {current ? (

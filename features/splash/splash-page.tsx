@@ -357,6 +357,7 @@ export function SplashPage({
               id: block.id,
               // Each ripple keeps its author in a pool (H23).
               initials: pool ? (pool.initialsOf[block.author_id] ?? '') : undefined,
+              authorId: block.author_id,
               body: (
                 <div id={`block-${block.id}`} data-block-entry={block.id} className="pb-2">
                   {editor?.kind === 'edit' && editor.block.id === block.id ? (

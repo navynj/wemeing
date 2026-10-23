@@ -18,6 +18,7 @@ import { deleteSplash, setSplashPinned } from '@/features/splash/actions';
 import type { MyPool, PoolView } from '@/lib/queries/pools';
 import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
+import { Avatar } from '@/features/people/avatar';
 
 import { deleteJointSplash } from './actions';
 import { InvitePanel } from './invite-panel';
@@ -225,16 +226,15 @@ export function PoolGround({
                 className="flex items-center"
               >
                 {current.slice(0, HEADER_AVATARS).map((member, at) => (
-                  <span
+                  <Avatar
                     key={member.userId}
-                    aria-hidden
+                    id={member.userId}
+                    initials={member.initials}
                     // Solid, so an avatar never shows the one beneath it (review).
                     className={`text-main-900/60 ring-main-900 flex h-8 w-8 items-center justify-center rounded-full bg-[#8283EE] text-[10px] font-medium ring-2 ${
                       at > 0 ? '-ml-2' : ''
                     }`}
-                  >
-                    {member.initials}
-                  </span>
+                  />
                 ))}
               </button>
               <button

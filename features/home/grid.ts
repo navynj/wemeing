@@ -31,6 +31,8 @@ export type Card = {
   lane?: CardLane | null;
   /** In a pool: the author's initials, under the mark's title and on the card. */
   author?: string;
+  /** In a pool: whose it is, for their face (0018). */
+  authorId?: string;
   /** A joint splash (H23): drawn as a band across the columns, each ripple a branch. */
   branches?: Branch[];
   /** On Home: the pools this post is shared to, as monogram chips. */
@@ -49,13 +51,20 @@ export type Card = {
 };
 
 /** A ripple as a card reads it: its words, when it was written, and in a pool whose it is. */
-export type CardRipple = { id: string; note: string; createdAt: string; initials?: string };
+export type CardRipple = {
+  id: string;
+  note: string;
+  createdAt: string;
+  initials?: string;
+  /** In a pool: whose it is, for their face (0018). */
+  authorId?: string;
+};
 
 /** What a card names as its lane: an emoji and a name. */
 export type CardLane = { icon: string | null; name: string };
 
 /** A joint splash's ripple, as a branch off its band: the column it drops into, and whose it is. */
-export type Branch = { id: string; column: string; initials: string };
+export type Branch = { id: string; column: string; initials: string; authorId?: string };
 
 /** A column of the grid: a lane of mine on Home, a pool lane or a member in a pool. */
 export type GridColumn = {

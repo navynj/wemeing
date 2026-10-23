@@ -3,6 +3,8 @@
 import { useRef } from 'react';
 
 import { useAxisLock } from '@/components/ui/use-axis-lock';
+import { Avatar } from '@/features/people/avatar';
+import { usePeople } from '@/features/people/people-provider';
 import type { MyCategory } from '@/lib/queries/profile';
 
 import { laneOfCard, type Card } from './grid';
@@ -33,6 +35,7 @@ export function PinnedCards({
   onPick: (id: string) => void;
 }) {
   const strip = useRef<HTMLOListElement>(null);
+  const { me } = usePeople();
   useAxisLock(strip);
   if (cards.length === 0) return null;
   const several = cards.length > 1;
@@ -75,12 +78,11 @@ export function PinnedCards({
                 </span>
                 {excerpt ? (
                   <span className="mt-1 flex min-w-0 items-center gap-3 text-sm text-white/60">
-                    <span
-                      aria-hidden
+                    <Avatar
+                      id={card.ripples.at(-1)?.authorId ?? card.authorId ?? me}
+                      initials={card.ripples.at(-1)?.initials ?? card.author ?? initials}
                       className="text-main-900/50 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/40 text-xs"
-                    >
-                      {card.ripples.at(-1)?.initials ?? card.author ?? initials}
-                    </span>
+                    />
                     <span data-pinned-excerpt className="min-w-0 truncate">
                       {excerpt}
                     </span>

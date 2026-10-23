@@ -2,6 +2,7 @@
 
 import { CommitRing } from '@/components/ui/waves';
 import type { IsoDate } from '@/lib/time';
+import { Initials } from '@/features/people/avatar';
 
 import { monthAbbrev, weekdayOf, type Card, type CardLane, type GridColumn } from './grid';
 
@@ -291,7 +292,7 @@ export function JointRows({
               className="flex w-full min-w-0 items-center gap-2 py-2 pl-3 text-left text-white"
             >
               <span className="w-6 shrink-0 text-[10px] font-medium text-white/70">
-                {ripple.initials}
+                <Initials id={ripple.authorId} initials={ripple.initials ?? ''} />
               </span>
               <span className="min-w-0 flex-1 truncate text-xs text-white/80">{ripple.note}</span>
             </button>

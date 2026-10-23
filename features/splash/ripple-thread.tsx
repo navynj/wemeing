@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 
+import { Avatar } from '@/features/people/avatar';
+
 /** The avatar column's width, and the avatar's diameter in it. */
 const AVATAR_PX = 20;
 
@@ -14,11 +16,20 @@ const AVATAR_PX = 20;
 export function RippleThread({
   entries,
   initials,
+  authorId,
   className = '',
 }: {
   /** `initials` per entry in a pool, where each ripple keeps its author (H23). */
-  entries: { id: string; body: ReactNode; meta?: ReactNode; initials?: string }[];
+  entries: {
+    id: string;
+    body: ReactNode;
+    meta?: ReactNode;
+    initials?: string;
+    authorId?: string;
+  }[];
   initials: string;
+  /** Whose face the entries without their own author show (0018): mine, on my own pages. */
+  authorId?: string | null;
   className?: string;
 }) {
   return (
@@ -33,13 +44,13 @@ export function RippleThread({
             style={{ gridTemplateColumns: `${AVATAR_PX}px minmax(0, 1fr)` }}
           >
             <span className="relative flex flex-col items-center">
-              <span
-                aria-hidden
-                data-thread-avatar
-                className="bg-pool-100 text-pool-500 flex shrink-0 items-center justify-center rounded-full text-[10px] font-medium"
-                style={{ width: AVATAR_PX, height: AVATAR_PX }}
-              >
-                {entry.initials ?? initials}
+              <span data-thread-avatar className="flex shrink-0">
+                <Avatar
+                  id={entry.authorId ?? (entry.initials === undefined ? authorId : undefined)}
+                  initials={entry.initials ?? initials}
+                  className="bg-pool-100 text-pool-500 flex shrink-0 items-center justify-center rounded-full text-[10px] font-medium"
+                  style={{ width: AVATAR_PX, height: AVATAR_PX }}
+                />
               </span>
               {last ? null : (
                 // The thread: from under this avatar down to the next one.

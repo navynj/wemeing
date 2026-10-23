@@ -22,6 +22,8 @@ import { monthKey } from '@/features/splash/summary';
 import type { IsoDate } from '@/lib/time';
 
 import { Monogram } from '@/components/ui/monogram';
+import { Avatar, Initials, PersonName } from '@/features/people/avatar';
+import { usePeople } from '@/features/people/people-provider';
 
 import {
   cardColumn,
@@ -123,6 +125,8 @@ export const LaneGrid = forwardRef<
     onPick: (id: string) => void;
     /** The `+` column after the last lane; absent where lanes are not made here. */
     onCreateLane?: () => void;
+    /** My avatar opens my profile (0018); absent, it is only a face. */
+    onAvatar?: () => void;
     /**
      * The Lane view (the grid) or the Date view (round 3): the same scroller,
      * rail, window, `?m=` target and ring; in the Date view a day's posts are
@@ -141,10 +145,12 @@ export const LaneGrid = forwardRef<
     scrollToMonth,
     onPick,
     onCreateLane,
+    onAvatar,
     view = 'lane',
   },
   ref,
 ) {
+  const { me } = usePeople();
   const scroller = useRef<HTMLDivElement>(null);
   // The inner, sideways scroller, and the header bar that follows it.
   const across = useRef<HTMLDivElement>(null);
@@ -363,12 +369,21 @@ export const LaneGrid = forwardRef<
       {/* The avatar: large, centred, scrolling away with the days. */}
       {initials !== null ? (
         <div data-avatar-row className="flex justify-center pt-5 pb-6">
-          <span
+          {/* My face is the way to my profile (0018). */}
+          <button
+            type="button"
             data-avatar
-            className="flex h-20 w-20 items-center justify-center rounded-full bg-white/25 text-2xl font-medium text-white/70"
+            aria-label="Profile"
+            disabled={!onAvatar}
+            onClick={onAvatar}
+            className="flex rounded-full"
           >
-            {initials}
-          </span>
+            <Avatar
+              id={me}
+              initials={initials}
+              className="flex h-20 w-20 items-center justify-center rounded-full bg-white/25 text-2xl font-medium text-white/70"
+            />
+          </button>
         </div>
       ) : null}
 
@@ -536,19 +551,25 @@ function ColumnHeader({ column }: { column: GridColumn }) {
       {column.monogram !== undefined ? (
         <Monogram name={column.monogram} size="head" />
       ) : column.avatar !== undefined ? (
-        <span
-          aria-hidden
-          data-column-avatar
-          className="text-main-900/60 flex h-9 w-9 items-center justify-center rounded-full bg-white/40 text-xs font-medium"
-        >
-          {column.avatar}
+        <span data-column-avatar className="flex">
+          <Avatar
+            id={column.id}
+            initials={column.avatar}
+            className="text-main-900/60 flex h-9 w-9 items-center justify-center rounded-full bg-white/40 text-xs font-medium"
+          />
         </span>
       ) : (
         <span aria-hidden className="text-2xl/none">
           {column.icon}
         </span>
       )}
-      <span className="max-w-full truncate text-[11px]/tight font-semibold">{column.name}</span>
+      <span className="max-w-full truncate text-[11px]/tight font-semibold">
+        {column.avatar !== undefined ? (
+          <PersonName id={column.id} name={column.name} />
+        ) : (
+          column.name
+        )}
+      </span>
     </>
   );
   const className = 'flex flex-col items-center gap-0.5 px-0.5 pb-2 text-white';
@@ -761,7 +782,7 @@ function Mark({
           data-mark-author
           className={`text-[10px]/none font-medium text-white/60 ${dived ? 'opacity-60' : ''}`}
         >
-          {card.author}
+          <Initials id={card.authorId} initials={card.author} />
         </span>
       ) : null}
     </span>

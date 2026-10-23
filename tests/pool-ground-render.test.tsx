@@ -25,6 +25,7 @@ vi.mock('@/features/pool/actions', () => ({
 }));
 
 import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
+import { PeopleProvider } from '@/features/people/people-provider';
 import { PoolGround } from '@/features/pool/pool-ground';
 import { PoolIndex } from '@/features/pool/pool-index';
 import { lastPool, rememberVisit } from '@/features/pool/remembered';
@@ -427,5 +428,56 @@ describe('re-tapping Pool (review)', () => {
     // The desktop rail cycles too.
     fireEvent.click(container.querySelector('[data-home-foot="wide"] [data-pool-tab]')!);
     expect(selected()).toBe('swimmers');
+  });
+});
+
+describe('faces (0018)', () => {
+  const PEOPLE = {
+    [ME]: { name: 'Yoonji Lee', photo: 'https://signed/me' },
+    [MINA]: { name: 'Mina Kim', photo: 'https://signed/mina' },
+    [GONE]: { name: 'Gone', photo: null },
+  };
+  const faces = (view: PoolView) =>
+    render(
+      <PeopleProvider me={ME} people={PEOPLE}>
+        <InputSheetProvider>
+          <PoolGround view={view} pools={POOLS} me={ME} today="2026-10-23" timeZone={TZ} />
+        </InputSheetProvider>
+      </PeopleProvider>,
+    );
+  const srcs = (root: Element | null) =>
+    [...(root?.querySelectorAll('img') ?? [])].map((img) => img.getAttribute('src'));
+
+  it('shows each member’s photo in the header, the Swimmers headers and the members sheet', () => {
+    setView('swimmers');
+    const { container } = faces(A);
+    expect(srcs(container.querySelector('[data-pool-members]'))).toEqual([
+      'https://signed/me',
+      'https://signed/mina',
+    ]);
+    expect(srcs(container.querySelector(`[data-lane-header="${MINA}"]`))).toEqual([
+      'https://signed/mina',
+    ]);
+    // A renamed member reads by their new name.
+    expect(container.querySelector(`[data-lane-header="${MINA}"]`)!.textContent).toContain(
+      'Mina Kim',
+    );
+    fireEvent.click(container.querySelector('[data-pool-members]')!);
+    expect(srcs(container.querySelector(`[data-member="${MINA}"]`))).toEqual([
+      'https://signed/mina',
+    ]);
+    // A former member has no photo for me: initials.
+    expect(container.querySelector(`[data-member="${GONE}"]`)!.textContent).toContain('GO');
+  });
+
+  it('labels a mark with its author’s current initials', () => {
+    setView('lane');
+    const { container } = faces(A);
+    expect(
+      container
+        .querySelector('[data-mark="s-mina"]')
+        ?.closest('[data-cell]')
+        ?.querySelector('[data-mark-author]')?.textContent,
+    ).toBe('MK');
   });
 });

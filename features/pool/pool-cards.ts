@@ -74,6 +74,7 @@ export function poolCards(
         note: r.note!,
         createdAt: r.created_at,
         initials: initialsOf.get(r.author_id) ?? '',
+        authorId: r.author_id,
       }));
     const href = poolSplashHref(view.pool.id, splash.id);
     if (splash.owner_id === null) {
@@ -90,6 +91,7 @@ export function poolCards(
           id: r.id,
           column: kind === 'swimmers' ? r.author_id : (splash.pool_lane_id ?? ''),
           initials: initialsOf.get(r.author_id) ?? '',
+          authorId: r.author_id,
         })),
         href,
         menu: { pin: true, delete: blocks.every((r) => r.author_id === me) },
@@ -109,6 +111,7 @@ export function poolCards(
       column: kind === 'swimmers' ? splash.owner_id : placement?.poolLaneId,
       lane: lane ? { icon: lane.icon, name: lane.name } : null,
       author,
+      authorId: splash.owner_id,
       href,
       origins,
       // My own post: my pin and my delete, as on Home. Someone else's: neither.

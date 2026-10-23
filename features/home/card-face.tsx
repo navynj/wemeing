@@ -7,6 +7,7 @@ import { splashFromHome } from '@/features/home/scope';
 import { RippleThread } from '@/features/splash/ripple-thread';
 import { DETAIL_TITLE_CLASS } from '@/features/splash/splash-header';
 import { Monogram } from '@/components/ui/monogram';
+import { usePeople } from '@/features/people/people-provider';
 
 import { cardDate, postIcon, type Card, type CardLane } from './grid';
 
@@ -59,6 +60,7 @@ export function CardFace({
   href?: string;
   onClickCapture?: (event: React.MouseEvent) => void;
 }) {
+  const { me } = usePeople();
   const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
   // The post's own icon, else its lane's emoji (0008).
   const glyph = postIcon(card.splash, lane);
@@ -149,12 +151,22 @@ export function CardFace({
         {/* Each ripple an entry of its own, threaded avatar to avatar (round 3). */}
         <RippleThread
           initials={card.author ?? initials}
+          authorId={card.authorId ?? me}
           entries={(card.ripples.length > 0
             ? card.ripples
-            : [{ id: card.splash.id, note: card.body, createdAt: '', initials: card.author }]
+            : [
+                {
+                  id: card.splash.id,
+                  note: card.body,
+                  createdAt: '',
+                  initials: card.author,
+                  authorId: card.authorId,
+                },
+              ]
           ).map((ripple) => ({
             id: ripple.id,
             initials: ripple.initials,
+            authorId: ripple.authorId,
             body: (
               <span className="text-ink/80 text-[13px]/relaxed whitespace-pre-wrap">
                 {ripple.note}

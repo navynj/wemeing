@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import type { PoolMember } from '@/lib/queries/pools';
+import { Avatar, PersonName } from '@/features/people/avatar';
 
 import { leavePool } from './actions';
 import { PoolSheet, SheetTitle } from './sheet';
@@ -36,14 +37,13 @@ export function MembersSheet({
             data-member={member.userId}
             className="border-pool-100 flex items-center gap-3 border-b py-3"
           >
-            <span
-              aria-hidden
+            <Avatar
+              id={member.userId}
+              initials={member.initials}
               className="bg-pool-100 text-pool-500 flex h-9 w-9 items-center justify-center rounded-full text-xs font-medium"
-            >
-              {member.initials}
-            </span>
+            />
             <span className="text-ink min-w-0 flex-1 truncate">
-              {member.name}
+              <PersonName id={member.userId} name={member.name} />
               {member.userId === me ? <span className="text-pool-500"> (you)</span> : null}
             </span>
             {member.former ? (

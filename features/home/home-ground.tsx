@@ -12,6 +12,7 @@ import type { SplashSummary } from '@/features/splash/summary';
 import type { MyCategory } from '@/lib/queries/profile';
 import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
+import { ProfileSheet } from '@/features/people/profile-sheet';
 
 import { FlipBoard } from './diving-board-flip';
 import { GroundFoot } from './ground-foot';
@@ -90,6 +91,7 @@ export function HomeGround({
   board?: Board;
 }) {
   const [newLane, setNewLane] = useState(false);
+  const [profile, setProfile] = useState(false);
   const [editingLanes, setEditingLanes] = useState(manageLanes);
   const [view, setView] = useHomeView();
   const {
@@ -292,6 +294,7 @@ export function HomeGround({
             scrollToMonth={scrollToMonth}
             onPick={goTo}
             onCreateLane={() => setNewLane(true)}
+            onAvatar={() => setProfile(true)}
           />
         </div>
 
@@ -334,6 +337,7 @@ export function HomeGround({
         />
       </div>
 
+      {profile ? <ProfileSheet onClose={() => setProfile(false)} /> : null}
       {newLane ? (
         <CategorySheet category={null} apply={lanes.run} onClose={() => setNewLane(false)} />
       ) : null}

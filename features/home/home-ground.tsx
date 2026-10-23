@@ -239,7 +239,7 @@ export function HomeGround({
         <div className="flex min-h-0 flex-1 flex-col lg:min-w-0 lg:flex-1">
           {/* The header (round 3): lane management at the left, the view
               toggle at the centre. No settings page exists, so no gear. */}
-          <header data-home-header className="flex shrink-0 items-center gap-3 px-4 pt-3 pb-3">
+          <header data-home-header className="flex shrink-0 items-center gap-3 px-4 pt-3 pb-6">
             <button
               type="button"
               aria-label="Lanes"

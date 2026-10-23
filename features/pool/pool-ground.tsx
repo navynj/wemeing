@@ -149,6 +149,18 @@ export function PoolGround({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [droppedId]);
 
+  // Compose from here defaults to this pool, its lanes as I linked them (H23).
+  const composeHere = (): void =>
+    openSheet({
+      poolId,
+      poolName: view.pool.name,
+      lanes: view.lanes.map((lane) => ({
+        id: lane.id,
+        name: lane.name,
+        icon: lane.icon,
+        myCategoryId: view.myLinks.find((l) => l.poolLaneId === lane.id)?.myCategoryId ?? null,
+      })),
+    });
   const waterIds = useMemo(() => new Set(ids.filter((id) => id !== heading)), [ids, heading]);
   const current = view.members.filter((m) => !m.former);
   const laneNames = view.lanes.map((l) => ({ id: l.id, name: l.name, icon: l.icon }));
@@ -281,23 +293,11 @@ export function PoolGround({
             onDelete={remove}
             hrefFor={(id) => shown.find((c) => c.splash.id === id)?.href ?? `/pool/${poolId}`}
           />
-          <GroundFoot
-            here="pool"
-            onCompose={() =>
-              openSheet({
-                poolId,
-                poolName: view.pool.name,
-                lanes: view.lanes.map((lane) => ({
-                  id: lane.id,
-                  name: lane.name,
-                  icon: lane.icon,
-                  myCategoryId:
-                    view.myLinks.find((l) => l.poolLaneId === lane.id)?.myCategoryId ?? null,
-                })),
-              })
-            }
-          />
+          <GroundFoot here="pool" onCompose={composeHere} />
         </div>
+
+        {/* Wide: Home, Pool and compose stacked at the right edge. */}
+        <GroundFoot slot="wide" here="pool" onCompose={composeHere} />
       </div>
 
       {sheet === 'switcher' ? (

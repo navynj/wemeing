@@ -306,6 +306,15 @@ export function HomeGround({
             onCompose={() => openSheet()}
           />
         </div>
+
+        {/* Wide: the same three, stacked at the right edge (review). */}
+        <GroundFoot
+          slot="wide"
+          here="home"
+          homeLabel={`Home, showing the ${view} view; tap to switch`}
+          onHome={() => setView(view === 'lane' ? 'date' : 'lane')}
+          onCompose={() => openSheet()}
+        />
       </div>
 
       {newLane ? (

@@ -10,13 +10,19 @@ import { Home, Plus, WavesLadder } from 'lucide-react';
  * wrapper, one fade for icon and label together. On Home, every tap on
  * Home switches Lane and Date (round 3); on a pool, Home goes home. Pool
  * opens my most recently viewed pool (`/pool` decides).
+ *
+ * Two slots, CSS showing one per breakpoint so nothing moves after load:
+ * on a phone a row at the foot of the board; on a wide screen a vertical
+ * stack at the ground's right edge — Home, Pool, then compose.
  */
 export function GroundFoot({
+  slot = 'phone',
   here,
   onHome,
   onCompose,
   homeLabel,
 }: {
+  slot?: 'phone' | 'wide';
   here: 'home' | 'pool';
   /** Home's own tap, when Home is where we are: the view switch. */
   onHome?: () => void;
@@ -39,13 +45,20 @@ export function GroundFoot({
       <span className="text-xs/none">Pool</span>
     </>
   );
+  const wide = slot === 'wide';
   return (
     <div
-      data-home-foot
-      className="flex shrink-0 items-center justify-between px-6 pt-2 lg:px-0"
-      style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }}
+      data-home-foot={slot}
+      className={
+        wide
+          ? 'hidden shrink-0 flex-col items-center justify-center gap-10 self-stretch pr-6 lg:flex'
+          : 'flex shrink-0 items-center justify-between px-6 pt-2 lg:hidden'
+      }
+      style={
+        wide ? undefined : { paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }
+      }
     >
-      <nav aria-label="Places" className="flex items-center gap-8">
+      <nav aria-label="Places" className={`flex items-center ${wide ? 'flex-col gap-7' : 'gap-8'}`}>
         {here === 'home' ? (
           <button
             type="button"

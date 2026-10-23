@@ -24,7 +24,7 @@ export function PoolIndex({ poolIds }: { poolIds: string[] }) {
   }, [poolIds, router]);
 
   return (
-    <main className="water-ground flex h-dvh min-h-0 flex-col">
+    <main className="water-ground flex h-dvh min-h-0 flex-col lg:flex-row">
       <div
         className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
@@ -49,6 +49,7 @@ export function PoolIndex({ poolIds }: { poolIds: string[] }) {
         )}
         <GroundFoot here="pool" onCompose={() => openSheet()} />
       </div>
+      <GroundFoot slot="wide" here="pool" onCompose={() => openSheet()} />
     </main>
   );
 }

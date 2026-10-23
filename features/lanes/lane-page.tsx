@@ -6,8 +6,8 @@ import { useMemo, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 
 import { type Card } from '@/features/home/grid';
+import { DAY_LIST_TEMPLATE, DateDay } from '@/features/home/date-day';
 import { PostRow } from '@/features/home/post-row';
-import { monthName } from '@/features/home/scope';
 import { StairBoard } from '@/features/home/stair-board';
 import { useFlip } from '@/features/home/use-flip';
 import { deleteRipple } from '@/features/ripple-sheet/actions';
@@ -22,8 +22,9 @@ import { EmojiInput } from './emoji-input';
 /**
  * A lane's page (round 3, review): a breadcrumb, Home / the lane; the lane's
  * emoji large with its name under it; then every post on the lane as a row
- * — the date, the icon, the title — newest first, grouped by month under a
- * small label, separated only by faint white lines. Beneath, Home's card
+ * in the Date view's own day list — the day over its weekday on the rail,
+ * the icon and the title, the month on a line of its own — newest first,
+ * separated only by faint white lines. Beneath, Home's card
  * stack over this lane's posts: the row of the card on top is the one at
  * full white, a row brings its post to the top, and the top card opens the
  * post's page, which comes back here with the same card on top.
@@ -85,12 +86,12 @@ export function LanePage({
     );
   }
 
-  const months: { month: string; cards: Card[] }[] = [];
+  // Newest day first, each day's posts newest first.
+  const days: { day: string; cards: Card[] }[] = [];
   for (const card of shown) {
-    const month = monthKey(card.day);
-    const last = months[months.length - 1];
-    if (last && last.month === month) last.cards.push(card);
-    else months.push({ month, cards: [card] });
+    const last = days[days.length - 1];
+    if (last && last.day === card.day) last.cards.push(card);
+    else days.push({ day: card.day, cards: [card] });
   }
   const shownLane = { ...lane, name: saved.value.name, icon: saved.value.icon };
 
@@ -100,8 +101,15 @@ export function LanePage({
       className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col"
       style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
     >
-      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-6 pt-4 pb-6">
-        <nav aria-label="Breadcrumb" data-breadcrumb className="flex items-center gap-1 text-sm">
+      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto pt-4 pb-6">
+        {/* No side padding on the scroller itself: the day list's rail is
+            sticky to its left edge, and padding there pushed it over the
+            rows (review). The parts above and below carry their own. */}
+        <nav
+          aria-label="Breadcrumb"
+          data-breadcrumb
+          className="flex items-center gap-1 px-6 text-sm"
+        >
           <Link href="/" className="font-medium text-white">
             Home
           </Link>
@@ -109,7 +117,7 @@ export function LanePage({
           <span className="text-white/70">{saved.value.name}</span>
         </nav>
 
-        <header className="flex flex-col items-center gap-2 pt-6 pb-8">
+        <header className="flex flex-col items-center gap-2 px-6 pt-6 pb-8">
           {editing ? (
             <div data-lane-edit className="flex w-full flex-col items-center gap-3">
               <EmojiInput value={icon} onChange={setIcon} label="Lane icon" />
@@ -163,30 +171,31 @@ export function LanePage({
           ) : null}
         </header>
 
-        {months.length === 0 ? (
-          <p className="py-10 text-center text-sm text-white/60">Nothing on this lane yet.</p>
+        {days.length === 0 ? (
+          <p className="px-6 py-10 text-center text-sm text-white/60">Nothing on this lane yet.</p>
         ) : (
-          <div data-lane-posts className="flex flex-col gap-6">
-            {months.map(({ month, cards: inMonth }) => (
-              <section key={month} className="flex flex-col">
-                <h2 data-lane-month className="pb-1 text-[11px] font-medium text-white/60">
-                  {monthName(month)} {month.slice(0, 4)}
-                </h2>
-                <ol className="flex flex-col">
-                  {inMonth.map((card) => (
-                    <li key={card.splash.id} data-lane-post={card.splash.id}>
-                      <PostRow
-                        card={card}
-                        lane={shownLane}
-                        current={card.splash.id === flip.heading}
-                        ring={null}
-                        lead="date"
-                        onPick={flip.bringForward}
-                      />
-                    </li>
-                  ))}
-                </ol>
-              </section>
+          // The Date view's own day list: the rail, the rows, the month on
+          // a line of its own (review).
+          <div data-lane-posts className="grid" style={{ gridTemplateColumns: DAY_LIST_TEMPLATE }}>
+            {days.map(({ day, cards: onDay }, index) => (
+              <DateDay
+                key={day}
+                day={day}
+                monthChanges={index === 0 || monthKey(days[index - 1].day) !== monthKey(day)}
+              >
+                {onDay.map((card) => (
+                  <div key={card.splash.id} data-lane-post={card.splash.id}>
+                    <PostRow
+                      card={card}
+                      lane={shownLane}
+                      current={card.splash.id === flip.heading}
+                      ring={null}
+                      showLane={false}
+                      onPick={flip.bringForward}
+                    />
+                  </div>
+                ))}
+              </DateDay>
             ))}
           </div>
         )}

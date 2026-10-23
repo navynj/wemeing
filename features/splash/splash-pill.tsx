@@ -58,7 +58,7 @@ export function SplashPill({
       className={`relative flex max-w-full items-center gap-2 rounded-full py-1.5 pr-2 pl-3.5 ${surface}`}
     >
       <span className="flex min-w-0 flex-col">
-        <span className={`text-[9px]/none font-medium tabular-nums ${date}`}>
+        <span className={`text-[10px]/none font-medium tabular-nums ${date}`}>
           {formatPillDate(range)}
         </span>
         <span className="flex min-w-0 items-center gap-1 text-[13px]/tight font-medium">

@@ -42,3 +42,19 @@ if [ -n "$hits" ]; then
 fi
 
 echo "✓ main-400 confined to chips and waves"
+
+# The smallest type is 10px (review): anything under it fails, unless the
+# line says why with `allow-small-text` — the rare real exception.
+small=$(grep -rnE 'text-\[[0-9]px\]|fontSize: ?[0-9](px)?[^0-9]' app features components \
+  --include='*.tsx' --include='*.ts' 2>/dev/null | grep -v 'allow-small-text' || true)
+if [ -n "$small" ]; then
+  echo "✖ type under 10px:"
+  echo ""
+  printf '%s\n' "$small" | sed 's/^/    /'
+  echo ""
+  echo "  The smallest size is text-[10px]. A genuine exception carries"
+  echo "  an allow-small-text comment saying why."
+  exit 1
+fi
+
+echo "✓ no type under 10px"

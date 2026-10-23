@@ -32,10 +32,12 @@ import {
   weekdayOf,
   type Card,
 } from './grid';
+import { DAY_RAIL_PX, DateDay } from './date-day';
 import { PostRow } from './post-row';
 
 /** The date rail's width and the `+` column's, both fixed; the lanes share the rest. */
-const RAIL_PX = 56;
+/** The date rail's width; shared with the day list. */
+const RAIL_PX = DAY_RAIL_PX;
 const PLUS_PX = 44;
 /** How many day rows the window grows by when the bottom comes into view. */
 const WINDOW_STEP = 31;
@@ -458,7 +460,6 @@ export const LaneGrid = forwardRef<
                         lane={laneId ? (byLaneId.get(laneId) ?? null) : null}
                         current={!waterIds.has(card.splash.id)}
                         ring={ringAt?.id === card.splash.id ? ringAt.seq : null}
-                        lead="lane"
                         onPick={onPick}
                       />
                     );
@@ -508,56 +509,16 @@ function DayRow({
         style={{ minHeight: ROW_PX }}
       >
         {monthChanges ? (
-          <span data-month-label className="text-[8px]/none font-medium text-white/50">
+          <span data-month-label className="text-[10px]/none font-medium text-white/50">
             {day.slice(0, 4)}
             <br />
             {monthAbbrev(day)}
           </span>
         ) : null}
         <span className="text-sm/none font-medium tabular-nums">{Number(day.slice(8, 10))}</span>
-        <span className="text-[8px]/none font-medium text-white/50">{weekdayOf(day)}</span>
+        <span className="text-[10px]/none font-medium text-white/50">{weekdayOf(day)}</span>
       </div>
       {children}
-    </>
-  );
-}
-
-/**
- * A day in the Date view (review): every day spaced alike. The month, when
- * it changes, is a line of its own above the day rather than a taller rail,
- * so no day's rows sit apart differently; the day number and weekday align
- * with its first row; one fixed space follows each day.
- */
-function DateDay({
-  day,
-  monthChanges,
-  children,
-}: {
-  day: IsoDate;
-  monthChanges: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <>
-      {monthChanges ? (
-        <div
-          data-month-label
-          className="col-span-full pt-1 pb-1 pl-6 text-[8px]/none font-medium text-white/50"
-        >
-          {day.slice(0, 4)} {monthAbbrev(day)}
-        </div>
-      ) : null}
-      <div
-        data-day-row={day}
-        data-labelled=""
-        className="bg-main-900 sticky left-0 z-10 flex flex-col gap-0.5 pt-3 pr-2 pl-6 text-white/70"
-      >
-        <span className="text-sm/none font-medium tabular-nums">{Number(day.slice(8, 10))}</span>
-        <span className="text-[8px]/none font-medium text-white/50">{weekdayOf(day)}</span>
-      </div>
-      <div data-cell="date" className="flex min-w-0 flex-col pr-4 pb-5">
-        {children}
-      </div>
     </>
   );
 }

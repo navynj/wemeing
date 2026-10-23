@@ -77,7 +77,7 @@ export function PinnedCards({
                   <span className="flex min-w-0 items-center gap-2 text-xs text-white/70">
                     <span
                       aria-hidden
-                      className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-white/20 text-[7px] font-medium"
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/20 text-[10px] font-medium"
                     >
                       {initials}
                     </span>

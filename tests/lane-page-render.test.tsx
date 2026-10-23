@@ -102,12 +102,21 @@ describe('a lane’s page (round 3)', () => {
     expect(crumb.textContent).toContain('Food');
     expect(container.querySelector('[data-lane-emoji]')!.textContent).toBe('🍜');
     expect(container.querySelector('[data-lane-name]')!.textContent).toBe('Food');
-    const months = [...container.querySelectorAll('[data-lane-month]')].map((m) => m.textContent);
-    expect(months).toEqual(['October 2026', 'September 2026']);
+    // The Date view's own day list: the month on a line of its own.
+    const months = [...container.querySelectorAll('[data-month-label]')].map((m) => m.textContent);
+    expect(months).toEqual(['2026 OCT', '2026 SEP']);
     const posts = [...container.querySelectorAll('[data-lane-post]')].map((p) =>
       p.getAttribute('data-lane-post'),
     );
     expect(posts).toEqual(['noodles', 'ramen', 'soup']);
+    // The day over its weekday on the rail, beside the day's rows.
+    let rail: Element | null = container
+      .querySelector('[data-lane-post="ramen"]')!
+      .closest('[data-cell="date"]');
+    rail = rail!.previousElementSibling;
+    expect(rail!.getAttribute('data-day-row')).toBe('2026-10-03');
+    expect(rail!.textContent).toBe('3SAT');
+    expect(container.querySelector('[data-lane-post="ramen"]')!.textContent).not.toContain('Oct');
     expect(container.querySelector('a[href="/?manage=lanes"]')!.textContent).toBe('Manage lanes');
   });
 

@@ -35,7 +35,7 @@ export function RippleThread({
               <span
                 aria-hidden
                 data-thread-avatar
-                className="bg-pool-100 text-pool-500 flex shrink-0 items-center justify-center rounded-full text-[8px] font-medium"
+                className="bg-pool-100 text-pool-500 flex shrink-0 items-center justify-center rounded-full text-[10px] font-medium"
                 style={{ width: AVATAR_PX, height: AVATAR_PX }}
               >
                 {initials}

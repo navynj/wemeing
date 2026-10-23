@@ -3,14 +3,15 @@
 import { CommitRing } from '@/components/ui/waves';
 import type { MyCategory } from '@/lib/queries/profile';
 
-import { cardDate, postIcon, type Card } from './grid';
+import { postIcon, type Card } from './grid';
 
 /** The icon disc's diameter, and the ring's bound around it. */
 const DISC_PX = 28;
 const RING_PX = 96;
 
 /**
- * A post as a row (review): in the Date view and on a lane page — no pill
+ * A post as a row (review): in a day list — the Date view and a lane's
+ * page alike — no pill
  * background, only a faint white line beneath each row. The post the stack
  * is reading is the one row at full white, its icon on a white disc; every
  * other row sits back, as every other mark does on the grid. The ring plays
@@ -22,7 +23,7 @@ export function PostRow({
   lane,
   current,
   ring,
-  lead,
+  showLane = true,
   onPick,
 }: {
   card: Card;
@@ -31,8 +32,8 @@ export function PostRow({
   current: boolean;
   /** The ring's sequence number while it plays here, else null. */
   ring: number | null;
-  /** What leads the row: the lane as a chip at the end (Date view), or the date first (a lane page). */
-  lead: 'lane' | 'date';
+  /** The lane as a chip at the end; off on a lane's own page, where every row shares it. */
+  showLane?: boolean;
   onPick: (id: string) => void;
 }) {
   const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
@@ -48,11 +49,6 @@ export function PostRow({
         current ? '' : 'opacity-60'
       }`}
     >
-      {lead === 'date' ? (
-        <span className="w-24 shrink-0 text-xs text-white/70 tabular-nums">
-          {cardDate(card.day)}
-        </span>
-      ) : null}
       <span className="relative flex shrink-0 items-center justify-center">
         {ring !== null ? (
           <span
@@ -83,7 +79,7 @@ export function PostRow({
       >
         {title}
       </span>
-      {lead === 'lane' && lane ? (
+      {showLane && lane ? (
         <span className="inline-flex h-5 shrink-0 items-center gap-1 rounded-full border border-white/25 px-2 text-[10px] text-white/80">
           {lane.icon ? <span aria-hidden>{lane.icon}</span> : null}
           {lane.name}

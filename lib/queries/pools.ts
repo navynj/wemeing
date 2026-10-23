@@ -279,28 +279,42 @@ export type MyLink = {
 };
 
 export async function getMyLinks(supabase: DuringClient, me: string): Promise<MyLink[]> {
-  const { data, error } = await supabase
-    .from('lane_mappings')
-    .select('my_category_id, pool_id, pool_lane_id, pool:pools(name)')
-    .eq('user_id', me)
-    .returns<
-      {
-        my_category_id: string;
-        pool_id: string;
-        pool_lane_id: string;
-        pool: { name: string } | null;
-      }[]
-    >();
+  // Two reads: lane_mappings reaches pools only through pool_lanes' composite
+  // key, which PostgREST cannot embed by name.
+  const [{ data: links, error }, pools] = await Promise.all([
+    supabase
+      .from('lane_mappings')
+      .select('my_category_id, pool_id, pool_lane_id')
+      .eq('user_id', me),
+    getMyPoolNames(supabase, me),
+  ]);
   if (error) throw error;
-  // A pool I have left is unreadable, so its links drop out here.
-  return data
-    .filter((row) => row.pool)
+  const nameOf = new Map(pools.map((p) => [p.id, p.name]));
+  // A pool I have left is not in my pools, so its links drop out here.
+  return links
+    .filter((row) => nameOf.has(row.pool_id))
     .map((row) => ({
       myCategoryId: row.my_category_id,
       poolId: row.pool_id,
-      poolName: row.pool!.name,
+      poolName: nameOf.get(row.pool_id)!,
       poolLaneId: row.pool_lane_id,
     }));
+}
+
+/** The pools I am in now, by name: the Audience sheet's rows and Home's monograms. */
+export async function getMyPoolNames(
+  supabase: DuringClient,
+  me: string,
+): Promise<{ id: string; name: string }[]> {
+  const { data, error } = await supabase
+    .from('pool_members')
+    .select('pool:pools(id, name)')
+    .eq('user_id', me)
+    .is('left_at', null)
+    .order('joined_at', { ascending: false })
+    .returns<{ pool: { id: string; name: string } | null }[]>();
+  if (error) throw error;
+  return data.flatMap((row) => (row.pool ? [row.pool] : []));
 }
 
 /** My posts' placements in pools I am in now, switched on or off. */

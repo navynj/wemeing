@@ -16,7 +16,14 @@ import {
   MediaPreviews,
   useMediaAttach,
 } from '@/features/input-sheet/media-field';
-import { dropSplash, type SplashResult } from '@/features/splash/actions';
+import { placeCard, type Card } from '@/features/home/grid';
+import { createJointSplash, placeNewSplash } from '@/features/pool/actions';
+import { defaultAudience, type AudienceLink } from '@/features/pool/audience';
+import { AudienceChip } from '@/features/pool/audience-sheet';
+import type { PoolScope } from '@/features/pool/compose-scope';
+import { poolSplashHref } from '@/features/pool/pool-cards';
+import { PoolLanePicker, type PoolPick } from '@/features/pool/pool-lane-picker';
+import { dropSplash } from '@/features/splash/actions';
 import { summarizeSplash, type SplashSummary } from '@/features/splash/summary';
 import type { MyCategory } from '@/lib/queries/profile';
 import { wallClockToInstant } from '@/lib/ripple-kind';
@@ -28,6 +35,12 @@ export type SheetContext = {
   categories: MyCategory[];
   timeZone: string;
   today: IsoDate;
+  /** My lane links across my pools: the Audience chip's default (H23). */
+  links: AudienceLink[];
+  /** The pools I am in now, for the Audience sheet. */
+  pools: { id: string; name: string }[];
+  /** My initials, for a card dropped into a pool. */
+  initials: string;
 };
 
 /** A drop as the composer hands it over: the post as the screen should show it, and the action that makes it true. */
@@ -36,7 +49,9 @@ export type DropHandoff = {
   month: string;
   /** The first block's words, for the recent column to preview at once. */
   note: string | null;
-  commit: () => Promise<SplashResult>;
+  /** Dropped from a pool (H23): the card that pool seats at once; the page stays there. */
+  pool?: { poolId: string; card: Card };
+  commit: () => Promise<{ ok: true } | { ok: false; message: string }>;
 };
 
 /** An IME is mid-composition: Chrome flags it, Safari reports keyCode 229. */
@@ -60,18 +75,36 @@ export function SplashComposer({
   context,
   onDrop,
   autoFocus = true,
+  pool = null,
 }: {
   context: SheetContext;
   onDrop: (drop: DropHandoff) => void;
   autoFocus?: boolean;
+  /** Composing from a pool (H23): its lanes are the picker, and it is the default audience. */
+  pool?: PoolScope | null;
 }) {
-  const { categories, timeZone, today } = context;
+  const { categories, timeZone, today, links, pools, initials } = context;
   const fresh = (): Annotation => ({ date: today, time: null, endDate: null, endTime: null });
   const [titleText, setTitleText] = useState('');
   // The post's own icon (0008); empty lets the lane's emoji stand for it.
   const [icon, setIcon] = useState('');
   const [bodyText, setBodyText] = useState('');
   const [laneId, setLaneId] = useState<string | null>(null);
+  // From a pool: a linked pool lane, or a joint splash on one (H23).
+  const [pick, setPick] = useState<PoolPick>(null);
+  // My lane for my first ripple on a joint splash whose pool lane I left unlinked.
+  const [jointMyLane, setJointMyLane] = useState<string | null>(null);
+  // Edited by hand, the audience stays as set; untouched, it follows the lane.
+  const [audienceEdited, setAudienceEdited] = useState<string[] | null>(null);
+  const joint = pick?.kind === 'joint';
+  // Only pools where the lane is linked can take the post (C5), edited or not.
+  const linkedHere = defaultAudience(laneId, links);
+  const audience = joint
+    ? []
+    : (audienceEdited ?? linkedHere).filter((poolId) => linkedHere.includes(poolId));
+  const jointLink = joint
+    ? (pool?.lanes.find((l) => l.id === pick.poolLaneId)?.myCategoryId ?? null)
+    : null;
   // Today is in the field from the start (review): the chip opens set to the
   // date, no clock, and is removed with its × for a plain posted block.
   const [annotation, setAnnotation] = useState<Annotation | null>(fresh);
@@ -92,6 +125,15 @@ export function SplashComposer({
   const { title, body } = composeDrop(titleText, bodyText);
   const hasContent =
     title.length > 0 || body.length > 0 || mediaPaths.length > 0 || laneId !== null;
+  // From a pool a lane must be chosen, or the post would not land there; a
+  // joint splash needs its pool lane, and my lane for any words of mine.
+  const poolReady =
+    !pool ||
+    (joint
+      ? pick.poolLaneId !== null &&
+        (title.length > 0 || body.length > 0) &&
+        (body.length === 0 || (jointLink ?? jointMyLane) !== null)
+      : laneId !== null);
   const annotationOk = !annotation || annotationVerdict(annotation) === 'ok';
 
   function drop(): void {
@@ -159,17 +201,61 @@ export function SplashComposer({
       now,
     );
 
+    const shared = audience;
+    const poolLane = pool
+      ? pool.lanes.find((l) =>
+          joint ? l.id === pick.poolLaneId : l.myCategoryId !== null && l.myCategoryId === laneId,
+        )
+      : undefined;
+    // The card this pool seats before the server has it (H23).
+    const poolCard: Card | null =
+      pool && poolLane && (joint || shared.includes(pool.poolId))
+        ? {
+            ...placeCard(splash, body, timeZone),
+            column: poolLane.id,
+            lane: { icon: poolLane.icon, name: poolLane.name },
+            href: poolSplashHref(pool.poolId, id),
+            ...(joint
+              ? { branches: body ? [{ id: `${id}-first`, column: poolLane.id, initials }] : [] }
+              : { author: initials }),
+          }
+        : null;
+    const myJointLane = jointLink ?? jointMyLane;
+
     onDrop({
       splash,
       month: (a?.date ?? today).slice(0, 7),
       note: body.length > 0 ? body : null,
-      commit: () => dropSplash(input),
+      ...(pool && poolCard ? { pool: { poolId: pool.poolId, card: poolCard } } : {}),
+      commit: joint
+        ? () =>
+            createJointSplash({
+              id,
+              poolId: pool!.poolId,
+              poolLaneId: pick.poolLaneId!,
+              title,
+              icon: icon || null,
+              body,
+              myCategoryId: myJointLane,
+              occurredOn: a?.date ?? null,
+            })
+        : async () => {
+            const made = await dropSplash(input);
+            if (!made.ok || shared.length === 0) return made;
+            const placed = await placeNewSplash(id, shared);
+            return placed.ok
+              ? placed
+              : { ok: false, message: `Dropped, but not shared: ${placed.message}` };
+          },
     });
 
     setTitleText('');
     setIcon('');
     setBodyText('');
     setLaneId(null);
+    setPick(null);
+    setJointMyLane(null);
+    setAudienceEdited(null);
     setAnnotation(fresh());
     setMediaPaths([]);
     field.current?.focus();
@@ -232,8 +318,61 @@ export function SplashComposer({
         className="text-ink placeholder:text-ink min-h-12 w-full resize-none text-base/relaxed font-light outline-none placeholder:opacity-20"
       />
 
-      {/* The declared lane: where every block of this post starts (H21f). */}
-      <LaneChips categories={categories} selectedId={laneId} onSelect={setLaneId} surface="white" />
+      {/* The declared lane: where every block of this post starts (H21f).
+          From a pool, its lanes as I linked them, and Joint splash (H23). */}
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          {pool ? (
+            <PoolLanePicker
+              scope={pool}
+              categories={categories}
+              pick={pick}
+              onPick={(next) => {
+                setPick(next);
+                setLaneId(next?.kind === 'lane' ? next.myCategoryId : null);
+              }}
+            />
+          ) : (
+            <LaneChips
+              categories={categories}
+              selectedId={laneId}
+              onSelect={setLaneId}
+              surface="white"
+            />
+          )}
+        </div>
+        {/* Where it is shared (H23); a joint splash belongs to its pool and has none. */}
+        {pools.length > 0 && !joint ? (
+          <AudienceChip
+            shared={audience}
+            linked={pools
+              .filter((p) => linkedHere.includes(p.id))
+              .map((p) => ({ poolId: p.id, name: p.name }))}
+            unlinked={pools
+              .filter((p) => !linkedHere.includes(p.id))
+              .map((p) => ({ poolId: p.id, name: p.name }))}
+            onToggle={(poolId, on) => {
+              const base = audienceEdited ?? linkedHere;
+              setAudienceEdited(
+                on ? [...new Set([...base, poolId])] : base.filter((id) => id !== poolId),
+              );
+            }}
+          />
+        ) : null}
+      </div>
+      {joint && pick.poolLaneId && !jointLink && body ? (
+        <div className="flex flex-col gap-2">
+          <span className="text-pool-500 text-xs">
+            That lane is not linked to yours. File your ripple under
+          </span>
+          <LaneChips
+            categories={categories}
+            selectedId={jointMyLane}
+            onSelect={setJointMyLane}
+            surface="white"
+          />
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
         <AnnotationControl annotation={annotation} today={today} onChange={setAnnotation} />
@@ -250,7 +389,7 @@ export function SplashComposer({
       {/* Blue means action: the one filled thing here commits (H20f). */}
       <button
         type="button"
-        disabled={!hasContent || !annotationOk}
+        disabled={!hasContent || !annotationOk || !poolReady}
         onClick={drop}
         className="bg-main-900 w-full rounded-full py-2.5 text-xl font-medium text-white disabled:opacity-50"
       >

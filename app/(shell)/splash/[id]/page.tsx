@@ -7,6 +7,9 @@ import { summarizeOrphan, summarizeSplash } from '@/features/splash/summary';
 import { flowInstant } from '@/lib/flow-key';
 import { signOwnMedia } from '@/lib/media';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
+import { SplashAudience } from '@/features/pool/splash-audience';
+import { representativeLane } from '@/features/splash/summary';
+import { getMyLinks, getMyPlacements, getMyPoolNames } from '@/lib/queries/pools';
 import { getMySplashes } from '@/lib/queries/splashes';
 import { getMyTrail } from '@/lib/queries/trail';
 import { createClient } from '@/lib/supabase/server';
@@ -28,10 +31,13 @@ export default async function SplashRoute({ params, searchParams }: PageProps<'/
   const now = new Date();
   const today = todayIn(profile.timezone);
 
-  const [ripples, categories, boards] = await Promise.all([
+  const [ripples, categories, boards, links, pools, placements] = await Promise.all([
     getMyTrail(supabase, profile.id, profile.timezone),
     getMyCategories(supabase),
     getMySplashes(supabase, profile.id),
+    getMyLinks(supabase, profile.id),
+    getMyPoolNames(supabase, profile.id),
+    getMyPlacements(supabase, profile.id),
   ]);
 
   const board = boards.find((b) => b.id === id) ?? null;
@@ -77,6 +83,32 @@ export default async function SplashRoute({ params, searchParams }: PageProps<'/
         timeZone={profile.timezone}
         today={today}
         initials={initialsOf(profile.display_name)}
+        audience={
+          // Where this post is shared (H23): a switch per pool its lane is
+          // linked in. A lone block has no post row to place yet.
+          board && pools.length > 0
+            ? (() => {
+                const lane = summary.declaredLaneId ?? representativeLane(summary);
+                const linkedIds = new Set(
+                  links.filter((l) => l.myCategoryId === lane).map((l) => l.poolId),
+                );
+                return (
+                  <SplashAudience
+                    splashId={board.id}
+                    shared={placements
+                      .filter((p) => p.splashId === board.id && p.shared)
+                      .map((p) => p.poolId)}
+                    linked={pools
+                      .filter((p) => linkedIds.has(p.id))
+                      .map((p) => ({ poolId: p.id, name: p.name }))}
+                    unlinked={pools
+                      .filter((p) => !linkedIds.has(p.id))
+                      .map((p) => ({ poolId: p.id, name: p.name }))}
+                  />
+                );
+              })()
+            : null
+        }
       />
     </main>
   );

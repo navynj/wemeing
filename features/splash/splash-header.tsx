@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, type ReactNode } from 'react';
 import { MoreHorizontal, Pin, PinOff, X } from 'lucide-react';
 
 import { OutlineChip } from '@/components/ui/chips/category-chip';
@@ -39,6 +39,7 @@ export function SplashHeader({
   onEdit,
   onPin,
   onDelete,
+  audience = null,
 }: {
   splash: SplashSummary;
   categories: MyCategory[];
@@ -46,6 +47,8 @@ export function SplashHeader({
   onEdit: (edit: HeaderEdit) => Promise<void>;
   onPin: (pinned: boolean) => Promise<void>;
   onDelete: () => Promise<void>;
+  /** The Audience chip (H23), beside the lane tags; absent when I am in no pool. */
+  audience?: ReactNode;
 }) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(splash.title);
@@ -114,6 +117,8 @@ export function SplashHeader({
             {tags.length === 0 ? <span className="text-pool-500 text-[10px]">+ lane</span> : null}
           </button>
         )}
+
+        {audience}
 
         <div className="relative shrink-0">
           <button

@@ -214,7 +214,10 @@ export function summarizeOrphan(block: SplashBlock, timeZone: string, now: Date)
 
 /**
  * Every post summarised against the blocks it holds, plus every splashless
- * block as a post of one, recent first.
+ * block as a post of one, recent first. A block whose post is not among
+ * `splashes` — a joint splash of a pool I have left, say (H23) — is never
+ * dropped: it reads as a post of one, so nothing I wrote vanishes from my
+ * own surfaces.
  */
 export function summarizeAll(
   splashes: Splash[],
@@ -224,8 +227,9 @@ export function summarizeAll(
 ): SplashSummary[] {
   const byPost = new Map<string, SplashBlock[]>();
   const orphans: SplashBlock[] = [];
+  const known = new Set(splashes.map((splash) => splash.id));
   for (const block of blocks) {
-    if (block.splash_id === null) {
+    if (block.splash_id === null || !known.has(block.splash_id)) {
       orphans.push(block);
       continue;
     }

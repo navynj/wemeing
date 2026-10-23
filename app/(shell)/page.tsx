@@ -4,6 +4,8 @@ import { byNewest, initialsOf, placeCard, type Card, type CardRipple } from '@/f
 import { HomeGround } from '@/features/home/home-ground';
 import { scopedMonth } from '@/features/home/scope';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
+import { poolSplashHref } from '@/features/pool/pool-cards';
+import { getJointSplashes, getMyPlacements, getMyPoolNames } from '@/lib/queries/pools';
 import { getMySplashes, summarizeSplashes } from '@/lib/queries/splashes';
 import { getMyTrail } from '@/lib/queries/trail';
 import { createClient } from '@/lib/supabase/server';
@@ -35,12 +37,32 @@ export default async function HomePage({ searchParams }: PageProps<'/'>) {
   const requested = one(params.m);
   const month = requested ? scopedMonth(requested, today) : null;
 
-  const [ripples, categories, boards] = await Promise.all([
+  const [ripples, categories, mine, placements, pools] = await Promise.all([
     getMyTrail(supabase, profile.id, profile.timezone),
     getMyCategories(supabase),
     getMySplashes(supabase, profile.id),
+    getMyPlacements(supabase, profile.id),
+    getMyPoolNames(supabase, profile.id),
   ]);
+  // My ripples on joint splashes show here too (H23): the splash, with only
+  // my ripples on it, at my ripple's lane. One I can no longer read (a pool
+  // I left) still shows its ripples, as posts of one.
+  const mineIds = new Set(mine.map((s) => s.id));
+  const joints = await getJointSplashes(supabase, [
+    ...new Set(
+      ripples.flatMap((r) => (r.splash_id && !mineIds.has(r.splash_id) ? [r.splash_id] : [])),
+    ),
+  ]);
+  const boards = [...mine, ...joints];
   const summaries = summarizeSplashes(boards, ripples, profile.timezone, now);
+  const poolName = new Map(pools.map((p) => [p.id, p.name]));
+  const sharedTo = new Map<string, string[]>();
+  for (const p of placements) {
+    const name = poolName.get(p.poolId);
+    if (!p.shared || !name) continue;
+    sharedTo.set(p.splashId, [...(sharedTo.get(p.splashId) ?? []), name]);
+  }
+  const jointPool = new Map(joints.map((j) => [j.id, j.pool_id!]));
 
   // A card's ripples: its blocks with words, oldest first. A lone block's is its own.
   const threads = new Map<string, CardRipple[]>();
@@ -55,11 +77,29 @@ export default async function HomePage({ searchParams }: PageProps<'/'>) {
   const cards: Card[] = summaries
     .map((summary) => {
       const thread = threads.get(summary.id) ?? [];
-      return placeCard(summary, thread.map((r) => r.note).join('\n\n'), profile.timezone, thread);
+      const card = placeCard(
+        summary,
+        thread.map((r) => r.note).join('\n\n'),
+        profile.timezone,
+        thread,
+      );
+      const pool = jointPool.get(summary.id);
+      if (pool) {
+        // A joint splash is the pool's: opened there, never pinned or deleted from here.
+        const name = poolName.get(pool);
+        return {
+          ...card,
+          pools: name ? [name] : [],
+          href: poolSplashHref(pool, summary.id),
+          menu: { pin: false, delete: false },
+        };
+      }
+      const shared = sharedTo.get(summary.id);
+      return shared ? { ...card, pools: shared } : card;
     })
     .sort(byNewest);
   const pinned = summaries
-    .filter((s) => s.pinnedAt !== null)
+    .filter((s) => s.pinnedAt !== null && !jointPool.has(s.id))
     .sort((a, b) => b.pinnedAt!.localeCompare(a.pinnedAt!));
 
   return (

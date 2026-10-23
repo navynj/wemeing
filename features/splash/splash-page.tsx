@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ChevronLeft } from 'lucide-react';
 
 import { GhostRing } from '@/components/ui/ghost-ring';
@@ -62,6 +62,7 @@ export function SplashPage({
   timeZone,
   today,
   initials = '',
+  audience = null,
 }: {
   splash: SplashSummary;
   /** Oldest first. */
@@ -74,6 +75,8 @@ export function SplashPage({
   today: IsoDate;
   /** The author's initials, for each ripple's avatar in the thread (round 3). */
   initials?: string;
+  /** The Audience chip for the header (H23). */
+  audience?: ReactNode;
 }) {
   const router = useRouter();
   const { markDeleted } = useInputSheet();
@@ -253,6 +256,7 @@ export function SplashPage({
           today={today}
           onEdit={editHeader}
           onPin={pin}
+          audience={audience}
           onDelete={async () => {
             // Gone the moment it is asked for, from every surface (CLAUDE.md,
             // the principle): back where it came from, and the rows follow. A

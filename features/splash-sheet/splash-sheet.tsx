@@ -2,6 +2,8 @@
 
 import { COLUMN_MAX_WIDTH } from '@/components/ui/column';
 
+import type { PoolScope } from '@/features/pool/compose-scope';
+
 import { SplashComposer, type DropHandoff, type SheetContext } from './splash-composer';
 
 export type { DropHandoff, SheetContext };
@@ -20,10 +22,13 @@ export function SplashSheet({
   context,
   onClose,
   onDrop,
+  pool = null,
 }: {
   context: SheetContext;
   onClose: () => void;
   onDrop: (drop: DropHandoff) => void;
+  /** Opened from a pool (H23): that pool is the default. */
+  pool?: PoolScope | null;
 }) {
   return (
     <div className="fixed inset-0 z-40 flex flex-col justify-end">
@@ -44,7 +49,7 @@ export function SplashSheet({
           className="flex min-h-0 flex-col overflow-y-auto px-7 pt-8"
           style={{ paddingBottom: 'calc(1.75rem + env(safe-area-inset-bottom, 0px))' }}
         >
-          <SplashComposer context={context} onDrop={onDrop} />
+          <SplashComposer context={context} onDrop={onDrop} pool={pool} />
         </div>
       </section>
     </div>

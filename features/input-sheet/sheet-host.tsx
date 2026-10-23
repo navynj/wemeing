@@ -21,8 +21,9 @@ function useDrop(): (drop: DropHandoff) => void {
   const router = useRouter();
   const pathname = usePathname();
   return (drop) => {
-    markDropped({ splash: drop.splash, month: drop.month, note: drop.note });
-    if (pathname !== '/') router.push('/');
+    markDropped({ splash: drop.splash, month: drop.month, note: drop.note, pool: drop.pool });
+    // Dropped from a pool, the pool seats it where we are (H23); else Home.
+    if (!drop.pool && !pathname.startsWith('/pool/') && pathname !== '/') router.push('/');
     void drop.commit().then((result) => {
       if (!result.ok) dropFailed(result.message);
       else router.refresh();
@@ -44,6 +45,7 @@ export function SheetHost({ context }: { context: SheetContext }) {
   return (
     <SplashSheet
       context={context}
+      pool={sheet.pool}
       onClose={closeSheet}
       onDrop={(handoff) => {
         closeSheet();

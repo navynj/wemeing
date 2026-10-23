@@ -230,3 +230,18 @@ describe('a pill’s date', () => {
     expect(formatPillDate({ start: '2026-08-28', end: '2026-09-03' })).toBe('Aug 28 – Sep 3');
   });
 });
+
+describe('a block whose post cannot be read (H23)', () => {
+  it('is never dropped: it reads as a post of one', () => {
+    const all = summarizeAll(
+      [splash()],
+      [
+        { ...block({ id: 'member' }), splash_id: 's1' },
+        { ...block({ id: 'unseen' }), splash_id: 'joint-of-a-pool-i-left' },
+      ],
+      TZ,
+      NOW,
+    );
+    expect(all.map((s) => s.id).sort()).toEqual(['s1', 'unseen']);
+  });
+});

@@ -84,7 +84,16 @@ export function PoolGround({
   const shown = useMemo(() => {
     const kept = cards.filter((c) => !pendingDeletes.includes(c.splash.id));
     if (!dropHere || landed) return kept;
-    return [{ ...dropHere, column: kind === 'swimmers' ? me : dropHere.column }, ...kept];
+    // In Swimmers my drop sits in my column, and a joint splash's first ripple branches into it.
+    const seated: Card =
+      kind === 'swimmers'
+        ? {
+            ...dropHere,
+            column: me,
+            branches: dropHere.branches?.map((branch) => ({ ...branch, column: me })),
+          }
+        : dropHere;
+    return [seated, ...kept];
   }, [cards, pendingDeletes, dropHere, landed, kind, me]);
   useEffect(() => {
     if (!landed) return;

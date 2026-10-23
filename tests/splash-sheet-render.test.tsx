@@ -9,6 +9,14 @@ vi.mock('@/features/splash/actions', () => ({
     return Promise.resolve({ ok: true, splash: { id: 's-new', title: input.title } });
   },
 }));
+const placed: { splashId: string; pools: string[] }[] = [];
+vi.mock('@/features/pool/actions', () => ({
+  placeNewSplash: (splashId: string, pools: string[]) => {
+    placed.push({ splashId, pools });
+    return Promise.resolve({ ok: true });
+  },
+  createJointSplash: () => Promise.resolve({ ok: true, id: 'j' }),
+}));
 const pathname = '/';
 vi.mock('next/navigation', () => ({
   usePathname: () => pathname,
@@ -50,9 +58,21 @@ const LANES = [
   lane('c-mood', 'Mood', '🌤️', 1),
   lane('c-day', 'Day', '🖋', 2),
 ];
+/** Place and Mood are linked in both pools; Day is linked nowhere (H23). */
+const POOLS = [
+  { id: 'p-ours', name: 'Our Pool' },
+  { id: 'p-crew', name: 'Crew' },
+];
+const LINKS = [
+  { myCategoryId: 'c-place', poolId: 'p-ours', poolName: 'Our Pool' },
+  { myCategoryId: 'c-place', poolId: 'p-crew', poolName: 'Crew' },
+  { myCategoryId: 'c-mood', poolId: 'p-ours', poolName: 'Our Pool' },
+  { myCategoryId: 'c-mood', poolId: 'p-crew', poolName: 'Crew' },
+];
 
 beforeEach(() => {
   drops.length = 0;
+  placed.length = 0;
   handoffs.length = 0;
   window.URL.createObjectURL = () => 'blob:preview';
 });
@@ -68,7 +88,14 @@ function sheet() {
   });
   const view = render(
     <SplashSheet
-      context={{ categories: LANES, timeZone: TZ, today: TODAY }}
+      context={{
+        categories: LANES,
+        timeZone: TZ,
+        today: TODAY,
+        links: LINKS,
+        pools: POOLS,
+        initials: 'YL',
+      }}
       onClose={() => {}}
       onDrop={onDrop}
     />,
@@ -252,10 +279,12 @@ describe('the sheet’s shape', () => {
     expect(drops[0]).toMatchObject({ declaredLaneId: 'c-place', body: '' });
   });
 
-  it('has no Timer, no audience chip, no mode toggle, no Add to Splash', () => {
-    const { queryByText, queryByRole } = sheet();
+  it('has no Timer, no per-ripple audience, no mode toggle, no Add to Splash', () => {
+    const { queryByText, queryByRole, container } = sheet();
     expect(queryByText('Timer')).toBeNull();
-    expect(queryByText(/everyone|only me/i)).toBeNull();
+    // The post's Audience chip is the one audience here (H23); ripples have none.
+    expect(container.querySelectorAll('[data-audience-chip]')).toHaveLength(1);
+    expect(queryByText(/everyone/i)).toBeNull();
     expect(queryByRole('group', { name: 'View' })).toBeNull();
     expect(queryByText('+ Add to Splash')).toBeNull();
   });
@@ -282,5 +311,39 @@ describe('the affordances under the text', () => {
     const { getByText, container } = sheet();
     expect(getByText('+ Add Image')).toBeTruthy();
     expect(container.querySelector('[data-media-input]')).not.toBeNull();
+  });
+});
+
+describe('the Audience chip (H23)', () => {
+  const chip = (view: ReturnType<typeof sheet>) =>
+    view.container.querySelector('[data-audience-chip]') as HTMLButtonElement;
+
+  it('defaults to every pool where the chosen lane is linked, and says so', () => {
+    const view = sheet();
+    expect(chip(view).textContent).toBe('Only me');
+    fireEvent.click(view.getByText('Place'));
+    expect(chip(view).textContent).toBe('2 pools');
+    fireEvent.click(view.getByText('Day'));
+    expect(chip(view).textContent).toBe('Only me');
+  });
+
+  it('keeps an audience edited by hand when the lane changes', () => {
+    const view = sheet();
+    fireEvent.click(view.getByText('Place'));
+    fireEvent.click(chip(view));
+    fireEvent.click(view.getByRole('switch', { name: 'Shared to Crew' }));
+    // The sheet stays open over the composer; the chip already reads the edit.
+    expect(chip(view).textContent).toBe('Our Pool');
+    fireEvent.click(view.getAllByText('Mood')[0]);
+    expect(chip(view).textContent).toBe('Our Pool');
+  });
+
+  it('places the dropped post where the chip says', async () => {
+    const view = sheet();
+    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Twin Falls' } });
+    fireEvent.click(view.getByText('Place'));
+    fireEvent.click(view.drop());
+    await waitFor(() => expect(placed).toHaveLength(1));
+    expect(placed[0].pools.sort()).toEqual(['p-crew', 'p-ours']);
   });
 });

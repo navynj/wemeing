@@ -1,6 +1,8 @@
 import { SheetHost } from '@/features/input-sheet/sheet-host';
 import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
+import { initialsOf } from '@/features/home/grid';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
+import { getMyLinks, getMyPoolNames } from '@/lib/queries/pools';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
 
@@ -23,6 +25,10 @@ export default async function ShellLayout({ children }: LayoutProps<'/'>) {
         categories: await getMyCategories(supabase),
         timeZone: profile.timezone,
         today: todayIn(profile.timezone),
+        // The Audience chip's defaults and rows (H23).
+        links: await getMyLinks(supabase, profile.id),
+        pools: await getMyPoolNames(supabase, profile.id),
+        initials: initialsOf(profile.display_name),
       }
     : null;
   return (

@@ -929,7 +929,15 @@ export type Database = {
         Returns: undefined
       }
       member_visible: { Args: { pid: string; uid: string }; Returns: boolean }
+      move_pool_splash: {
+        Args: { p_pool_lane: string; p_splash: string }
+        Returns: undefined
+      }
       record_ripple_view: { Args: { rid: string }; Returns: undefined }
+      rename_pool: {
+        Args: { p_name: string; p_pool: string }
+        Returns: undefined
+      }
       revoke_invite: { Args: { p_invite: string }; Returns: undefined }
       ripple_author: { Args: { rid: string }; Returns: string }
       ripple_in_my_pools: { Args: { rid: string }; Returns: boolean }

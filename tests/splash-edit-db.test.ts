@@ -33,6 +33,9 @@ const DROPPED = crypto.randomUUID();
 const RANGED = crypto.randomUUID();
 let me: string;
 let first: string;
+const OWN = crypto.randomUUID();
+let pool: string;
+let lanes: Record<string, string> = {};
 
 beforeAll(async () => {
   const admin = asAdmin();
@@ -76,6 +79,31 @@ beforeAll(async () => {
     declared_start: '2026-10-10',
     declared_end: '2026-10-12',
   });
+
+  const made = await client.rpc('create_pool', {
+    p_name: 'Edit pool',
+    p_kind: null as unknown as 'friends',
+    p_lanes: [
+      { name: 'Food', icon: '🍽️', my_category_id: null },
+      { name: 'Media', icon: '🎬', my_category_id: null },
+    ],
+    p_include_history: false,
+  });
+  if (made.error) throw made.error;
+  pool = made.data!;
+  lanes = Object.fromEntries(
+    (await client.from('pool_lanes').select('id, name').eq('pool_id', pool)).data!.map((l) => [
+      l.name,
+      l.id,
+    ]),
+  );
+  const own = await client.rpc('create_own_pool_splash', {
+    p_id: OWN,
+    p_pool: pool,
+    p_pool_lane: lanes.Food,
+    p_title: 'Mine here',
+  });
+  if (own.error) throw own.error;
 });
 
 afterAll(async () => {
@@ -84,6 +112,7 @@ afterAll(async () => {
     await admin.from('ripples').delete().eq('author_id', me);
     await admin.from('splashes').delete().eq('owner_id', me);
   }
+  if (pool) await admin.from('pools').delete().eq('id', pool);
   if (me) await admin.auth.admin.deleteUser(me);
 });
 
@@ -93,6 +122,7 @@ const base = {
   share: [],
   poolId: null,
   block: null,
+  poolLaneId: null,
 };
 
 describe('the edit sheet’s date', () => {
@@ -137,5 +167,41 @@ describe('the edit sheet’s date', () => {
       date: { source: 'declared' },
       annotation: { date: '2026-10-10', time: null, endDate: '2026-10-12', endTime: null },
     });
+  });
+});
+
+describe('a pool’s own splash in the edit sheet (0020)', () => {
+  it('offers its pool’s lanes and moves a Just-mine splash within them', async () => {
+    const state = await loadSplashEdit(OWN);
+    expect(state).toMatchObject({ kind: 'own', poolLaneId: lanes.Food });
+    expect(state.ok && state.poolLanes.map((l) => l.name)).toEqual(['Food', 'Media']);
+    const done = await saveSplashEdit({
+      ...base,
+      id: OWN,
+      kind: 'own',
+      title: 'Mine here',
+      declaredStart: null,
+      declaredEnd: null,
+      poolId: pool,
+      poolLaneId: lanes.Media,
+    });
+    expect(done).toEqual({ ok: true });
+    const placed = (
+      await asUser(me)
+        .from('splash_placements')
+        .select('pool_lane_id')
+        .eq('splash_id', OWN)
+        .single()
+    ).data!;
+    expect(placed.pool_lane_id).toBe(lanes.Media);
+  });
+});
+
+describe('renaming a pool (0021)', () => {
+  it('is its creator’s, trimmed', async () => {
+    const { error } = await asUser(me).rpc('rename_pool', { p_pool: pool, p_name: '  Edited  ' });
+    expect(error).toBeNull();
+    const row = (await asUser(me).from('pools').select('name').eq('id', pool).single()).data!;
+    expect(row.name).toBe('Edited');
   });
 });

@@ -126,7 +126,8 @@ type Edit = {
     occurredTime: string | null;
     startInstant: string | null;
     endInstant: string | null;
-  } | null;
+  } | null; /** Only when it moved: a pool's own splash's new pool lane (0020). */
+  poolLaneId: string | null;
 };
 
 /** The same annotation, compared on what it says. */
@@ -152,6 +153,8 @@ function EditForm({
   // lives: a declaration's days, or the first ripple's annotation.
   const [annotation, setAnnotation] = useState<Annotation | null>(initial.annotation);
   const declared = initial.date.source === 'declared';
+  const [poolLaneId, setPoolLaneId] = useState(initial.poolLaneId);
+  const pooled = initial.kind === 'joint' || initial.kind === 'own';
   const [laneId, setLaneId] = useState<string | null>(initial.declaredLaneId);
   const [shared, setShared] = useState<string[]>(initial.shared);
   const mine = initial.kind === 'mine';
@@ -163,6 +166,7 @@ function EditForm({
     title.trim() !== initial.title ||
     (icon || null) !== initial.icon ||
     (!joint && !sameAnnotation(annotation, initial.annotation)) ||
+    (pooled && poolLaneId !== initial.poolLaneId) ||
     (mine && laneId !== initial.declaredLaneId) ||
     (mine && [...shared].sort().join() !== [...initial.shared].sort().join());
   const rangeOk = !annotation || annotationVerdict(annotation) === 'ok';
@@ -214,6 +218,18 @@ function EditForm({
           className="text-main-900 placeholder:text-main-900 min-w-0 flex-1 resize-none text-3xl/snug font-semibold outline-none placeholder:opacity-20"
         />
       </div>
+
+      {pooled && initial.poolLanes.length > 0 ? (
+        // A pool's own splash moves among that pool's lanes only (review, 0020).
+        <div data-edit-pool-lanes>
+          <LaneChips
+            categories={initial.poolLanes}
+            selectedId={poolLaneId}
+            onSelect={(id) => id && setPoolLaneId(id)}
+            surface="white"
+          />
+        </div>
+      ) : null}
 
       {joint ? (
         <p className="text-pool-500 text-xs">
@@ -296,6 +312,7 @@ function EditForm({
                   ]
                 : [],
               poolId: initial.poolId,
+              poolLaneId: pooled && poolLaneId !== initial.poolLaneId ? poolLaneId : null,
             })
           }
           className="bg-main-900 flex-1 rounded-full py-2.5 text-base font-semibold text-white disabled:opacity-40"

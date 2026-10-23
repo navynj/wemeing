@@ -16,6 +16,7 @@ import { asAdmin, asUser } from './as-user';
 const ANA_TRIPS = '0e000000-0000-0000-0000-0000000000a1';
 const ANA_DAY = '0e000000-0000-0000-0000-0000000000a2';
 const BEN_TRIPS = '0e000000-0000-0000-0000-0000000000b1';
+const BEN_DAYS = '0e000000-0000-0000-0000-0000000000b2';
 const CAL_TRIPS = '0e000000-0000-0000-0000-0000000000c1';
 
 const ANA_OLD_POST = '0e100000-0000-0000-0000-0000000000a1';
@@ -360,7 +361,8 @@ describe('a joint ripple with no lane of mine (0016)', () => {
       p_pool: pool,
       p_links: [
         { pool_lane_id: tripsLane, my_category_id: BEN_TRIPS },
-        { pool_lane_id: days, my_category_id: BEN_TRIPS },
+        // Trips already sends Ben's lane into Trips (0019): Days only brings in.
+        { pool_lane_id: days, my_category_id: BEN_TRIPS, direction: 'in' },
       ],
     });
     expect(linked.error).toBeNull();
@@ -406,9 +408,11 @@ describe('a link’s direction (0017)', () => {
   it('moves earlier lane-less joint ripples in when out becomes both', async () => {
     const days = (await asUser(ben).from('pool_lanes').select('id').eq('name', 'Days').single())
       .data!.id;
+    // A lane of Ben's own for Days: Trips already sends BEN_TRIPS (0019).
+    await asAdmin().from('my_categories').insert({ id: BEN_DAYS, user_id: ben, name: 'Days' });
     const links = (direction: string) => [
       { pool_lane_id: tripsLane, my_category_id: BEN_TRIPS },
-      { pool_lane_id: days, my_category_id: BEN_TRIPS, direction },
+      { pool_lane_id: days, my_category_id: BEN_DAYS, direction },
     ];
     await asUser(ben).rpc('set_lane_links', { p_pool: pool, p_links: links('out') });
     await asUser(ben).rpc('create_joint_splash', {
@@ -437,7 +441,7 @@ describe('a link’s direction (0017)', () => {
       .select('category_id')
       .eq('id', ripple.data!.id)
       .single();
-    expect(moved.data!.category_id).toBe(BEN_TRIPS);
+    expect(moved.data!.category_id).toBe(BEN_DAYS);
     // Back to Trips alone for what follows.
     await asUser(ben).rpc('set_lane_links', {
       p_pool: pool,
@@ -701,5 +705,41 @@ describe('leaving', () => {
     const former = members.data!.find((m) => m.user_id === ana)!;
     expect(former.left_at).not.toBeNull();
     expect(former.keep_on_leave).toBe(true);
+  });
+});
+
+describe('one sender per lane of mine (0019)', () => {
+  it('refuses a second pool lane taking the same lane as a sender', async () => {
+    const days = (await asUser(ben).from('pool_lanes').select('id').eq('name', 'Days').single())
+      .data!.id;
+    const { error } = await asUser(ben).rpc('set_lane_links', {
+      p_pool: pool,
+      p_links: [
+        { pool_lane_id: tripsLane, my_category_id: BEN_TRIPS, direction: 'both' },
+        { pool_lane_id: days, my_category_id: BEN_TRIPS, direction: 'out' },
+      ],
+    });
+    expect(error?.code).toBe('23505');
+    expect(error?.message).toMatch(/lane_mappings_one_sender/);
+  });
+
+  it('lets the same lane bring in from several pool lanes', async () => {
+    const days = (await asUser(ben).from('pool_lanes').select('id').eq('name', 'Days').single())
+      .data!.id;
+    const { error } = await asUser(ben).rpc('set_lane_links', {
+      p_pool: pool,
+      p_links: [
+        { pool_lane_id: tripsLane, my_category_id: BEN_TRIPS, direction: 'both' },
+        { pool_lane_id: days, my_category_id: BEN_TRIPS, direction: 'in' },
+      ],
+    });
+    expect(error).toBeNull();
+  });
+});
+
+describe('renaming a pool (0021)', () => {
+  it('is refused to a member who is not its creator', async () => {
+    const { error } = await asUser(ben).rpc('rename_pool', { p_pool: pool, p_name: 'Bens' });
+    expect(error?.code).toBe('42501');
   });
 });

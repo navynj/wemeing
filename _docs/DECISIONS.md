@@ -443,3 +443,12 @@ Retired with it, each with its reason: the **lane rows** and their ropes (the gr
 - the stack and compose are the pool's;
 - there is no Manage lanes link, since a pool's lanes are managed from its glyph.
 A member's column in Swimmers opens nothing.
+
+**0019–0021: one sender per lane, moving a pool's splash, renaming a pool (2026-10-23).**
+- **0019:** a partial unique index lets a lane of mine send (out or both) into one pool lane per pool. Bringing in (in) stays unlimited. Saving links that break it says "Each of your lanes can share into only one lane of this Pool."
+- **0020:** `move_pool_splash` moves a pool's own splash to another lane of that pool.
+  - A joint splash: any current member may move it. Each current member's ripples on it are re-filed by their own link (their lane for both or in, else none). A former member's kept ripples stay as they are.
+  - A Just-mine splash: only its author may move it.
+  - My own splash shared into a pool: never; its pool lane follows my link.
+  - The edit sheet shows only that pool's lane chips for joint and Just-mine splashes.
+- **0021:** `rename_pool` belongs to the creator only ("rename은 owner만"). It is offered as a Name field in Pool settings, shown at once and trimmed to 1–60 characters. Current members' origin tags follow the rename.

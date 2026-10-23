@@ -38,6 +38,13 @@ function said(error: { message: string; code?: string } | null): string {
   if (error.code === '42501' && /ripples? by other members/.test(error.message)) {
     return error.message;
   }
+  // 0019: a lane of mine sends into one pool lane per pool.
+  if (error.code === '23505' && /lane_mappings_one_sender/.test(error.message)) {
+    return 'Each of your lanes can share into only one lane of this Pool.';
+  }
+  if (error.code === '42501' && /creator renames/.test(error.message)) {
+    return 'Only the Pool’s creator can rename it.';
+  }
   if (error.code === '42501') return 'You are not a member of this Pool.';
   return error.message;
 }
@@ -125,6 +132,23 @@ export async function setLaneLinks(poolId: string, links: z.infer<typeof LINKS>)
   });
   if (error) return { ok: false, message: said(error) };
   revalidatePool(poolId);
+  return { ok: true };
+}
+
+/** Pool settings: the creator renames the pool (0021). */
+export async function renamePool(poolId: string, name: string): Promise<Done> {
+  const parsed = z
+    .object({ poolId: z.uuid(), name: z.string().trim().min(1).max(60) })
+    .safeParse({ poolId, name });
+  if (!parsed.success) return { ok: false, message: 'A Pool needs a name of 1–60 characters.' };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('rename_pool', {
+    p_pool: parsed.data.poolId,
+    p_name: parsed.data.name,
+  });
+  if (error) return { ok: false, message: said(error) };
+  revalidatePool(poolId);
+  revalidatePath('/');
   return { ok: true };
 }
 

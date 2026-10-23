@@ -19,6 +19,11 @@ const JOINT = {
   poolId: 'p-ours',
   date: { source: 'declared' },
   annotation: null,
+  poolLanes: [
+    { id: 'l-games', name: 'Games', icon: '🎲' },
+    { id: 'l-media', name: 'Media', icon: '🎬' },
+  ],
+  poolLaneId: 'l-games',
 };
 const loaded = vi.hoisted(() => ({ state: null as unknown }));
 vi.mock('@/features/splash-sheet/edit-actions', () => ({
@@ -205,5 +210,29 @@ describe('a splash’s date in the edit sheet (review)', () => {
       declaredEnd: '2026-10-13',
       block: null,
     });
+  });
+});
+
+describe('a pool’s own splash in the edit sheet (0020)', () => {
+  it('offers only its pool’s lanes, and saves a move', async () => {
+    const view = await open({});
+    const lanes = view.container.querySelector('[data-edit-pool-lanes]')!;
+    expect(lanes.textContent).toContain('Games');
+    expect(lanes.textContent).toContain('Media');
+    fireEvent.click(view.getByText('Media'));
+    await save(view);
+    expect(saved[0]).toMatchObject({ kind: 'joint', poolLaneId: 'l-media' });
+  });
+
+  it('sends no move when the lane is unchanged', async () => {
+    const view = await open({});
+    fireEvent.change(view.getByLabelText('Title'), { target: { value: 'Renamed' } });
+    await save(view);
+    expect(saved[0]).toMatchObject({ poolLaneId: null });
+  });
+
+  it('keeps my own lane chips, not the pool’s, for my splash shared to a pool', async () => {
+    const view = await open({ kind: 'mine', poolLanes: [], poolLaneId: null });
+    expect(view.container.querySelector('[data-edit-pool-lanes]')).toBeNull();
   });
 });

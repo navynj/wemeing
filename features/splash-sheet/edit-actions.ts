@@ -30,6 +30,9 @@ export type SplashEditState =
       date: { source: 'declared' } | { source: 'block'; rippleId: string };
       /** That date as the composer's control shows it; null when unset. */
       annotation: Annotation | null;
+      /** A pool's own splash (joint, Just mine): its pool's lanes, and the one it is in (0020). */
+      poolLanes: { id: string; name: string; icon: string | null }[];
+      poolLaneId: string | null;
     }
   | { ok: false; message: string };
 
@@ -43,7 +46,7 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
   const { data: splash } = await supabase
     .from('splashes')
     .select(
-      'owner_id, pool_id, own_pool_id, title, icon, declared_start, declared_end, declared_lane_id',
+      'owner_id, pool_id, pool_lane_id, own_pool_id, title, icon, declared_start, declared_end, declared_lane_id',
     )
     .eq('id', id)
     .maybeSingle();
@@ -53,20 +56,38 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
   if (!joint && splash.owner_id !== user.id) {
     return { ok: false, message: 'Only its author edits this splash.' };
   }
-  const [{ data: profile }, { data: first }] = await Promise.all([
-    supabase.from('profiles').select('timezone').eq('id', user.id).single(),
-    supabase
-      .from('ripples')
-      .select(
-        'id, category_id, note, media, occurred_on, occurred_time, ended_at, started_at, splash_id',
-      )
-      .eq('splash_id', id)
-      .eq('author_id', user.id)
-      .is('parent_ripple_id', null)
-      .order('created_at')
-      .limit(1)
-      .maybeSingle(),
-  ]);
+  const ownPool = splash.pool_id ?? splash.own_pool_id;
+  const [{ data: profile }, { data: first }, { data: lanes }, { data: placed }] = await Promise.all(
+    [
+      supabase.from('profiles').select('timezone').eq('id', user.id).single(),
+      supabase
+        .from('ripples')
+        .select(
+          'id, category_id, note, media, occurred_on, occurred_time, ended_at, started_at, splash_id',
+        )
+        .eq('splash_id', id)
+        .eq('author_id', user.id)
+        .is('parent_ripple_id', null)
+        .order('created_at')
+        .limit(1)
+        .maybeSingle(),
+      ownPool
+        ? supabase
+            .from('pool_lanes')
+            .select('id, name, icon')
+            .eq('pool_id', ownPool)
+            .order('position')
+        : Promise.resolve({ data: [] }),
+      splash.own_pool_id
+        ? supabase
+            .from('splash_placements')
+            .select('pool_lane_id')
+            .eq('splash_id', id)
+            .eq('pool_id', splash.own_pool_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ],
+  );
   // A declaration wins where there is one; otherwise the date is the first
   // ripple's, where the composer put it; with no ripple, a declaration to be.
   const onBlock = !splash.declared_start && first;
@@ -102,6 +123,8 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
     poolId: splash.pool_id ?? splash.own_pool_id,
     date: onBlock ? { source: 'block', rippleId: first.id } : { source: 'declared' },
     annotation,
+    poolLanes: lanes ?? [],
+    poolLaneId: splash.pool_lane_id ?? placed?.pool_lane_id ?? null,
   };
 }
 
@@ -135,6 +158,8 @@ const Edit = z.object({
       endInstant: z.iso.datetime().nullable(),
     })
     .nullable(),
+  /** A pool's own splash: the pool lane it moves to, when it moved (0020). */
+  poolLaneId: z.uuid().nullable(),
 });
 
 /**
@@ -158,6 +183,8 @@ export async function saveSplashEdit(
       .update({ title: edit.title, icon: edit.icon || null })
       .eq('id', edit.id);
     if (error) return { ok: false, message: error.message };
+    const moved = await movePoolSplash(supabase, edit.id, edit.poolLaneId);
+    if (moved) return moved;
     revalidatePath('/');
     if (edit.poolId) {
       revalidatePath(`/pool/${edit.poolId}`);
@@ -200,6 +227,10 @@ export async function saveSplashEdit(
       .eq('splash_id', edit.id);
     if (error) return { ok: false, message: error.message };
   }
+  if (edit.kind === 'own') {
+    const moved = await movePoolSplash(supabase, edit.id, edit.poolLaneId);
+    if (moved) return moved;
+  }
   revalidatePath('/');
   revalidatePath(`/splash/${edit.id}`);
   if (edit.poolId) revalidatePath(`/pool/${edit.poolId}/splash/${edit.id}`);
@@ -211,4 +242,18 @@ export async function saveSplashEdit(
   }
   if (edit.poolId) revalidatePath(`/pool/${edit.poolId}`);
   return { ok: true };
+}
+
+/** Moves a pool's own splash to another of its pool's lanes (0020); null when done or unmoved. */
+async function movePoolSplash(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  id: string,
+  poolLaneId: string | null,
+): Promise<{ ok: false; message: string } | null> {
+  if (!poolLaneId) return null;
+  const { error } = await supabase.rpc('move_pool_splash', {
+    p_splash: id,
+    p_pool_lane: poolLaneId,
+  });
+  return error ? { ok: false, message: error.message } : null;
 }

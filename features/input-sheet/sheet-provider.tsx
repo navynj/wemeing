@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
-import type { Card } from '@/features/home/grid';
+import type { Card, GridColumn } from '@/features/home/grid';
 import type { PoolScope } from '@/features/pool/compose-scope';
 import type { SplashSummary } from '@/features/splash/summary';
 
@@ -33,6 +33,12 @@ export type PendingDrop = {
   month: string;
   note: string | null;
   pool?: { poolId: string; card: Card };
+  /**
+   * Dropped from a pool, as Home should seat it before the server has it
+   * (review): its column and the emoji it falls back to, and the pool's
+   * column when Home has none yet.
+   */
+  home?: { card: Partial<Card>; column?: GridColumn };
 };
 
 type SheetApi = {

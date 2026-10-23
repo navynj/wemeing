@@ -368,6 +368,20 @@ export async function getJointSplashes(supabase: DuringClient, ids: string[]): P
 }
 
 /**
+ * Joint splashes I made (H23), readable while I am in their pool: a joint
+ * splash written as a title alone has no ripple of mine to bring it Home.
+ */
+export async function getMyJointShells(supabase: DuringClient, me: string): Promise<Splash[]> {
+  const { data, error } = await supabase
+    .from('splashes')
+    .select('*')
+    .is('owner_id', null)
+    .eq('created_by', me);
+  if (error) throw error;
+  return data;
+}
+
+/**
  * Where each of my splashes is or was in a pool (0015), one tag per pool:
  * the live pool and pool lane names while I am in it, so renames show at
  * once; the placement's frozen snapshot once I have left; and a recorded

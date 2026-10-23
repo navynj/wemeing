@@ -1052,3 +1052,57 @@ describe('Just mine on Home (0014)', () => {
     expect(header.querySelector('[data-monogram=""]')).not.toBeNull();
   });
 });
+
+describe('a post just dropped from a pool (review)', () => {
+  function PoolDropper({ splash }: { splash: SplashSummary }) {
+    const { markDropped } = useInputSheet();
+    useEffect(
+      () =>
+        markDropped({
+          splash,
+          month: '2026-09',
+          note: null,
+          home: {
+            card: {
+              column: 'pool:p-ours',
+              lane: { icon: '🎲', name: 'Our Pool' },
+              pools: ['Our Pool'],
+            },
+            column: {
+              id: 'pool:p-ours',
+              name: 'Our Pool',
+              icon: null,
+              monogram: 'Our Pool',
+              href: null,
+            },
+          },
+        }),
+      [splash, markDropped],
+    );
+    return null;
+  }
+
+  it('sits in its pool’s column at once, headed by the monogram, with the pool lane’s emoji', () => {
+    // A joint splash written as a title alone: no ripple, no lane of mine.
+    const shell = { ...post('shell', '테스트', []), declaredLaneId: null };
+    const { container } = render(
+      <InputSheetProvider>
+        <PoolDropper splash={shell} />
+        <HomeGround
+          cards={cards(POSTS)}
+          pinned={[]}
+          categories={LANES}
+          today={TODAY}
+          timeZone={TZ}
+          initials="YL"
+          scrollToMonth={null}
+        />
+      </InputSheetProvider>,
+    );
+    const header = container.querySelector('[data-lane-header="pool:p-ours"]')!;
+    expect(header.querySelector('[data-monogram="OU"]')).not.toBeNull();
+    const mark = container.querySelector('[data-cell="pool:p-ours"] [data-mark="shell"]');
+    expect(mark).not.toBeNull();
+    expect(mark!.textContent).toContain('🎲');
+  });
+});

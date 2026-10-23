@@ -16,7 +16,7 @@ import {
   MediaPreviews,
   useMediaAttach,
 } from '@/features/input-sheet/media-field';
-import { placeCard, type Card } from '@/features/home/grid';
+import { placeCard, type Card, ownPoolColumn } from '@/features/home/grid';
 import { createJointSplash, dropOwnPoolSplash, placeNewSplash } from '@/features/pool/actions';
 import { defaultAudience, linkedPools, type AudienceLink } from '@/features/pool/audience';
 import { bringsIn } from '@/features/pool/direction';
@@ -252,11 +252,44 @@ export function SplashComposer({
           }
         : null;
 
+    // Home seats it where the server will (review): a joint splash with no
+    // lane of mine, and Just mine, in the pool's column with the pool lane's
+    // emoji; a joint ripple in my linked lane, in that lane.
+    const poolColumn = pool
+      ? {
+          id: ownPoolColumn(pool.poolId),
+          name: pool.poolName,
+          icon: null,
+          monogram: pool.poolName,
+          href: null,
+        }
+      : null;
+    const fallback = poolLane ? { icon: poolLane.icon, name: pool!.poolName } : null;
+    const home =
+      pool && poolColumn && (joint || own)
+        ? {
+            card: {
+              ...(joint
+                ? {
+                    column: jointLink ?? poolColumn.id,
+                    pools: [pool.poolName],
+                    href: poolSplashHref(pool.poolId, id),
+                    menu: { pin: false, delete: false },
+                    editable: true,
+                  }
+                : {}),
+              ...(fallback && !(joint && jointLink) ? { lane: fallback } : {}),
+            },
+            ...(joint && jointLink ? {} : { column: poolColumn }),
+          }
+        : undefined;
+
     onDrop({
       splash,
       month: (a?.date ?? today).slice(0, 7),
       note: body.length > 0 ? body : null,
       ...(pool && poolCard ? { pool: { poolId: pool.poolId, card: poolCard } } : {}),
+      ...(home ? { home } : {}),
       commit: own
         ? () =>
             dropOwnPoolSplash({

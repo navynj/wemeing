@@ -38,6 +38,16 @@ describe('the pool badge on Home (H23, 0016)', () => {
     expect(card.href).toBe('/pool/p-ours/splash/s-joint');
   });
 
+  it('lends the pool lane’s emoji to a mark in the pool’s column, never leaving it blank', () => {
+    const card = withPoolBadge(placeCard(summary('s-joint'), '', 'UTC'), {
+      poolId: 'p-ours',
+      poolName: 'Our Pool',
+      latestLane: null,
+      poolLane: { name: 'Games', icon: '🎲' },
+    });
+    expect(card.lane).toEqual({ icon: '🎲', name: 'Our Pool' });
+  });
+
   it('keeps a joint entry whose latest ripple is linked in that lane’s column', () => {
     const card = withPoolBadge(placeCard(summary('s-joint'), '', 'UTC'), {
       poolId: 'p-ours',
@@ -47,6 +57,8 @@ describe('the pool badge on Home (H23, 0016)', () => {
     });
     expect(card.column).toBe('my-media');
     expect(card.pools).toEqual(['Our Pool']);
+    // My lane names it there, not the pool lane.
+    expect(card.lane).toBeUndefined();
   });
 
   it('leaves my own splash shared to a pool unbadged', () => {

@@ -138,9 +138,13 @@ export function HomeGround({
       ({ splash }) => !pendingDeletes.includes(splash.id),
     );
     if (!pendingDrop || landed) return kept;
-    return [...kept, placeCard(pendingDrop.splash, pendingDrop.note ?? '', timeZone)].sort(
-      byNewest,
-    );
+    return [
+      ...kept,
+      {
+        ...placeCard(pendingDrop.splash, pendingDrop.note ?? '', timeZone),
+        ...pendingDrop.home?.card,
+      },
+    ].sort(byNewest);
   }, [cards, pendingEdits, pendingDeletes, pendingDrop, landed, timeZone]);
 
   useEffect(() => {
@@ -149,6 +153,18 @@ export function HomeGround({
     return () => window.clearTimeout(timer);
   }, [landed, clearDropped]);
 
+  // A pool's column for a post just dropped there, until the server's has it.
+  const pendingColumn = landed ? undefined : pendingDrop?.home?.column;
+  const columns = useMemo(
+    () => [
+      ...lanes.value,
+      ...poolColumns,
+      ...(pendingColumn && !poolColumns.some((c) => c.id === pendingColumn.id)
+        ? [pendingColumn]
+        : []),
+    ],
+    [lanes.value, poolColumns, pendingColumn],
+  );
   const ids = useMemo(() => shown.map((card) => card.splash.id), [shown]);
   // What opens on top: the post a page sent Home back to, else the month's
   // newest under `?m=`, else the newest.
@@ -286,7 +302,7 @@ export function HomeGround({
             ref={grid}
             view={view}
             cards={shown}
-            categories={[...lanes.value, ...poolColumns]}
+            categories={columns}
             today={today}
             ring={ring}
             waterIds={waterIds}

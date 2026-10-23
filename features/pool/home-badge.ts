@@ -34,6 +34,11 @@ export function withPoolBadge(card: Card, joint: JointOnHome | undefined): Card 
     // Its title and icon are any current member's to edit; once I left, not mine.
     editable: name !== null,
     column: joint.latestLane ?? ownPoolColumn(joint.poolId),
+    // In its pool's column there is no lane of mine to lend an emoji: the
+    // mark falls back to the pool lane's (review), named by the pool.
+    ...(joint.latestLane === null && joint.poolLane
+      ? { lane: { icon: joint.poolLane.icon, name: name ?? 'A pool you left' } }
+      : {}),
     ...(joint.poolLane
       ? {
           origins: [originTag(name ?? 'A pool you left', joint.poolLane.icon, joint.poolLane.name)],

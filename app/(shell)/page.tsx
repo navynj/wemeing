@@ -15,6 +15,7 @@ import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
 import { withPoolBadge } from '@/features/pool/home-badge';
 import {
   getJointSplashes,
+  getMyJointShells,
   getMyOriginTags,
   getMyPlacements,
   getMyPoolNames,
@@ -61,11 +62,16 @@ export default async function HomePage({ searchParams }: PageProps<'/'>) {
   // my ripples on it, at my ripple's lane. One I can no longer read (a pool
   // I left) still shows its ripples, as posts of one.
   const mineIds = new Set(mine.map((s) => s.id));
-  const joints = await getJointSplashes(supabase, [
-    ...new Set(
-      ripples.flatMap((r) => (r.splash_id && !mineIds.has(r.splash_id) ? [r.splash_id] : [])),
-    ),
+  const [written, made] = await Promise.all([
+    getJointSplashes(supabase, [
+      ...new Set(
+        ripples.flatMap((r) => (r.splash_id && !mineIds.has(r.splash_id) ? [r.splash_id] : [])),
+      ),
+    ]),
+    // One I made with no ripple of mine yet sits in its pool's column (review).
+    getMyJointShells(supabase, profile.id),
   ]);
+  const joints = [...written, ...made.filter((shell) => !written.some((j) => j.id === shell.id))];
   const boards = [...mine, ...joints];
   const summaries = summarizeSplashes(boards, ripples, profile.timezone, now);
   const poolName = new Map(pools.map((p) => [p.id, p.name]));
@@ -102,10 +108,9 @@ export default async function HomePage({ searchParams }: PageProps<'/'>) {
   const ownPools = [
     ...new Set([
       ...mine.flatMap((s) => (s.own_pool_id ? [s.own_pool_id] : [])),
-      // A joint entry whose latest ripple of mine has no lane lives there too (0016).
-      ...[...latestLane.entries()].flatMap(([id, lane]) =>
-        lane === null ? [jointPool.get(id)!] : [],
-      ),
+      // A joint entry whose latest ripple of mine has no lane lives there too
+      // (0016), as does one with no ripple of mine at all (review).
+      ...joints.flatMap((j) => ((latestLane.get(j.id) ?? null) === null ? [j.pool_id!] : [])),
     ]),
   ];
   const ownLaneIcon = new Map<string, string | null>();

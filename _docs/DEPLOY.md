@@ -257,6 +257,75 @@ done, on the device it was built for:
 
 ## Afterwards
 
-**Weekly-ish `pnpm backup` is yours to run.** The free tier keeps no backups;
-these dumps are the only copy. Object bytes are not in them — Postgres does
-not hold them — so a full restore re-uploads media by hand.
+**Backups run weekly on their own, and `pnpm backup` stays mandatory before
+every push.** The free tier keeps no backups; these are the only copies. See
+§ Backups below.
+
+## Backups
+
+Two copies, the same contents: the database dump (schema, then data), every
+object in the `ripple-media` and `avatars` buckets with its path, and a
+manifest with the object count and bytes.
+
+### Local: `pnpm backup`
+
+Writes `backups/<stamp>.sql` and `backups/<stamp>/storage/<bucket>/<path>`
+plus `backups/<stamp>/storage/manifest.json` (all gitignored). It reads
+production through the linked project; the storage service key comes from
+the logged-in Supabase CLI and is never printed. An object unchanged since
+the previous local backup (same etag) is hard-linked from it rather than
+downloaded, so every folder is complete on its own. `pnpm db:push` refuses
+without a dump from today.
+
+### Weekly: the encrypted GitHub artifact
+
+`.github/workflows/backup.yml` runs every Sunday at 03:00 UTC and on demand
+(Actions → Backup → Run workflow). It packs the dump, the storage folder and
+the manifest into one `tar.gz`, encrypts it with age to the public key in the
+repo variable `BACKUP_AGE_PUBLIC_KEY`, checks the age header, and uploads it
+as the artifact `weming-backup-<stamp>`, kept 60 days. The private key is
+never on GitHub. Each run downloads every object; there is no private key in
+CI to reuse an earlier archive.
+
+It reads, from Settings → Secrets and variables → Actions:
+
+| Name | Kind | What |
+|---|---|---|
+| `SUPABASE_DB_URL` | secret | Session pooler URI with the database password (Connect → Session pooler) |
+| `SUPABASE_SERVICE_ROLE_KEY` | secret | Project Settings → API Keys: `service_role`, or a secret key |
+| `SUPABASE_URL` | variable | `https://<ref>.supabase.co` |
+| `BACKUP_AGE_PUBLIC_KEY` | variable | the `age1…` line from `age-keygen` |
+
+The log is public, because the repo is. It prints counts and byte totals only.
+
+**Download and decrypt.** From the run's page (Actions → Backup → the run →
+Artifacts), or:
+
+```sh
+gh run list -R navynj/weming -w Backup              # pick a run id
+gh run download <run-id> -R navynj/weming -D ~/weming-restore
+cd ~/weming-restore/weming-backup-<stamp>
+age -d -i <path to weming-backup.key> -o backup.tar.gz weming-backup-<stamp>.tar.gz.age
+mkdir backup && tar -xzf backup.tar.gz -C backup     # <stamp>.sql and <stamp>/storage/
+```
+
+Keep the private key file (`weming-backup.key`) offline, never in the repo:
+`*.key` is gitignored as a guard. Without it no artifact can be opened.
+
+### Restoring storage
+
+Rows first, so the paths in `ripples.media` and `profiles.avatar_path` point at
+files again. Then re-upload each bucket's folder:
+
+```sh
+SUPABASE_URL=https://<ref>.supabase.co SUPABASE_SERVICE_ROLE_KEY=<key> \
+  node scripts/restore-storage.mjs backup/<stamp>/storage ripple-media
+SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
+  node scripts/restore-storage.mjs backup/<stamp>/storage avatars
+```
+
+Each object goes back to its own path with the content type the manifest
+recorded. Objects already in the bucket are kept unless `--overwrite` is
+passed. The script names the target project and waits for its ref to be
+typed before it writes anything. The bucket must exist (migrations 0003 and
+0018 make both).

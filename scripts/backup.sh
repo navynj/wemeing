@@ -1,43 +1,70 @@
 #!/usr/bin/env bash
-# A dump of the linked (production) database, because the free tier has none.
+# A backup of the production project, because the free tier keeps none.
 #
-# Two files per run, both gitignored:
-#   backups/<stamp>.sql          schema then data
-#   backups/<stamp>.storage.txt  what is in the media bucket
+#   backups/<stamp>.sql                  schema then data
+#   backups/<stamp>/storage/<bucket>/…   every object in ripple-media and avatars
+#   backups/<stamp>/storage/manifest.json  object count, bytes, one row per object
 #
-# The bucket's OBJECT BYTES are not here. Postgres does not hold them, so the
-# listing tells you what a restore would have to re-upload and nothing more.
-# That gap is real; it is written down rather than papered over.
+# All gitignored. Locally it uses the linked project and, for storage, the
+# service key the logged-in Supabase CLI hands over; it never prints it. An
+# object unchanged since the previous local backup (same etag) is hard-linked
+# from there instead of downloaded, and every folder stays complete on its own.
+#
+# In CI (.github/workflows/backup.yml) the same script runs with
+# SUPABASE_DB_URL, SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY from secrets,
+# and BACKUP_OUT naming a folder outside the repo.
 set -euo pipefail
+set +x # Never trace: the commands carry credentials in their environment.
 
-ref_file="supabase/.temp/project-ref"
-if [ ! -f "$ref_file" ]; then
-  echo "✖ No linked project. Run: supabase link --project-ref <ref>" >&2
-  exit 1
-fi
-ref="$(cat "$ref_file")"
-
-mkdir -p backups
+out="${BACKUP_OUT:-backups}"
+mkdir -p "$out"
 stamp="$(date +%Y%m%d-%H%M%S)"
-dump="backups/${stamp}.sql"
-objects="backups/${stamp}.storage.txt"
+dump="${out}/${stamp}.sql"
 
-echo "→ dumping ${ref}"
+if [ -n "${SUPABASE_DB_URL:-}" ]; then
+  source_flags=(--db-url "$SUPABASE_DB_URL")
+  label="the configured database"
+else
+  ref_file="supabase/.temp/project-ref"
+  if [ ! -f "$ref_file" ]; then
+    echo "✖ No linked project. Run: supabase link --project-ref <ref>" >&2
+    exit 1
+  fi
+  ref="$(cat "$ref_file")"
+  source_flags=(--linked)
+  label="${ref}"
+  export SUPABASE_URL="${SUPABASE_URL:-https://${ref}.supabase.co}"
+  if [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+    # Read once into the environment of this run; never echoed.
+    SUPABASE_SERVICE_ROLE_KEY="$(
+      supabase projects api-keys --project-ref "$ref" -o json 2>/dev/null |
+        python3 -c 'import json,sys; print(next(r["api_key"] for r in json.load(sys.stdin) if r.get("name") == "service_role"))'
+    )" || {
+      echo "✖ Could not read the service key from the Supabase CLI (supabase login?)." >&2
+      exit 1
+    }
+    export SUPABASE_SERVICE_ROLE_KEY
+  fi
+fi
+
+echo "→ dumping ${label}"
 {
-  echo "-- During backup ${stamp} — project ${ref}"
+  echo "-- Weming backup ${stamp}"
   echo "-- schema"
 } > "$dump"
-supabase db dump --linked >> "$dump"
-
+# Tool chatter goes to a file, not the log: it may echo connection details.
+supabase db dump "${source_flags[@]}" >> "$dump" 2> "${out}/.dump-schema.err" || {
+  echo "✖ schema dump failed (details kept out of the log)" >&2
+  exit 1
+}
 echo "-- data" >> "$dump"
-supabase db dump --linked --data-only >> "$dump"
+supabase db dump "${source_flags[@]}" --data-only >> "$dump" 2> "${out}/.dump-data.err" || {
+  echo "✖ data dump failed (details kept out of the log)" >&2
+  exit 1
+}
+rm -f "${out}/.dump-schema.err" "${out}/.dump-data.err"
+echo "✓ ${dump} ($(wc -l < "$dump" | tr -d ' ') lines)"
 
-echo "→ listing storage objects"
-supabase db dump --linked --data-only --schema storage > "$objects" 2>/dev/null ||
-  echo "-- storage listing unavailable; check the bucket by hand" > "$objects"
-
-lines=$(wc -l < "$dump" | tr -d ' ')
-echo "✓ $dump (${lines} lines)"
-echo "✓ $objects"
-echo ""
-echo "  Object bytes are NOT in this dump. A full restore re-uploads them by hand."
+echo "→ downloading storage"
+previous="$(ls -d "${out}"/*/storage 2>/dev/null | grep -v "/${stamp}/" | sort | tail -1 || true)"
+node scripts/backup-storage.mjs "${out}/${stamp}/storage" ${previous:+--previous "$previous"}

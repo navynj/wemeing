@@ -190,10 +190,10 @@ export function HomeGround({
           grid left and the board right, the board's column as tall as the
           screen (review). */}
       <div
-        className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col lg:max-w-5xl lg:flex-row lg:gap-8"
+        className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col lg:max-w-7xl lg:flex-row lg:gap-8"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
-        <div className="flex min-h-0 flex-1 flex-col lg:w-1/2 lg:flex-none">
+        <div className="flex min-h-0 flex-1 flex-col lg:min-w-0 lg:flex-1">
           <header className="relative flex shrink-0 items-center px-6 pt-4 pb-1">
             <button
               type="button"
@@ -293,7 +293,7 @@ export function HomeGround({
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-col lg:min-h-0 lg:w-1/2 lg:flex-none lg:pt-10">
+        <div className="flex shrink-0 flex-col lg:min-h-0 lg:min-w-0 lg:flex-1 lg:py-10">
           {board === 'stair' ? (
             <StairBoard
               cards={shown}
@@ -307,58 +307,58 @@ export function HomeGround({
           ) : (
             <FlipBoard cards={shown} flip={flip} categories={lanes.value} initials={initials} />
           )}
+        </div>
 
-          {/* The bottom nav on the ground (review): Home, Locker and Sessions
-            as tabs at the left — white, the active one full and the others
-            faded as one item (SPEC 7, chrome) — and compose at the right, a
-            white disc with the blue plus: on the water, white carries the
-            action (H21c). A tab appears only when its screen ships. */}
-          <nav
-            data-ground-nav
-            aria-label="Home"
-            className="flex shrink-0 items-center justify-between px-6 pt-2"
-            style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }}
-          >
-            <div className="flex items-center gap-7 text-white">
-              <Link
-                href="/"
-                aria-current="page"
-                data-ground-tab="home"
-                className="flex flex-col items-center gap-1 font-semibold"
-              >
-                <Home aria-hidden size={20} strokeWidth={2.25} />
-                <span className="text-xs/none">Home</span>
-              </Link>
-              <Link
-                href="/locker"
-                data-ground-tab="locker"
-                className="flex flex-col items-center gap-1 font-medium opacity-50"
-              >
-                <ShelvingUnit aria-hidden size={20} />
-                <span className="text-xs/none">Locker</span>
-              </Link>
-              <button
-                type="button"
-                data-ground-tab="sessions"
-                aria-haspopup="dialog"
-                onClick={() => setSessionsOpen(true)}
-                className="flex flex-col items-center gap-1 font-medium opacity-50"
-              >
-                <CalendarDays aria-hidden size={20} />
-                <span className="text-xs/none">Sessions</span>
-              </button>
-            </div>
+        {/* The bottom nav on the ground (review): Home, Locker and Sessions
+          as tabs at the left — white, the active one full and the others
+          faded as one item (SPEC 7, chrome) — and compose at the right, a
+          white disc with the blue plus: on the water, white carries the
+          action (H21c). A tab appears only when its screen ships. */}
+        <nav
+          data-ground-nav
+          aria-label="Home"
+          className="flex shrink-0 items-center justify-between px-6 pt-2 lg:w-20 lg:flex-col lg:px-0 lg:py-10"
+          style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }}
+        >
+          <div className="flex items-center gap-7 text-white lg:flex-col lg:gap-8">
+            <Link
+              href="/"
+              aria-current="page"
+              data-ground-tab="home"
+              className="flex flex-col items-center gap-1 font-semibold"
+            >
+              <Home aria-hidden size={20} strokeWidth={2.25} />
+              <span className="text-xs/none">Home</span>
+            </Link>
+            <Link
+              href="/locker"
+              data-ground-tab="locker"
+              className="flex flex-col items-center gap-1 font-medium opacity-50"
+            >
+              <ShelvingUnit aria-hidden size={20} />
+              <span className="text-xs/none">Locker</span>
+            </Link>
             <button
               type="button"
-              aria-label="Drop a splash"
-              data-compose
-              onClick={openSheet}
-              className="text-main-900 flex h-12 w-12 items-center justify-center rounded-full bg-white"
+              data-ground-tab="sessions"
+              aria-haspopup="dialog"
+              onClick={() => setSessionsOpen(true)}
+              className="flex flex-col items-center gap-1 font-medium opacity-50"
             >
-              <Plus aria-hidden size={24} />
+              <CalendarDays aria-hidden size={20} />
+              <span className="text-xs/none">Sessions</span>
             </button>
-          </nav>
-        </div>
+          </div>
+          <button
+            type="button"
+            aria-label="Drop a splash"
+            data-compose
+            onClick={openSheet}
+            className="text-main-900 flex h-12 w-12 items-center justify-center rounded-full bg-white"
+          >
+            <Plus aria-hidden size={24} />
+          </button>
+        </nav>
       </div>
 
       {sessionsOpen ? (

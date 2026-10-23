@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { motion, useTransform, type PanInfo } from 'motion/react';
+import { motion, useSpring, useTransform, type MotionValue, type PanInfo } from 'motion/react';
 
 import { useWide } from '@/components/ui/use-wide';
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
@@ -10,7 +10,7 @@ import type { MyCategory } from '@/lib/queries/profile';
 import { CARD_PX, CardFace, face, SPINE_PX } from './card-face';
 import { CardMenu } from './card-menu';
 import { cardLane, type Card } from './grid';
-import type { Flip } from './use-flip';
+import { FLIP_SPRING, type Flip } from './use-flip';
 
 /** Each step of the lower stair: how far a card peeks below the one in front, its visible edge. */
 export const STEP_PX = 26;
@@ -41,11 +41,13 @@ const UP_INK = 0.6;
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 
-/** The stair's geometry: the top card's size, which way the stair runs, how many cards show each way. */
+/** The stair's geometry: the top card's size and seat, which way the stair runs, how many cards show each way. */
 export type Stair = {
   horizontal: boolean;
   width: number;
   height: number;
+  /** Sideways: the top card's left edge, past the read card's spine when there is one. */
+  left: number;
   down: number;
   up: number;
 };
@@ -182,10 +184,17 @@ export function StairBoard({
       1,
       Math.min(DOWN, Math.floor((width - SPINE_PX - MIN_CARD_WIDTH_PX) / SPINE_PX)),
     );
+    // Only the spines in use take room: with fewer cards behind, or none
+    // read, the top card widens into the slots they would have had, so
+    // nothing is left empty at either side (review). Measured against where
+    // the flip in flight lands, so the width springs along with it.
+    const behind = Math.min(down, Math.max(0, ids.length - 1 - next));
+    const before = Math.min(UP, next);
     stair = {
       horizontal: true,
-      width: Math.max(MIN_CARD_WIDTH_PX, width - SPINE_PX * (UP + down)),
+      width: Math.max(MIN_CARD_WIDTH_PX, width - SPINE_PX * (before + behind)),
       height: Math.max(CARD_PX, height),
+      left: SPINE_PX * before,
       down,
       up: UP,
     };
@@ -194,11 +203,19 @@ export function StairBoard({
       horizontal: false,
       width: room?.width ?? 0,
       height: Math.max(CARD_PX, (room?.height ?? 0) - DOWN * STEP_PX),
+      left: 0,
       down: DOWN,
       up: UP,
     };
   }
   const stackHeight = horizontal ? stair.height : stair.height + DOWN * STEP_PX;
+  // The top card's width and seat move on the spring as cards come and go.
+  const cardWidth = useSpring(stair.width, FLIP_SPRING);
+  const cardLeft = useSpring(stair.left, FLIP_SPRING);
+  useEffect(() => {
+    cardWidth.set(stair.width);
+    cardLeft.set(stair.left);
+  }, [stair.width, stair.left, cardWidth, cardLeft]);
 
   // The finger on the top card: up (left, sideways) flips forward, down
   // (right) flips back; which is not known until it has moved, so the grab
@@ -277,6 +294,8 @@ export function StairBoard({
                 index={i}
                 flip={flip}
                 stair={stair}
+                cardWidth={cardWidth}
+                cardLeft={cardLeft}
                 lane={categories.find((c) => c.id === cardLane(card.splash)) ?? null}
                 initials={initials}
                 onPanStart={onPanStart}
@@ -301,6 +320,8 @@ function Step({
   index,
   flip,
   stair,
+  cardWidth,
+  cardLeft,
   lane,
   initials,
   onPanStart,
@@ -315,6 +336,8 @@ function Step({
   index: number;
   flip: Flip;
   stair: Stair;
+  cardWidth: MotionValue<number>;
+  cardLeft: MotionValue<number>;
   lane: MyCategory | null;
   initials: string;
   onPanStart: () => void;
@@ -387,7 +410,7 @@ function Step({
         opacity,
         zIndex,
         height: stair.height,
-        ...(horizontal ? { left: SPINE_PX, width: stair.width } : {}),
+        ...(horizontal ? { left: cardLeft, width: cardWidth } : {}),
       }}
       onPanStart={onTop ? onPanStart : undefined}
       onPan={onTop ? onPan : undefined}

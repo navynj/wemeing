@@ -18,8 +18,8 @@ export type PoolPick =
   | null;
 
 /**
- * Composing from a pool (review): one row — this pool's lanes, the chips
- * the only filled element — and one *Just mine* switch at its right end.
+ * Composing from a pool (review): this pool's lanes, the chips the only
+ * filled element, and under them at the right one *Just mine* switch.
  * Off (the default): a joint splash on the chosen pool lane, everyone's.
  * On: mine alone. On a pool lane I have linked, that is my own splash in
  * my linked lane, placed here — it shows in that lane on my Home too; on
@@ -50,20 +50,6 @@ export function PoolLanePicker({
 
   return (
     <div data-pool-lane-picker className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-4">
-        <span className="text-pool-500 text-xs">{scope.poolName} lanes</span>
-        <label data-just-mine className="text-pool-500 flex items-center gap-2 text-xs">
-          Just mine
-          <Switch
-            on={justMine}
-            label="Just mine"
-            onChange={(on) => {
-              setJustMine(on);
-              if (chosen) onPick(pickFor(chosen, on));
-            }}
-          />
-        </label>
-      </div>
       <div className="no-scrollbar flex gap-2 overflow-x-auto">
         {scope.lanes.map((lane) => {
           const selected = chosen === lane.id;
@@ -84,6 +70,20 @@ export function PoolLanePicker({
             </button>
           );
         })}
+      </div>
+      {/* Under the lanes, at the right: whose it is (review). */}
+      <div className="flex justify-end">
+        <label data-just-mine className="text-pool-500 flex items-center gap-2 text-xs">
+          Just mine
+          <Switch
+            on={justMine}
+            label="Just mine"
+            onChange={(on) => {
+              setJustMine(on);
+              if (chosen) onPick(pickFor(chosen, on));
+            }}
+          />
+        </label>
       </div>
     </div>
   );

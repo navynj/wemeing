@@ -264,6 +264,78 @@ describe('a post’s audience (H23)', () => {
   });
 });
 
+describe('Just mine (0014)', () => {
+  const OWN = '0e300000-0000-0000-0000-000000000001';
+
+  it('makes my splash on a pool lane, placed and shared there, with a ripple and no lane of mine', async () => {
+    const made = await asUser(ben).rpc('create_own_pool_splash', {
+      p_id: OWN,
+      p_pool: pool,
+      p_pool_lane: tripsLane,
+      p_title: 'just mine',
+    });
+    expect(made.error).toBeNull();
+    const block = await asUser(ben)
+      .from('ripples')
+      .insert({ author_id: ben, category_id: null, note: 'mine alone', splash_id: OWN });
+    expect(block.error).toBeNull();
+
+    const row = await asAdmin()
+      .from('splashes')
+      .select('owner_id, own_pool_id, declared_lane_id')
+      .eq('id', OWN)
+      .single();
+    expect(row.data).toEqual({ owner_id: ben, own_pool_id: pool, declared_lane_id: null });
+    const placement = await asAdmin()
+      .from('splash_placements')
+      .select('pool_id, pool_lane_id, shared')
+      .eq('splash_id', OWN);
+    expect(placement.data).toEqual([{ pool_id: pool, pool_lane_id: tripsLane, shared: true }]);
+    // No link was made for it.
+    const links = await asUser(ben)
+      .from('lane_mappings')
+      .select('pool_lane_id')
+      .eq('pool_id', pool);
+    expect(links.data).toEqual([{ pool_lane_id: tripsLane }]);
+  });
+
+  it('is read by members and by nobody outside', async () => {
+    const member = await asUser(ana).from('ripples').select('note').eq('splash_id', OWN);
+    // Ana may have left in an earlier case; Ben's own read is the member read then.
+    const reader = member.data?.length
+      ? member
+      : await asUser(ben).from('ripples').select('note').eq('splash_id', OWN);
+    expect(reader.data).toEqual([{ note: 'mine alone' }]);
+    expect((await asUser(cal).from('splashes').select('id').eq('id', OWN)).data).toEqual([]);
+    expect((await asUser(cal).from('ripples').select('id').eq('splash_id', OWN)).data).toEqual([]);
+  });
+
+  it('is always shared to its pool, and takes no lane of mine', async () => {
+    const off = await asUser(ben)
+      .from('splash_placements')
+      .update({ shared: false })
+      .eq('splash_id', OWN)
+      .eq('pool_id', pool);
+    expect(off.error?.code).toBe('42501');
+    const laned = await asUser(ben)
+      .from('ripples')
+      .insert({ author_id: ben, category_id: BEN_TRIPS, note: 'with a lane', splash_id: OWN });
+    expect(laned.error?.code).toBe('23514');
+    const lone = await asUser(ben)
+      .from('ripples')
+      .insert({ author_id: ben, category_id: null, note: 'no lane' });
+    expect(lone.error?.code).toBe('23514');
+  });
+
+  it('goes everywhere at once when deleted', async () => {
+    expect((await asUser(ben).from('splashes').delete().eq('id', OWN)).error).toBeNull();
+    expect(
+      (await asAdmin().from('splash_placements').select('splash_id').eq('splash_id', OWN)).data,
+    ).toEqual([]);
+    expect((await asAdmin().from('ripples').select('id').eq('splash_id', OWN)).data).toEqual([]);
+  });
+});
+
 describe('writing', () => {
   it('refuses a block written into another member’s post', async () => {
     const { error } = await asUser(ben)

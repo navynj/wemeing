@@ -15,7 +15,7 @@ import { useOptimisticAction } from '@/lib/use-optimistic-action';
 
 import { FlipBoard } from './diving-board-flip';
 import { GroundFoot } from './ground-foot';
-import { byNewest, newestIn, placeCard, type Card } from './grid';
+import { byNewest, newestIn, placeCard, type Card, type GridColumn } from './grid';
 import { LaneGrid, type GridHandle, type Ring } from './lane-grid';
 import { LaneIcon } from './lane-icon';
 import { PinnedCards } from './pinned-cards';
@@ -66,6 +66,7 @@ export function HomeGround({
   scrollToMonth,
   topParam = null,
   manageLanes = false,
+  poolColumns = [],
   board = BOARD,
 }: {
   /** Newest first. */
@@ -81,6 +82,11 @@ export function HomeGround({
   topParam?: string | null;
   /** `?manage=lanes`: open with lane management up, from a lane page. */
   manageLanes?: boolean;
+  /**
+   * After my lanes, one column per pool holding my Just-mine splashes
+   * (0014), headed by the pool's monogram and name.
+   */
+  poolColumns?: GridColumn[];
   board?: Board;
 }) {
   const [newLane, setNewLane] = useState(false);
@@ -267,7 +273,7 @@ export function HomeGround({
             ref={grid}
             view={view}
             cards={shown}
-            categories={lanes.value}
+            categories={[...lanes.value, ...poolColumns]}
             today={today}
             ring={ring}
             waterIds={waterIds}

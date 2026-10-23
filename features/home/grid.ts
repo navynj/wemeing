@@ -57,6 +57,11 @@ export type GridColumn = {
   icon: string | null;
   /** A member's column shows their initials on a disc instead of an emoji. */
   avatar?: string;
+  /**
+   * A pool's column on Home (0014): its monogram tile instead of an emoji —
+   * the pool's name, or '' for a neutral tile (a pool I left).
+   */
+  monogram?: string;
   /** Where the header goes: a lane's page on Home; null for no link. */
   href?: string | null;
 };
@@ -107,9 +112,17 @@ export function cardLane(splash: SplashSummary): string | null {
   return splash.declaredLaneId ?? representativeLane(splash);
 }
 
+/** Home's column for my Just-mine splashes in one pool (0014). */
+export function ownPoolColumn(poolId: string): string {
+  return `pool:${poolId}`;
+}
+
 /** The column a mark sits in: the pool's choice where there is one (H23), else its lane. */
 export function cardColumn(card: Card): string | null {
-  return card.column ?? cardLane(card.splash);
+  if (card.column) return card.column;
+  // Just mine: no lane of mine, so its pool's column on Home (0014).
+  if (card.splash.ownPoolId) return ownPoolColumn(card.splash.ownPoolId);
+  return cardLane(card.splash);
 }
 
 /** What a card names as its lane: its own (a pool lane), else one of mine. */

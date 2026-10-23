@@ -7,6 +7,7 @@ import { summarizeOrphan, summarizeSplash } from '@/features/splash/summary';
 import { flowInstant } from '@/lib/flow-key';
 import { signOwnMedia } from '@/lib/media';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
+import { FixedAudienceChip } from '@/features/pool/audience-sheet';
 import { SplashAudience } from '@/features/pool/splash-audience';
 import { representativeLane } from '@/features/splash/summary';
 import { getMyLinks, getMyPlacements, getMyPoolNames } from '@/lib/queries/pools';
@@ -86,28 +87,33 @@ export default async function SplashRoute({ params, searchParams }: PageProps<'/
         audience={
           // Where this post is shared (H23): a switch per pool its lane is
           // linked in. A lone block has no post row to place yet.
-          board && pools.length > 0
-            ? (() => {
-                const lane = summary.declaredLaneId ?? representativeLane(summary);
-                const linkedIds = new Set(
-                  links.filter((l) => l.myCategoryId === lane).map((l) => l.poolId),
-                );
-                return (
-                  <SplashAudience
-                    splashId={board.id}
-                    shared={placements
-                      .filter((p) => p.splashId === board.id && p.shared)
-                      .map((p) => p.poolId)}
-                    linked={pools
-                      .filter((p) => linkedIds.has(p.id))
-                      .map((p) => ({ poolId: p.id, name: p.name }))}
-                    unlinked={pools
-                      .filter((p) => !linkedIds.has(p.id))
-                      .map((p) => ({ poolId: p.id, name: p.name }))}
-                  />
-                );
-              })()
-            : null
+          board?.own_pool_id ? (
+            // Just mine: always its pool, nothing to switch (0014).
+            <FixedAudienceChip
+              poolName={pools.find((p) => p.id === board.own_pool_id)?.name ?? 'A pool you left'}
+            />
+          ) : board && pools.length > 0 ? (
+            (() => {
+              const lane = summary.declaredLaneId ?? representativeLane(summary);
+              const linkedIds = new Set(
+                links.filter((l) => l.myCategoryId === lane).map((l) => l.poolId),
+              );
+              return (
+                <SplashAudience
+                  splashId={board.id}
+                  shared={placements
+                    .filter((p) => p.splashId === board.id && p.shared)
+                    .map((p) => p.poolId)}
+                  linked={pools
+                    .filter((p) => linkedIds.has(p.id))
+                    .map((p) => ({ poolId: p.id, name: p.name }))}
+                  unlinked={pools
+                    .filter((p) => !linkedIds.has(p.id))
+                    .map((p) => ({ poolId: p.id, name: p.name }))}
+                />
+              );
+            })()
+          ) : null
         }
       />
     </main>

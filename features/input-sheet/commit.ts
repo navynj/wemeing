@@ -56,8 +56,12 @@ export async function commitRipple(input: Draft): Promise<CommitResult> {
   const refusal = checkAnnotation(draft);
   if (refusal) return refusal;
 
-  const categoryId = await categoryFor(supabase, draft.categoryId, draft.splashId);
-  if (!categoryId) return { ok: false, reason: 'error', message: 'There is no lane to drop into.' };
+  const lane = await categoryFor(supabase, draft.categoryId, draft.splashId);
+  // A block on a Just-mine splash has no lane of mine (0014); any other needs one.
+  const categoryId = lane === 'none' ? null : lane;
+  if (lane === null) {
+    return { ok: false, reason: 'error', message: 'There is no lane to drop into.' };
+  }
 
   // A point ends where it starts; a span ends where it says — with a clock,
   // or by dates alone; an unannotated fragment has no instant at all (H20c).
@@ -95,13 +99,19 @@ async function categoryFor(
   supabase: Awaited<ReturnType<typeof createClient>>,
   chosen: string | null,
   splashId: string | null,
-): Promise<string | null> {
+): Promise<string | 'none' | null> {
   const [{ data: categories }, { data: splash }] = await Promise.all([
     supabase.from('my_categories').select('*').order('position'),
     splashId
-      ? supabase.from('splashes').select('declared_lane_id').eq('id', splashId).maybeSingle()
+      ? supabase
+          .from('splashes')
+          .select('declared_lane_id, own_pool_id')
+          .eq('id', splashId)
+          .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
+  // Just mine (0014): no lane of mine, and no Day to fall into.
+  if (splash?.own_pool_id) return 'none';
 
   const rule = laneRule(splash ? { declaredLaneId: splash.declared_lane_id } : null);
   return resolveCategory(chosen, rule, categories ?? []);

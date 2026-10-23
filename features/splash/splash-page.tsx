@@ -293,6 +293,7 @@ export function SplashPage({
                       target={editor}
                       categories={categories}
                       defaultLaneId={page.splash.declaredLaneId}
+                      laneless={page.splash.ownPoolId !== null}
                       timeZone={timeZone}
                       today={today}
                       onSubmit={(draft) => saveBlock(editor, draft)}
@@ -329,6 +330,7 @@ export function SplashPage({
               target={editor}
               categories={categories}
               defaultLaneId={page.splash.declaredLaneId}
+              laneless={page.splash.ownPoolId !== null}
               timeZone={timeZone}
               today={today}
               onSubmit={(draft) => saveBlock(editor, draft)}

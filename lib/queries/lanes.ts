@@ -44,7 +44,7 @@ export async function getLaneCounts(
 }
 
 /** The row shape the tally reads: the key columns and the lane. */
-export type LaneRow = FlowKeyed & { category_id: string };
+export type LaneRow = FlowKeyed & { category_id: string | null };
 
 /**
  * The counting, kept pure. Two spans that overlap are two records and both
@@ -56,6 +56,8 @@ export function tallyLaneCounts(rows: LaneRow[], timeZone: string, today: IsoDat
   let earliest: IsoDate | null = null;
   for (const row of rows) {
     if (isFutureDated(row, timeZone, today)) continue;
+    // No lane of mine (Just mine, 0014): no cell to count it in.
+    if (row.category_id === null) continue;
     const date = dayOf(row, timeZone);
     const day = counts.get(date) ?? {};
     day[row.category_id] = (day[row.category_id] ?? 0) + 1;

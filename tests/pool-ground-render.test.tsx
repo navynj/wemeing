@@ -49,6 +49,7 @@ function splash(over: Partial<Splash> & { id: string }): Splash {
     pinned_at: null,
     pool_id: null,
     pool_lane_id: null,
+    own_pool_id: null,
     created_by: null,
     type: 'free',
     prompt: null,
@@ -116,10 +117,12 @@ const A: PoolView = {
   placements: [
     { splashId: 's-mine', poolId: 'p-a', poolLaneId: 'l-food', shared: true, ownerId: ME },
     { splashId: 's-mina', poolId: 'p-a', poolLaneId: 'l-food', shared: true, ownerId: MINA },
+    { splashId: 's-own', poolId: 'p-a', poolLaneId: 'l-media', shared: true, ownerId: ME },
   ],
   splashes: [
     splash({ id: 's-mine', title: 'Fried egg' }),
     splash({ id: 's-mina', owner_id: MINA, title: 'Hiking' }),
+    splash({ id: 's-own', own_pool_id: 'p-a', title: 'Just mine' }),
     splash({
       id: 's-joint',
       owner_id: null,
@@ -133,6 +136,7 @@ const A: PoolView = {
   ripples: [
     ripple({ id: 'r-mine', splash_id: 's-mine', occurred_on: '2026-10-22' }),
     ripple({ id: 'r-mina', splash_id: 's-mina', author_id: MINA }),
+    ripple({ id: 'r-own', splash_id: 's-own', category_id: null }),
     ripple({ id: 'r-j1', splash_id: 's-joint', author_id: MINA, occurred_on: '2026-10-20' }),
     ripple({ id: 'r-j2', splash_id: 's-joint', author_id: ME, occurred_on: '2026-10-20' }),
   ],
@@ -369,5 +373,20 @@ describe('pool lanes (H23)', () => {
     const listed = [...doc.querySelectorAll('[data-pool-lane]')].map((el) => el.textContent);
     expect(listed.some((t) => t?.includes('Books'))).toBe(true);
     expect(listed.some((t) => t?.includes('Walks'))).toBe(true);
+  });
+});
+
+describe('Just mine in the pool (0014)', () => {
+  it('is a mark in its pool lane’s column, never a band', () => {
+    setView('lane');
+    const { container } = ground(A);
+    expect(container.querySelector('[data-cell="l-media"] [data-mark="s-own"]')).not.toBeNull();
+    expect(container.querySelector('[data-joint-band="s-own"]')).toBeNull();
+  });
+
+  it('is a mark in my column in Swimmers', () => {
+    setView('swimmers');
+    const { container } = ground(A);
+    expect(container.querySelector(`[data-cell="${ME}"] [data-mark="s-own"]`)).not.toBeNull();
   });
 });

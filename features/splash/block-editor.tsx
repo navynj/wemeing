@@ -51,6 +51,7 @@ export function BlockEditor({
   target,
   categories,
   defaultLaneId,
+  laneless = false,
   timeZone,
   today,
   onSubmit,
@@ -62,6 +63,8 @@ export function BlockEditor({
   categories: MyCategory[];
   /** The post's declared lane, where a new block starts (H21f). */
   defaultLaneId: string | null;
+  /** A Just-mine splash (0014): its blocks take no lane of mine, so no lane chips. */
+  laneless?: boolean;
   timeZone: string;
   today: IsoDate;
   onSubmit: (draft: BlockDraft) => void;
@@ -125,12 +128,14 @@ export function BlockEditor({
         className="text-ink placeholder:text-ink min-h-20 w-full resize-none overflow-hidden text-[15px]/[1.65] outline-none placeholder:opacity-20"
       />
 
-      <LaneChips
-        categories={categories}
-        selectedId={categoryId}
-        onSelect={setCategoryId}
-        surface="white"
-      />
+      {laneless ? null : (
+        <LaneChips
+          categories={categories}
+          selectedId={categoryId}
+          onSelect={setCategoryId}
+          surface="white"
+        />
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <AnnotationControl annotation={annotation} today={today} onChange={setAnnotation} />

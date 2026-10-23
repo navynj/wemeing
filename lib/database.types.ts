@@ -499,7 +499,7 @@ export type Database = {
       ripples: {
         Row: {
           author_id: string
-          category_id: string
+          category_id: string | null
           created_at: string
           ended_at: string | null
           id: string
@@ -516,7 +516,7 @@ export type Database = {
         }
         Insert: {
           author_id: string
-          category_id: string
+          category_id?: string | null
           created_at?: string
           ended_at?: string | null
           id?: string
@@ -533,7 +533,7 @@ export type Database = {
         }
         Update: {
           author_id?: string
-          category_id?: string
+          category_id?: string | null
           created_at?: string
           ended_at?: string | null
           id?: string
@@ -689,6 +689,7 @@ export type Database = {
           ends_at: string | null
           icon: string | null
           id: string
+          own_pool_id: string | null
           owner_id: string | null
           pinned_at: string | null
           pool_id: string | null
@@ -708,6 +709,7 @@ export type Database = {
           ends_at?: string | null
           icon?: string | null
           id?: string
+          own_pool_id?: string | null
           owner_id?: string | null
           pinned_at?: string | null
           pool_id?: string | null
@@ -727,6 +729,7 @@ export type Database = {
           ends_at?: string | null
           icon?: string | null
           id?: string
+          own_pool_id?: string | null
           owner_id?: string | null
           pinned_at?: string | null
           pool_id?: string | null
@@ -757,6 +760,13 @@ export type Database = {
             columns: ["declared_lane_id"]
             isOneToOne: false
             referencedRelation: "my_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "splashes_own_pool_id_fkey"
+            columns: ["own_pool_id"]
+            isOneToOne: false
+            referencedRelation: "pools"
             referencedColumns: ["id"]
           },
           {
@@ -805,6 +815,17 @@ export type Database = {
         }[]
       }
       create_joint_splash: {
+        Args: {
+          p_declared_start?: string
+          p_icon?: string
+          p_id: string
+          p_pool: string
+          p_pool_lane: string
+          p_title: string
+        }
+        Returns: string
+      }
+      create_own_pool_splash: {
         Args: {
           p_declared_start?: string
           p_icon?: string

@@ -57,6 +57,24 @@ export function AudienceChip({
 }
 
 /**
+ * A "Just mine" splash's audience (0014): always its pool, so a plain chip
+ * naming it, with nothing to switch.
+ */
+export function FixedAudienceChip({ poolName }: { poolName: string }) {
+  return (
+    <span
+      data-audience-chip
+      data-audience-fixed
+      aria-label={`Audience: ${poolName}, always`}
+      className="border-pool-200 text-ink inline-flex h-8 max-w-[12rem] shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm"
+    >
+      <Users aria-hidden size={14} className="text-pool-500 shrink-0" />
+      <span className="truncate">{poolName}</span>
+    </span>
+  );
+}
+
+/**
  * Where a post is shared, as switches. Sections, so a *Followers* row can
  * join *Pools* later without reshaping this; only Pools is built.
  */

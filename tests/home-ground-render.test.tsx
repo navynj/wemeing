@@ -135,6 +135,7 @@ function post(
       pinned_at: null,
       pool_id: null,
       pool_lane_id: null,
+      own_pool_id: null,
       created_by: null,
       type: 'free',
       prompt: null,
@@ -1005,5 +1006,49 @@ describe('the top card\u2019s ripples as a thread (round 3)', () => {
     const thread = topCard(container).querySelector('[data-ripple-thread]')!;
     expect(thread.querySelectorAll('[data-thread-avatar]')).toHaveLength(1);
     expect(thread.querySelectorAll('[data-thread-line]')).toHaveLength(0);
+  });
+});
+
+describe('Just mine on Home (0014)', () => {
+  function homeWith(columns: { id: string; name: string; monogram: string }[]) {
+    const own = {
+      ...post('own', 'Arnak notes', [block('own-b', '2026-09-20')]),
+      ownPoolId: 'p-ours',
+    };
+    return render(
+      <InputSheetProvider>
+        <HomeGround
+          cards={cards([...POSTS, own])}
+          pinned={[]}
+          categories={LANES}
+          today={TODAY}
+          timeZone={TZ}
+          initials="YL"
+          scrollToMonth={null}
+          poolColumns={columns.map((c) => ({ ...c, icon: null, href: null }))}
+        />
+      </InputSheetProvider>,
+    );
+  }
+
+  it('sits in a trailing column for its pool, headed by the pool’s monogram and name, unbadged', () => {
+    const { container } = homeWith([{ id: 'pool:p-ours', name: 'Our Pool', monogram: 'Our Pool' }]);
+    const headers = [...container.querySelectorAll('[data-lane-header]')].map((h) =>
+      h.getAttribute('data-lane-header'),
+    );
+    expect(headers.at(-1)).toBe('pool:p-ours');
+    const header = container.querySelector('[data-lane-header="pool:p-ours"]')!;
+    expect(header.textContent).toContain('Our Pool');
+    expect(header.querySelector('[data-monogram="OU"]')).not.toBeNull();
+    const mark = container.querySelector('[data-cell="pool:p-ours"] [data-mark="own"]');
+    expect(mark).not.toBeNull();
+    expect(mark!.querySelector('[data-mark-pool]')).toBeNull();
+  });
+
+  it('reads "A pool you left" with a neutral tile once the pool is gone from me', () => {
+    const { container } = homeWith([{ id: 'pool:p-ours', name: 'A pool you left', monogram: '' }]);
+    const header = container.querySelector('[data-lane-header="pool:p-ours"]')!;
+    expect(header.textContent).toContain('A pool you left');
+    expect(header.querySelector('[data-monogram=""]')).not.toBeNull();
   });
 });

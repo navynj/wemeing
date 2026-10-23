@@ -12,6 +12,7 @@ vi.mock('@/features/splash/actions', () => ({
 const placed: { splashId: string; pools: string[] }[] = [];
 const joints: Record<string, unknown>[] = [];
 const linked: Record<string, unknown>[] = [];
+const owns: Record<string, unknown>[] = [];
 vi.mock('@/features/pool/actions', () => ({
   placeNewSplash: (splashId: string, pools: string[]) => {
     placed.push({ splashId, pools });
@@ -19,6 +20,10 @@ vi.mock('@/features/pool/actions', () => ({
   },
   createJointSplash: (input: Record<string, unknown>) => {
     joints.push(input);
+    return Promise.resolve({ ok: true, id: input.id });
+  },
+  dropOwnPoolSplash: (input: Record<string, unknown>) => {
+    owns.push(input);
     return Promise.resolve({ ok: true, id: input.id });
   },
   linkLane: (input: Record<string, unknown>) => {
@@ -85,6 +90,7 @@ beforeEach(() => {
   placed.length = 0;
   joints.length = 0;
   linked.length = 0;
+  owns.length = 0;
   handoffs.length = 0;
   window.URL.createObjectURL = () => 'blob:preview';
 });
@@ -465,6 +471,47 @@ describe('compose from a pool (H23)', () => {
     fireEvent.click(view.container.querySelector('[data-link-it]')!);
     fireEvent.click(view.drop());
     await waitFor(() => expect(joints).toHaveLength(1));
+    expect(linked).toEqual([]);
+  });
+});
+
+describe('Just mine from a pool (0014)', () => {
+  it('offers Everyone’s | Just mine once a pool lane is picked, and Just mine needs no lane of mine', async () => {
+    const view = render(
+      <InputSheetProvider>
+        <SplashSheet
+          context={{
+            categories: LANES,
+            timeZone: TZ,
+            today: TODAY,
+            links: LINKS,
+            pools: POOLS,
+            initials: 'YL',
+          }}
+          pool={{
+            poolId: 'p-ours',
+            poolName: 'Our Pool',
+            lanes: [{ id: 'pl-notes', name: 'Notes', icon: '📓', myCategoryId: null }],
+          }}
+          onClose={() => {}}
+          onDrop={(drop) => void drop.commit()}
+        />
+      </InputSheetProvider>,
+    );
+    expect(view.container.querySelector('[data-whose]')).toBeNull();
+    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'my notes' } });
+    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-notes"]')!);
+    expect(view.getByRole('tab', { name: "Everyone's" }).getAttribute('aria-selected')).toBe(
+      'true',
+    );
+    fireEvent.click(view.getByRole('tab', { name: 'Just mine' }));
+    // No lane of mine asked for, no link offered, no audience.
+    expect(view.queryByText('Not linked to your lanes')).toBeNull();
+    expect(view.container.querySelector('[data-audience-chip]')).toBeNull();
+    fireEvent.click(view.getByText('Drop'));
+    await waitFor(() => expect(owns).toHaveLength(1));
+    expect(owns[0]).toMatchObject({ poolId: 'p-ours', poolLaneId: 'pl-notes', body: 'my notes' });
+    expect(joints).toEqual([]);
     expect(linked).toEqual([]);
   });
 });

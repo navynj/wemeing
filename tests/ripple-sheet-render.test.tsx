@@ -73,6 +73,7 @@ function board(over: Partial<SplashSummary>): SplashSummary {
     blocks: [],
     latestCreatedAt: '2026-09-24T16:00:00Z',
     writtenOn: '2026-09-01',
+    ownPoolId: null,
     open: true,
     createdAt: '2026-09-01T16:00:00Z',
     pinnedAt: null,

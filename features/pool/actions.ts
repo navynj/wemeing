@@ -269,6 +269,7 @@ async function poolLaneFor(
       .eq('splash_id', splashId);
     const tally = new Map<string, { count: number; latest: string }>();
     for (const b of blocks ?? []) {
+      if (b.category_id === null) continue;
       const t = tally.get(b.category_id) ?? { count: 0, latest: '' };
       tally.set(b.category_id, {
         count: t.count + 1,
@@ -434,4 +435,73 @@ export async function linkLane(input: {
   if (error) return { ok: false, message: said(error) };
   revalidatePool(parsed.data.poolId);
   return { ok: true };
+}
+
+const OwnDrop = z.object({
+  id: z.uuid(),
+  poolId: z.uuid(),
+  poolLaneId: z.uuid(),
+  title: z.string().trim().max(120),
+  icon: ICON,
+  body: z.string().trim().max(8000),
+  media: z.array(z.string()).max(8),
+  occurredOn: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable(),
+  occurredTime: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/)
+    .nullable(),
+  startInstant: z.iso.datetime().nullable(),
+  endInstant: z.iso.datetime().nullable(),
+});
+
+/**
+ * "Just mine" (0014): my splash on a pool lane, linked to no lane of mine.
+ * The splash and its one placement are made together by the database
+ * (`create_own_pool_splash`); the first ripple follows with no lane. A
+ * ripple that will not land takes the splash back with it.
+ */
+export async function dropOwnPoolSplash(input: z.infer<typeof OwnDrop>): Promise<Made> {
+  const parsed = OwnDrop.safeParse(input);
+  if (!parsed.success) return { ok: false, message: 'That splash is incomplete.' };
+  const drop = parsed.data;
+  if (drop.occurredTime !== null && drop.occurredOn === null) {
+    return { ok: false, message: 'A time needs a date.' };
+  }
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: 'Sign in again to drop this.' };
+
+  const { error } = await supabase.rpc('create_own_pool_splash', {
+    p_id: drop.id,
+    p_pool: drop.poolId,
+    p_pool_lane: drop.poolLaneId,
+    p_title: drop.title,
+    ...(drop.icon ? { p_icon: drop.icon } : {}),
+  });
+  if (error) return { ok: false, message: said(error) };
+
+  if (drop.body || drop.media.length > 0) {
+    const { error: blockError } = await supabase.from('ripples').insert({
+      author_id: user.id,
+      category_id: null,
+      note: drop.body || null,
+      media: drop.media,
+      occurred_on: drop.occurredOn,
+      occurred_time: drop.occurredTime,
+      ended_at: drop.endInstant ?? drop.startInstant,
+      splash_id: drop.id,
+    });
+    if (blockError) {
+      // Deleting the splash takes its placement with it (0014 allows that).
+      await supabase.from('splashes').delete().eq('id', drop.id);
+      return { ok: false, message: said(blockError) };
+    }
+  }
+  revalidatePool(drop.poolId);
+  return { ok: true, id: drop.id };
 }

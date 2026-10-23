@@ -1,11 +1,19 @@
 import { redirect } from 'next/navigation';
 
-import { byNewest, initialsOf, placeCard, type Card, type CardRipple } from '@/features/home/grid';
+import {
+  byNewest,
+  initialsOf,
+  placeCard,
+  type Card,
+  type CardRipple,
+  ownPoolColumn,
+  type GridColumn,
+} from '@/features/home/grid';
 import { HomeGround } from '@/features/home/home-ground';
 import { scopedMonth } from '@/features/home/scope';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
 import { withPoolBadge } from '@/features/pool/home-badge';
-import { getJointSplashes, getMyPoolNames } from '@/lib/queries/pools';
+import { getJointSplashes, getMyPlacements, getMyPoolNames } from '@/lib/queries/pools';
 import { getMySplashes, summarizeSplashes } from '@/lib/queries/splashes';
 import { getMyTrail } from '@/lib/queries/trail';
 import { createClient } from '@/lib/supabase/server';
@@ -57,6 +65,35 @@ export default async function HomePage({ searchParams }: PageProps<'/'>) {
   const poolName = new Map(pools.map((p) => [p.id, p.name]));
   const jointPool = new Map(joints.map((j) => [j.id, j.pool_id!]));
 
+  // Just mine (0014): a column per pool after my lanes, headed by the pool's
+  // monogram and name — "A pool you left" with a neutral tile once I cannot
+  // read it — and each mark showing its pool lane's emoji while I can.
+  const ownPools = [...new Set(mine.flatMap((s) => (s.own_pool_id ? [s.own_pool_id] : [])))];
+  const ownLaneIcon = new Map<string, string | null>();
+  if (ownPools.length > 0) {
+    const placed = await getMyPlacements(supabase, profile.id);
+    const laneOf = new Map(placed.map((p) => [p.splashId, p.poolLaneId]));
+    const { data: lanes } = await supabase
+      .from('pool_lanes')
+      .select('id, icon')
+      .in('id', [...new Set(placed.map((p) => p.poolLaneId))]);
+    const iconOf = new Map((lanes ?? []).map((l) => [l.id, l.icon]));
+    for (const s of mine) {
+      const lane = laneOf.get(s.id);
+      if (s.own_pool_id && lane) ownLaneIcon.set(s.id, iconOf.get(lane) ?? null);
+    }
+  }
+  const poolColumns: GridColumn[] = ownPools.map((id) => {
+    const name = poolName.get(id);
+    return {
+      id: ownPoolColumn(id),
+      name: name ?? 'A pool you left',
+      icon: null,
+      monogram: name ?? '',
+      href: null,
+    };
+  });
+
   // A card's ripples: its blocks with words, oldest first. A lone block's is its own.
   const threads = new Map<string, CardRipple[]>();
   for (const ripple of [...ripples].reverse()) {
@@ -76,6 +113,16 @@ export default async function HomePage({ searchParams }: PageProps<'/'>) {
         profile.timezone,
         thread,
       );
+      if (summary.ownPoolId) {
+        // No badge: the column header says where it lives.
+        return {
+          ...card,
+          lane: {
+            icon: ownLaneIcon.get(summary.id) ?? null,
+            name: poolName.get(summary.ownPoolId) ?? 'A pool you left',
+          },
+        };
+      }
       return withPoolBadge(card, jointPool, poolName);
     })
     .sort(byNewest);
@@ -97,6 +144,7 @@ export default async function HomePage({ searchParams }: PageProps<'/'>) {
         scrollToMonth={month}
         topParam={one(params.top) ?? null}
         manageLanes={one(params.manage) === 'lanes'}
+        poolColumns={poolColumns}
       />
     </main>
   );

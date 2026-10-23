@@ -15,6 +15,8 @@ import type { PoolScope } from './compose-scope';
  */
 export type PoolPick =
   | { kind: 'joint'; poolLaneId: string }
+  /** "Just mine" (0014): my splash on that pool lane, linked to no lane of mine. */
+  | { kind: 'own'; poolLaneId: string }
   | { kind: 'lane'; poolLaneId: string; myCategoryId: string }
   | null;
 
@@ -54,8 +56,8 @@ export function PoolLanePicker({
   const { closeSheet } = useInputSheet();
   const [segment, setSegment] = useState<Segment>('pool');
   const linked = scope.lanes.filter((lane) => lane.myCategoryId);
-  const chosenPoolLane =
-    pick?.kind === 'joint' ? scope.lanes.find((l) => l.id === pick.poolLaneId) : undefined;
+  const onPoolLane = pick?.kind === 'joint' || pick?.kind === 'own';
+  const chosenPoolLane = onPoolLane ? scope.lanes.find((l) => l.id === pick.poolLaneId) : undefined;
 
   return (
     <div data-pool-lane-picker className="flex flex-col gap-3">
@@ -95,14 +97,21 @@ export function PoolLanePicker({
         <>
           <div className="no-scrollbar flex gap-2 overflow-x-auto">
             {scope.lanes.map((lane) => {
-              const selected = pick?.kind === 'joint' && pick.poolLaneId === lane.id;
+              const selected = onPoolLane && pick.poolLaneId === lane.id;
               return (
                 <button
                   key={lane.id}
                   type="button"
                   aria-pressed={selected}
                   data-pick-pool-lane={lane.id}
-                  onClick={() => onPick(selected ? null : { kind: 'joint', poolLaneId: lane.id })}
+                  onClick={() =>
+                    // Another lane keeps Everyone's or Just mine as it was.
+                    onPick(
+                      selected
+                        ? null
+                        : { kind: pick?.kind === 'own' ? 'own' : 'joint', poolLaneId: lane.id },
+                    )
+                  }
                   className={`h-10 shrink-0 rounded-full px-4 text-sm font-semibold ${
                     selected ? 'bg-ink text-white' : 'border-pool-200 text-ink border'
                   }`}
@@ -113,7 +122,38 @@ export function PoolLanePicker({
               );
             })}
           </div>
-          {chosenPoolLane && !chosenPoolLane.myCategoryId ? (
+          {chosenPoolLane ? (
+            // Whose splash it is: the pool's (everyone writes in it), or mine
+            // alone on that lane (0014). Ink for the chosen one (H20f).
+            <div
+              role="tablist"
+              aria-label="Whose"
+              data-whose
+              className="bg-pool-100 flex self-start rounded-full p-0.5 text-xs font-medium"
+            >
+              {(
+                [
+                  ['joint', "Everyone's"],
+                  ['own', 'Just mine'],
+                ] as const
+              ).map(([kind, label]) => (
+                <button
+                  key={kind}
+                  type="button"
+                  role="tab"
+                  aria-selected={pick?.kind === kind}
+                  data-whose-option={kind}
+                  onClick={() => onPick({ kind, poolLaneId: chosenPoolLane.id })}
+                  className={`rounded-full px-3 py-1 ${
+                    pick?.kind === kind ? 'bg-ink text-white' : 'text-pool-500'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {chosenPoolLane && pick?.kind === 'joint' && !chosenPoolLane.myCategoryId ? (
             // A ripple is always filed under one of my lanes (ripples.category_id).
             <div
               data-joint-unlinked

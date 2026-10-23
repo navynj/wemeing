@@ -533,7 +533,9 @@ function ColumnHeader({ column }: { column: GridColumn }) {
   const href = column.href === undefined ? `/lane/${column.id}` : column.href;
   const body = (
     <>
-      {column.avatar !== undefined ? (
+      {column.monogram !== undefined ? (
+        <Monogram name={column.monogram} size="head" />
+      ) : column.avatar !== undefined ? (
         <span
           aria-hidden
           data-column-avatar

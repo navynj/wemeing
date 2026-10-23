@@ -16,7 +16,8 @@ const GHOST_TITLE_WORDS = 6;
 /** What a block contributes to its post: its key, its lane, its words. */
 export type SplashBlock = FlowKeyed & {
   id: string;
-  category_id: string;
+  /** Null only on a "Just mine" splash (0014): a block with no lane of mine. */
+  category_id: string | null;
   note: string | null;
   /** A span's end, when the block has one: its last day counts for the range. */
   ended_at?: string | null;
@@ -50,6 +51,8 @@ export type SplashSummary = {
   latestCreatedAt: string;
   /** The author's local date when the post was made (0013): its row with no range. */
   writtenOn: IsoDate;
+  /** A "Just mine" splash (0014): the pool it lives in, with no lane of mine. */
+  ownPoolId: string | null;
   open: boolean;
   createdAt: string;
   pinnedAt: string | null;
@@ -74,6 +77,8 @@ export function lanesByFrequency(
 ): string[] {
   const tally = new Map<string, { count: number; latest: number }>();
   for (const block of blocks) {
+    // A block with no lane of mine (Just mine, 0014) takes no tag.
+    if (block.category_id === null) continue;
     const at = Date.parse(block.created_at);
     const current = tally.get(block.category_id) ?? { count: 0, latest: 0 };
     tally.set(block.category_id, {
@@ -184,6 +189,7 @@ export function summarizeSplash(
     blocks: placed.map(({ day, endDay, instant }) => ({ day, endDay, instant })),
     latestCreatedAt: latestCreatedAt ?? splash.created_at,
     writtenOn: splash.written_on ?? todayIn(timeZone, new Date(splash.created_at)),
+    ownPoolId: splash.own_pool_id ?? null,
     open: isSplashOpen(blocks.length, latestCreatedAt, now),
     createdAt: splash.created_at,
     pinnedAt: splash.pinned_at,
@@ -204,7 +210,7 @@ export function summarizeOrphan(block: SplashBlock, timeZone: string, now: Date)
     ghostTitle: ghostTitle(block.note),
     declaredLaneId: null,
     icon: null,
-    laneIds: [block.category_id],
+    laneIds: block.category_id ? [block.category_id] : [],
     declaredRange: null,
     range: { start: day, end: day },
     count: 1,
@@ -213,6 +219,7 @@ export function summarizeOrphan(block: SplashBlock, timeZone: string, now: Date)
     ],
     latestCreatedAt: block.created_at,
     writtenOn: day,
+    ownPoolId: null,
     open: isSplashOpen(1, block.created_at, now),
     createdAt: block.created_at,
     pinnedAt: null,

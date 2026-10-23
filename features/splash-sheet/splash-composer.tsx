@@ -17,7 +17,12 @@ import {
   useMediaAttach,
 } from '@/features/input-sheet/media-field';
 import { placeCard, type Card } from '@/features/home/grid';
-import { createJointSplash, linkLane, placeNewSplash } from '@/features/pool/actions';
+import {
+  createJointSplash,
+  dropOwnPoolSplash,
+  linkLane,
+  placeNewSplash,
+} from '@/features/pool/actions';
 import { defaultAudience, type AudienceLink } from '@/features/pool/audience';
 import { AudienceChip } from '@/features/pool/audience-sheet';
 import type { PoolScope } from '@/features/pool/compose-scope';
@@ -99,12 +104,14 @@ export function SplashComposer({
   // Edited by hand, the audience stays as set; untouched, it follows the lane.
   const [audienceEdited, setAudienceEdited] = useState<string[] | null>(null);
   const joint = pick?.kind === 'joint';
+  // "Just mine" (0014): my splash on the pool lane, with no lane of mine.
+  const own = pick?.kind === 'own';
   // Only pools where the lane is linked can take the post (C5), edited or not.
   const linkedHere = defaultAudience(laneId, links);
   // From a pool there is no audience to choose: what is written there is in
   // that pool, and only there.
   const audience = pool
-    ? joint
+    ? joint || own
       ? []
       : [pool.poolId]
     : (audienceEdited ?? linkedHere).filter((poolId) => linkedHere.includes(poolId));
@@ -138,7 +145,9 @@ export function SplashComposer({
     (joint
       ? (title.length > 0 || body.length > 0) &&
         (body.length === 0 || (jointLink ?? jointLane.myCategoryId) !== null)
-      : laneId !== null);
+      : own
+        ? title.length > 0 || body.length > 0 || mediaPaths.length > 0
+        : laneId !== null);
   const annotationOk = !annotation || annotationVerdict(annotation) === 'ok';
 
   function drop(): void {
@@ -183,6 +192,7 @@ export function SplashComposer({
         pinned_at: null,
         pool_id: null,
         pool_lane_id: null,
+        own_pool_id: own && pool ? pool.poolId : null,
         created_by: null,
         type: 'free',
         prompt: null,
@@ -195,7 +205,7 @@ export function SplashComposer({
         ? [
             {
               id: `${id}-first`,
-              category_id: laneId ?? '',
+              category_id: own ? null : (laneId ?? ''),
               note: body.length > 0 ? body : null,
               occurred_on: a?.date ?? null,
               occurred_time: a?.time ? `${a.time}:00` : null,
@@ -211,12 +221,14 @@ export function SplashComposer({
     const shared = audience;
     const poolLane = pool
       ? pool.lanes.find((l) =>
-          joint ? l.id === pick.poolLaneId : l.myCategoryId !== null && l.myCategoryId === laneId,
+          joint || own
+            ? l.id === pick.poolLaneId
+            : l.myCategoryId !== null && l.myCategoryId === laneId,
         )
       : undefined;
     // The card this pool seats before the server has it (H23).
     const poolCard: Card | null =
-      pool && poolLane && (joint || shared.includes(pool.poolId))
+      pool && poolLane && (joint || own || shared.includes(pool.poolId))
         ? {
             ...placeCard(splash, body, timeZone),
             column: poolLane.id,
@@ -239,35 +251,50 @@ export function SplashComposer({
       month: (a?.date ?? today).slice(0, 7),
       note: body.length > 0 ? body : null,
       ...(pool && poolCard ? { pool: { poolId: pool.poolId, card: poolCard } } : {}),
-      commit: joint
-        ? async () => {
-            if (linkFirst) {
-              const linked = await linkLane({
-                poolId: pool!.poolId,
-                poolLaneId: pick.poolLaneId,
-                myCategoryId: linkFirst,
-              });
-              if (!linked.ok) return linked;
-            }
-            return createJointSplash({
+      commit: own
+        ? () =>
+            dropOwnPoolSplash({
               id,
               poolId: pool!.poolId,
               poolLaneId: pick.poolLaneId,
               title,
               icon: icon || null,
               body,
-              myCategoryId: myJointLane,
+              media: mediaPaths,
               occurredOn: a?.date ?? null,
-            });
-          }
-        : async () => {
-            const made = await dropSplash(input);
-            if (!made.ok || shared.length === 0) return made;
-            const placed = await placeNewSplash(id, shared);
-            return placed.ok
-              ? placed
-              : { ok: false, message: `Dropped, but not shared: ${placed.message}` };
-          },
+              occurredTime: a?.time ?? null,
+              startInstant,
+              endInstant,
+            })
+        : joint
+          ? async () => {
+              if (linkFirst) {
+                const linked = await linkLane({
+                  poolId: pool!.poolId,
+                  poolLaneId: pick.poolLaneId,
+                  myCategoryId: linkFirst,
+                });
+                if (!linked.ok) return linked;
+              }
+              return createJointSplash({
+                id,
+                poolId: pool!.poolId,
+                poolLaneId: pick.poolLaneId,
+                title,
+                icon: icon || null,
+                body,
+                myCategoryId: myJointLane,
+                occurredOn: a?.date ?? null,
+              });
+            }
+          : async () => {
+              const made = await dropSplash(input);
+              if (!made.ok || shared.length === 0) return made;
+              const placed = await placeNewSplash(id, shared);
+              return placed.ok
+                ? placed
+                : { ok: false, message: `Dropped, but not shared: ${placed.message}` };
+            },
     });
 
     setTitleText('');

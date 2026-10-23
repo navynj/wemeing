@@ -78,6 +78,7 @@ function post(id: string, title: string, day: string) {
       pinned_at: null,
       pool_id: null,
       pool_lane_id: null,
+      own_pool_id: null,
       created_by: null,
       type: 'free',
       prompt: null,

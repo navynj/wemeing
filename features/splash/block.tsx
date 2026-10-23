@@ -24,12 +24,16 @@ export function BlockView({
   timeZone,
   today,
   onEdit,
+  clock = null,
 }: {
   block: RippleWithCategory;
   photos: (string | null)[];
   timeZone: string;
   today: IsoDate;
-  onEdit: () => void;
+  /** Absent: read-only — another member's ripple in a pool (review). */
+  onEdit?: () => void;
+  /** In a pool (0013): when it was written, mine, and the author's when our zones differ. */
+  clock?: { mine: string; theirs: string | null } | null;
 }) {
   const kind = rippleKind(block, timeZone);
   const annotation = draftFrom(block, timeZone).annotation;
@@ -39,16 +43,16 @@ export function BlockView({
       : shortDay(annotation.date)
     : shortDay(dayOf(block, timeZone));
 
-  return (
-    <button
-      type="button"
-      data-block={block.id}
-      onClick={onEdit}
-      aria-label="Edit this block"
-      className="flex w-full flex-col items-start gap-2 text-left"
-    >
+  const body = (
+    <>
       <span className="text-pool-500 flex items-center gap-2 text-[11px] tabular-nums">
         <span data-block-date>{label}</span>
+        {clock ? <span data-block-clock>· {clock.mine}</span> : null}
+        {clock?.theirs ? (
+          <span data-author-clock className="opacity-70">
+            · {clock.theirs}
+          </span>
+        ) : null}
         {block.category?.icon ? <span aria-hidden>{block.category.icon}</span> : null}
         {kind === 'timed' ? (
           <DurationChip minutes={rippleDurationMinutes(block, timeZone)} />
@@ -74,6 +78,24 @@ export function BlockView({
           />
         ),
       )}
+    </>
+  );
+  if (!onEdit) {
+    return (
+      <div data-block={block.id} data-read-only className="flex w-full flex-col items-start gap-2">
+        {body}
+      </div>
+    );
+  }
+  return (
+    <button
+      type="button"
+      data-block={block.id}
+      onClick={onEdit}
+      aria-label="Edit this block"
+      className="flex w-full flex-col items-start gap-2 text-left"
+    >
+      {body}
     </button>
   );
 }

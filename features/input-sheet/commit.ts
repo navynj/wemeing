@@ -105,13 +105,29 @@ async function categoryFor(
     splashId
       ? supabase
           .from('splashes')
-          .select('declared_lane_id, own_pool_id')
+          .select('declared_lane_id, own_pool_id, owner_id, pool_id, pool_lane_id')
           .eq('id', splashId)
           .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
   // Just mine (0014): no lane of mine, and no Day to fall into.
   if (splash?.own_pool_id) return 'none';
+  // A joint splash (0016, 0017): my lane linked to its pool lane when the
+  // link brings in (both, in), else none — never a lane I happened to pick.
+  if (splash && splash.owner_id === null && splash.pool_lane_id) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { data: link } = await supabase
+      .from('lane_mappings')
+      .select('my_category_id, direction')
+      .eq('user_id', user?.id ?? '')
+      .eq('pool_lane_id', splash.pool_lane_id)
+      .maybeSingle();
+    return link && (link.direction === 'both' || link.direction === 'in')
+      ? link.my_category_id
+      : 'none';
+  }
 
   const rule = laneRule(splash ? { declaredLaneId: splash.declared_lane_id } : null);
   return resolveCategory(chosen, rule, categories ?? []);

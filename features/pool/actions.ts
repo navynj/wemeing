@@ -367,40 +367,6 @@ export async function createJointSplash(input: z.infer<typeof Joint>): Promise<M
   return { ok: true, id: joint.id };
 }
 
-/** A ripple of mine on a joint splash (its page's add slot). */
-export async function addJointRipple(input: {
-  splashId: string;
-  poolId: string;
-  /** My lane linked to the joint splash's pool lane, or none (0016). */
-  myCategoryId: string | null;
-  body: string;
-}): Promise<Done> {
-  const parsed = z
-    .object({
-      splashId: z.uuid(),
-      poolId: z.uuid(),
-      myCategoryId: z.uuid().nullable(),
-      body: z.string().trim().min(1).max(8000),
-    })
-    .safeParse(input);
-  if (!parsed.success) return { ok: false, message: 'Write something first.' };
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, message: 'Sign in again to write this.' };
-  const { error } = await supabase.from('ripples').insert({
-    author_id: user.id,
-    category_id: parsed.data.myCategoryId,
-    note: parsed.data.body,
-    splash_id: parsed.data.splashId,
-  });
-  if (error) return { ok: false, message: said(error) };
-  revalidatePool(parsed.data.poolId);
-  revalidatePath(`/pool/${parsed.data.poolId}/splash/${parsed.data.splashId}`);
-  return { ok: true };
-}
-
 /** Delete a joint splash: only while every ripple on it is mine (0011). */
 export async function deleteJointSplash(poolId: string, splashId: string): Promise<Done> {
   if (!z.uuid().safeParse(splashId).success) return { ok: false, message: 'No such splash.' };

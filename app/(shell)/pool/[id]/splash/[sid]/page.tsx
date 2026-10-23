@@ -1,82 +1,99 @@
 import { notFound, redirect } from 'next/navigation';
 
 import { initialsOf } from '@/features/home/grid';
-import { PoolSplashPage } from '@/features/pool/pool-splash-page';
+import { audienceFor } from '@/features/pool/audience-for';
 import { originTag } from '@/features/pool/origin-tag';
-import { bringsIn } from '@/features/pool/direction';
-import { authorClock } from '@/features/pool/times';
-import { dayOf } from '@/lib/flow-key';
+import { SplashPage } from '@/features/splash/splash-page';
+import { summarizeSplash } from '@/features/splash/summary';
+import { compareFlow } from '@/lib/flow-key';
 import { signRippleMedia } from '@/lib/media';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
-import { getPoolView } from '@/lib/queries/pools';
+import { getMyLinks, getMyPlacements, getMyPoolNames, getPoolView } from '@/lib/queries/pools';
+import { WITH_CATEGORY, type RippleWithCategory } from '@/lib/queries/ripples';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
 
 /**
- * A post in a pool (H23): placed or joint, as the pool reads it. RLS
- * decides: a post not shared here, or a pool I am not in, is not found.
+ * A splash in a pool (H23, review): the same page as Home's — the same
+ * detail, the same in-place writing, the same split on a wide screen — read
+ * with the pool as context: its origin tag, every ripple's author, the way
+ * back to the pool. My own splash is mine to edit; a joint splash's title
+ * and icon are any member's, its ripples their authors'; someone else's
+ * splash is read only. RLS decides whether it exists for me at all.
  */
 export default async function PoolSplashRoute({ params }: PageProps<'/pool/[id]/splash/[sid]'>) {
   const supabase = await createClient();
   const profile = await getMyProfile(supabase);
   if (!profile) redirect('/sign-in');
   const { id, sid } = await params;
-  const [view, categories] = await Promise.all([
+
+  const [view, categories, links, pools, placements, ripples] = await Promise.all([
     getPoolView(supabase, id, profile.id),
     getMyCategories(supabase),
+    getMyLinks(supabase, profile.id),
+    getMyPoolNames(supabase, profile.id),
+    getMyPlacements(supabase, profile.id),
+    // Every ripple on it I may read, with my own lanes where they are mine.
+    supabase
+      .from('ripples')
+      .select(WITH_CATEGORY)
+      .eq('splash_id', sid)
+      .is('parent_ripple_id', null)
+      .returns<RippleWithCategory[]>(),
   ]);
-  const splash = view?.splashes.find((s) => s.id === sid);
-  if (!view || !splash) notFound();
+  const board = view?.splashes.find((s) => s.id === sid);
+  if (!view || !board) notFound();
+  if (ripples.error) throw ripples.error;
 
-  const initials = new Map(view.members.map((m) => [m.userId, m.initials]));
-  const zoneOf = new Map(view.members.map((m) => [m.userId, m.timeZone]));
-  const blocks = view.ripples
-    .filter((r) => r.splash_id === sid)
-    .sort((a, b) => a.created_at.localeCompare(b.created_at));
-  const photos = await Promise.all(
-    blocks.map((r) => (r.media.length > 0 ? signRippleMedia(r.id) : Promise.resolve([]))),
-  );
+  const joint = board.owner_id === null;
+  const author = board.owner_id ?? board.created_by;
+  const zone = view.members.find((m) => m.userId === author)?.timeZone ?? profile.timezone;
+  const blocks = [...ripples.data].sort((a, b) => compareFlow(a, b, zone));
+  const summary = summarizeSplash(board, blocks, zone, new Date());
+
+  const [photoLists, { data: lockRows }] = await Promise.all([
+    Promise.all(blocks.map((r) => (r.media.length > 0 ? signRippleMedia(r.id) : []))),
+    supabase
+      .from('ripple_audience')
+      .select('ripple_id')
+      .eq('target_type', 'lock')
+      .in(
+        'ripple_id',
+        blocks.length ? blocks.map((r) => r.id) : ['00000000-0000-0000-0000-000000000000'],
+      ),
+  ]);
+  const photos = Object.fromEntries(blocks.map((r, at) => [r.id, photoLists[at]]));
+
   const placement = view.placements.find((p) => p.splashId === sid);
-  const laneId = splash.pool_lane_id ?? placement?.poolLaneId ?? null;
+  const laneId = board.pool_lane_id ?? placement?.poolLaneId ?? null;
   const lane = view.lanes.find((l) => l.id === laneId) ?? null;
-  const joint = splash.owner_id === null;
-  const opener = joint ? view.members.find((m) => m.userId === splash.created_by) : undefined;
+  const initials = Object.fromEntries(view.members.map((m) => [m.userId, m.initials]));
 
   return (
-    <PoolSplashPage
-      poolId={id}
-      poolName={view.pool.name}
-      splashId={sid}
-      title={splash.title}
-      icon={splash.icon ?? lane?.icon ?? null}
-      lane={lane ? { icon: lane.icon, name: lane.name } : null}
-      joint={joint ? { openedBy: opener?.name ?? null } : null}
-      mine={splash.owner_id === profile.id}
-      entries={blocks.map((r, at) => ({
-        id: r.id,
-        initials: initials.get(r.author_id) ?? '',
-        note: r.note,
-        photos: photos[at],
-        day: dayOf({ ...r, splash: { declared_start: splash.declared_start } }, profile.timezone),
-        clock: authorClock(
-          r.started_at ?? r.created_at,
-          profile.timezone,
-          zoneOf.get(r.author_id) ?? profile.timezone,
-        ),
-      }))}
-      myInitials={initialsOf(profile.display_name)}
-      myLane={
-        // My linked lane only when the link brings in (both, in; 0017), else none.
-        joint
-          ? (() => {
-              const link = view.myLinks.find((l) => l.poolLaneId === splash.pool_lane_id);
-              return link && bringsIn(link.direction) ? link.myCategoryId : null;
-            })()
-          : null
-      }
-      categories={categories}
-      today={todayIn(profile.timezone)}
-      tag={lane ? originTag(view.pool.name, lane.icon, lane.name) : null}
-    />
+    // The same frame as Home's splash page: one column, two halves when wide.
+    <main className="mx-auto flex w-full max-w-xl flex-1 flex-col px-6 lg:max-w-5xl">
+      <SplashPage
+        splash={summary}
+        blocks={blocks}
+        photos={photos}
+        lockedIds={(lockRows ?? []).map((row) => row.ripple_id)}
+        categories={categories}
+        origin={{ label: view.pool.name, href: `/pool/${id}?top=${sid}` }}
+        timeZone={profile.timezone}
+        today={todayIn(profile.timezone)}
+        initials={initialsOf(profile.display_name)}
+        poolTags={lane ? [originTag(view.pool.name, lane.icon, lane.name)] : []}
+        audience={audienceFor({ board, summary, me: profile.id, links, pools, placements })}
+        pool={{
+          poolId: id,
+          me: profile.id,
+          scope: joint ? 'joint' : board.owner_id === profile.id ? 'mine' : 'theirs',
+          initialsOf: initials,
+          laneChip: lane ? { icon: lane.icon, name: lane.name } : null,
+          canDeleteJoint: joint && blocks.every((r) => r.author_id === profile.id),
+          zoneOf: Object.fromEntries(view.members.map((m) => [m.userId, m.timeZone])),
+        }}
+      />
+    </main>
   );
 }

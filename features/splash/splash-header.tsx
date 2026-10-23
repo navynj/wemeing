@@ -41,6 +41,10 @@ export function SplashHeader({
   onDelete,
   audience = null,
   onOpenEdit = null,
+  editLevel = 'all',
+  canPin = true,
+  canDelete = true,
+  laneChip = undefined,
 }: {
   splash: SplashSummary;
   categories: MyCategory[];
@@ -52,6 +56,16 @@ export function SplashHeader({
   audience?: ReactNode;
   /** The pencil (review): only where I can edit this splash. */
   onOpenEdit?: (() => void) | null;
+  /**
+   * What may be edited in place (review): all of it on my own splash; the
+   * title and icon on a joint splash (any current member); nothing on
+   * someone else's.
+   */
+  editLevel?: 'all' | 'title' | 'none';
+  canPin?: boolean;
+  canDelete?: boolean;
+  /** In a pool: the pool lane's chip in place of my lane tags (others' lanes are theirs). */
+  laneChip?: { icon: string | null; name: string } | null;
 }) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(splash.title);
@@ -87,7 +101,15 @@ export function SplashHeader({
       <div className="flex items-start justify-between gap-3">
         {/* Lane tags: the declared lane first, then every lane the blocks
             took (H21f). Tapping them edits the declared one. */}
-        {editingLane ? (
+        {editLevel !== 'all' ? (
+          <span data-lane-tags className="flex min-h-5 min-w-0 flex-1 flex-wrap items-center gap-1">
+            {laneChip ? (
+              <OutlineChip icon={laneChip.icon} name={laneChip.name} />
+            ) : (
+              tags.map((lane) => <OutlineChip key={lane.id} icon={lane.icon} name={lane.name} />)
+            )}
+          </span>
+        ) : editingLane ? (
           <div className="flex min-w-0 flex-1 flex-col gap-2">
             <LaneChips
               categories={categories}
@@ -112,7 +134,7 @@ export function SplashHeader({
             aria-label="Edit the declared lane"
             data-lane-tags
             onClick={() => setEditingLane(true)}
-            className="flex min-h-5 flex-wrap items-center gap-1"
+            className="flex min-h-5 min-w-0 flex-1 flex-wrap items-center gap-1"
           >
             {tags.map((lane) => (
               <OutlineChip key={lane.id} icon={lane.icon} name={lane.name} />
@@ -136,96 +158,118 @@ export function SplashHeader({
           </button>
         ) : null}
 
-        <div className="relative shrink-0">
-          <button
-            type="button"
-            aria-label="More"
-            aria-expanded={menu !== 'closed'}
-            onClick={() => setMenu(menu === 'closed' ? 'open' : 'closed')}
-            className="text-pool-500 flex h-8 w-8 items-center justify-center"
-          >
-            <MoreHorizontal aria-hidden size={18} />
-          </button>
-
-          {menu === 'open' ? (
-            <ul
-              role="menu"
-              data-header-menu
-              className="border-pool-100 absolute top-full right-0 z-10 flex w-52 flex-col rounded-xl border bg-white py-1 text-sm shadow-lg"
+        {canPin || canDelete ? (
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              aria-label="More"
+              aria-expanded={menu !== 'closed'}
+              onClick={() => setMenu(menu === 'closed' ? 'open' : 'closed')}
+              className="text-pool-500 flex h-8 w-8 items-center justify-center"
             >
-              <li>
-                <button
-                  type="button"
-                  role="menuitem"
-                  disabled={pending}
-                  onClick={() => {
-                    setMenu('closed');
-                    run(() => onPin(splash.pinnedAt === null));
-                  }}
-                  className="text-ink hover:bg-pool-100 flex w-full items-center gap-2 px-3 py-2 text-left"
-                >
-                  {splash.pinnedAt ? (
-                    <PinOff aria-hidden size={14} />
-                  ) : (
-                    <Pin aria-hidden size={14} />
-                  )}
-                  {splash.pinnedAt ? 'Unpin' : 'Pin'}
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => setMenu('delete')}
-                  className="text-pool-500 hover:bg-pool-100 flex w-full items-center gap-2 px-3 py-2 text-left"
-                >
-                  Delete
-                </button>
-              </li>
-            </ul>
-          ) : null}
+              <MoreHorizontal aria-hidden size={18} />
+            </button>
 
-          {menu === 'delete' ? (
-            <div
-              role="alertdialog"
-              className="border-pool-100 absolute top-full right-0 z-10 flex w-60 flex-col gap-2 rounded-xl border bg-white px-3 py-2 text-sm shadow-lg"
-            >
-              <p data-delete-confirm className="text-pool-500">
-                Deletes the post and its {splash.count} block{splash.count === 1 ? '' : 's'}.
-              </p>
-              <span className="flex gap-3">
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => run(onDelete)}
-                  className="text-main-900 font-medium disabled:opacity-50"
-                >
-                  Delete
-                </button>
-                <button type="button" onClick={() => setMenu('closed')} className="text-pool-500">
-                  Keep
-                </button>
-              </span>
-            </div>
-          ) : null}
-        </div>
+            {menu === 'open' ? (
+              <ul
+                role="menu"
+                data-header-menu
+                className="border-pool-100 absolute top-full right-0 z-10 flex w-52 flex-col rounded-xl border bg-white py-1 text-sm shadow-lg"
+              >
+                {canPin ? (
+                  <li>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={pending}
+                      onClick={() => {
+                        setMenu('closed');
+                        run(() => onPin(splash.pinnedAt === null));
+                      }}
+                      className="text-ink hover:bg-pool-100 flex w-full items-center gap-2 px-3 py-2 text-left"
+                    >
+                      {splash.pinnedAt ? (
+                        <PinOff aria-hidden size={14} />
+                      ) : (
+                        <Pin aria-hidden size={14} />
+                      )}
+                      {splash.pinnedAt ? 'Unpin' : 'Pin'}
+                    </button>
+                  </li>
+                ) : null}
+                {canDelete ? (
+                  <li>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => setMenu('delete')}
+                      className="text-pool-500 hover:bg-pool-100 flex w-full items-center gap-2 px-3 py-2 text-left"
+                    >
+                      Delete
+                    </button>
+                  </li>
+                ) : null}
+              </ul>
+            ) : null}
+
+            {menu === 'delete' ? (
+              <div
+                role="alertdialog"
+                className="border-pool-100 absolute top-full right-0 z-10 flex w-60 flex-col gap-2 rounded-xl border bg-white px-3 py-2 text-sm shadow-lg"
+              >
+                <p data-delete-confirm className="text-pool-500">
+                  Deletes the post and its {splash.count} block{splash.count === 1 ? '' : 's'}.
+                </p>
+                <span className="flex gap-3">
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => run(onDelete)}
+                    className="text-main-900 font-medium disabled:opacity-50"
+                  >
+                    Delete
+                  </button>
+                  <button type="button" onClick={() => setMenu('closed')} className="text-pool-500">
+                    Keep
+                  </button>
+                </span>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {/* The title, edited where it is read. */}
       <div className="flex items-start gap-3">
         {/* The post's own icon, edited in place (0008): one glyph, saved as it
           is chosen; emptied, the lane's emoji stands for the post again. */}
-        <EmojiInput
-          value={icon}
-          onChange={(next) => {
-            setIcon(next);
-            if ((next || null) !== splash.icon) run(() => onEdit(header({ icon: next || null })));
-          }}
-          label="Icon"
-          placeholder={categories.find((c) => c.id === splash.laneIds[0])?.icon ?? '🙂'}
-        />
+        {editLevel === 'none' ? (
+          splash.icon ? (
+            <span aria-hidden className="text-3xl/none">
+              {splash.icon}
+            </span>
+          ) : null
+        ) : (
+          <EmojiInput
+            value={icon}
+            onChange={(next) => {
+              setIcon(next);
+              if ((next || null) !== splash.icon) run(() => onEdit(header({ icon: next || null })));
+            }}
+            label="Icon"
+            placeholder={categories.find((c) => c.id === splash.laneIds[0])?.icon ?? '🙂'}
+          />
+        )}
         <div className="min-w-0 flex-1">
-          {editingTitle ? (
+          {editLevel === 'none' ? (
+            <h1 data-splash-title className={`text-ink ${DETAIL_TITLE_CLASS}`}>
+              {splash.title.trim() ? (
+                splash.title
+              ) : (
+                <span className="opacity-30">{splash.ghostTitle ?? 'Untitled'}</span>
+              )}
+            </h1>
+          ) : editingTitle ? (
             <input
               value={title}
               autoFocus
@@ -274,7 +318,13 @@ export function SplashHeader({
       </span>
 
       {/* The range: declared (its own to edit), else derived from the blocks. */}
-      {editingDate ? (
+      {editLevel !== 'all' ? (
+        displayRange ? (
+          <span data-range className="text-pool-500 text-xs tabular-nums">
+            {formatRange(displayRange)}
+          </span>
+        ) : null
+      ) : editingDate ? (
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <input
             type="date"

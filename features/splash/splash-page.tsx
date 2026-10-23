@@ -14,6 +14,9 @@ import type { RippleWithCategory } from '@/lib/queries/ripples';
 import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction, type ActionOutcome } from '@/lib/use-optimistic-action';
 
+import { deleteJointSplash } from '@/features/pool/actions';
+import { authorClock } from '@/features/pool/times';
+
 import { adoptRipple, deleteSplash, setSplashPinned, updateSplashHeader } from './actions';
 import { BlockEditor, type BlockDraft, type EditorTarget } from './block-editor';
 import { BlockView } from './block';
@@ -23,6 +26,26 @@ import { laneTags, type SplashSummary } from './summary';
 
 /** Where the page came from, for the back chip. */
 export type Origin = { label: string; href: string };
+
+/**
+ * The page read inside a pool (review): the same page as Home's, with each
+ * ripple's author, and edits by right — my own splash fully; a joint
+ * splash's title and icon by any current member, ripples by their authors;
+ * someone else's splash read only. Ripples I did not write are read only.
+ */
+export type PoolContext = {
+  poolId: string;
+  me: string;
+  scope: 'mine' | 'joint' | 'theirs';
+  /** Initials by author, for every ripple's avatar. */
+  initialsOf: Record<string, string>;
+  /** The pool lane's chip, in place of my lane tags. */
+  laneChip: { icon: string | null; name: string } | null;
+  /** A joint splash goes only while every ripple on it is mine (0011). */
+  canDeleteJoint: boolean;
+  /** Each author's zone (0013): a ripple's time shows in mine, theirs after it when they differ. */
+  zoneOf: Record<string, string>;
+};
 
 /** A block action's result, read as a plain outcome: the dormant refusals have no surface here. */
 function outcome(result: CommitResult): ActionOutcome {
@@ -64,6 +87,7 @@ export function SplashPage({
   initials = '',
   audience = null,
   poolTags = [],
+  pool = null,
 }: {
   splash: SplashSummary;
   /** Oldest first. */
@@ -80,7 +104,15 @@ export function SplashPage({
   audience?: ReactNode;
   /** Where it is or was in a pool (0015): "<Pool> · <emoji> <pool lane>". */
   poolTags?: string[];
+  /** Read inside a pool (review). */
+  pool?: PoolContext | null;
 }) {
+  // Mine to edit: everything off a pool; in one, my own ripples only.
+  const editable = (block: RippleWithCategory): boolean => !pool || block.author_id === pool.me;
+  const scope = pool?.scope ?? 'mine';
+  // A joint splash's ripples take my linked lane or none, decided on the
+  // server (0016, 0017): no lane chips, as on a Just-mine splash.
+  const laneless = splash.ownPoolId !== null || scope === 'joint';
   const router = useRouter();
   const { markDeleted, openEdit, pendingEdits } = useInputSheet();
   const [editor, setEditor] = useState<EditorTarget | null>(null);
@@ -174,7 +206,7 @@ export function SplashPage({
     const placeholder: RippleWithCategory = shaped(
       {
         id: draft.id,
-        author_id: '',
+        author_id: pool?.me ?? '',
         category_id: draft.categoryId ?? '',
         note: null,
         media: [],
@@ -275,17 +307,26 @@ export function SplashPage({
           onEdit={editHeader}
           onPin={pin}
           audience={audience}
+          editLevel={scope === 'mine' ? 'all' : scope === 'joint' ? 'title' : 'none'}
+          canPin={scope !== 'theirs'}
+          canDelete={scope === 'mine' || (scope === 'joint' && pool!.canDeleteJoint)}
+          laneChip={pool ? pool.laneChip : undefined}
           // A post of one has no row to edit yet; it gets one from the header itself.
-          onOpenEdit={page.splash.orphan ? null : () => openEdit(page.splash.id)}
+          onOpenEdit={
+            page.splash.orphan || scope === 'theirs' ? null : () => openEdit(page.splash.id)
+          }
           onDelete={async () => {
             // Gone the moment it is asked for, from every surface (CLAUDE.md,
             // the principle): back where it came from, and the rows follow. A
             // lone block is its own post, so deleting it deletes the block.
             markDeleted(page.splash.id);
             router.push(origin.href);
-            const result = page.splash.orphan
-              ? await deleteRipple(page.splash.id)
-              : await deleteSplash(page.splash.id);
+            const result =
+              scope === 'joint'
+                ? await deleteJointSplash(pool!.poolId, page.splash.id)
+                : page.splash.orphan
+                  ? await deleteRipple(page.splash.id)
+                  : await deleteSplash(page.splash.id);
             if (result.ok) router.refresh();
           }}
         />
@@ -314,6 +355,8 @@ export function SplashPage({
             initials={initials}
             entries={page.blocks.map((block) => ({
               id: block.id,
+              // Each ripple keeps its author in a pool (H23).
+              initials: pool ? (pool.initialsOf[block.author_id] ?? '') : undefined,
               body: (
                 <div id={`block-${block.id}`} data-block-entry={block.id} className="pb-2">
                   {editor?.kind === 'edit' && editor.block.id === block.id ? (
@@ -321,7 +364,7 @@ export function SplashPage({
                       target={editor}
                       categories={categories}
                       defaultLaneId={page.splash.declaredLaneId}
-                      laneless={page.splash.ownPoolId !== null}
+                      laneless={laneless}
                       timeZone={timeZone}
                       today={today}
                       onSubmit={(draft) => saveBlock(editor, draft)}
@@ -333,14 +376,26 @@ export function SplashPage({
                     <BlockView
                       block={block}
                       photos={photos[block.id] ?? []}
+                      clock={
+                        pool
+                          ? authorClock(
+                              block.started_at ?? block.created_at,
+                              timeZone,
+                              pool.zoneOf[block.author_id] ?? timeZone,
+                            )
+                          : null
+                      }
                       timeZone={timeZone}
                       today={today}
-                      onEdit={() =>
-                        setEditor({
-                          kind: 'edit',
-                          block,
-                          locked: page.lockedIds.includes(block.id),
-                        })
+                      onEdit={
+                        editable(block)
+                          ? () =>
+                              setEditor({
+                                kind: 'edit',
+                                block,
+                                locked: page.lockedIds.includes(block.id),
+                              })
+                          : undefined
                       }
                     />
                   )}
@@ -352,34 +407,37 @@ export function SplashPage({
 
         {/* The add slot: the seat of the next block, at the bottom where the
           story continues. The ring ripples as the one invitation (law 3). */}
-        <div data-add-slot className="border-pool-100 mt-2 border-t pt-4 pb-10">
-          {editor?.kind === 'add' ? (
-            <BlockEditor
-              target={editor}
-              categories={categories}
-              defaultLaneId={page.splash.declaredLaneId}
-              laneless={page.splash.ownPoolId !== null}
-              timeZone={timeZone}
-              today={today}
-              onSubmit={(draft) => saveBlock(editor, draft)}
-              onDelete={() => setEditor(null)}
-              onLock={() => {}}
-              onCancel={() => setEditor(null)}
-            />
-          ) : (
-            <div className="flex items-center gap-3">
-              <GhostRing label="Write the next block" onClick={startBlock} />
-              <button
-                type="button"
-                onClick={startBlock}
-                className="text-main-900 text-base font-medium"
-                style={{ opacity: 0.3 }}
-              >
-                Drop your words here
-              </button>
-            </div>
-          )}
-        </div>
+        {/* Someone else's splash takes no words of mine (review). */}
+        {scope === 'theirs' ? null : (
+          <div data-add-slot className="border-pool-100 mt-2 border-t pt-4 pb-10">
+            {editor?.kind === 'add' ? (
+              <BlockEditor
+                target={editor}
+                categories={categories}
+                defaultLaneId={page.splash.declaredLaneId}
+                laneless={laneless}
+                timeZone={timeZone}
+                today={today}
+                onSubmit={(draft) => saveBlock(editor, draft)}
+                onDelete={() => setEditor(null)}
+                onLock={() => {}}
+                onCancel={() => setEditor(null)}
+              />
+            ) : (
+              <div className="flex items-center gap-3">
+                <GhostRing label="Write the next block" onClick={startBlock} />
+                <button
+                  type="button"
+                  onClick={startBlock}
+                  className="text-main-900 text-base font-medium"
+                  style={{ opacity: 0.3 }}
+                >
+                  Drop your words here
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

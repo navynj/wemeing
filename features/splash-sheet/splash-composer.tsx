@@ -17,12 +17,12 @@ import {
   useMediaAttach,
 } from '@/features/input-sheet/media-field';
 import { placeCard, type Card } from '@/features/home/grid';
-import { createJointSplash, placeNewSplash } from '@/features/pool/actions';
+import { createJointSplash, linkLane, placeNewSplash } from '@/features/pool/actions';
 import { defaultAudience, type AudienceLink } from '@/features/pool/audience';
 import { AudienceChip } from '@/features/pool/audience-sheet';
 import type { PoolScope } from '@/features/pool/compose-scope';
 import { poolSplashHref } from '@/features/pool/pool-cards';
-import { PoolLanePicker, type PoolPick } from '@/features/pool/pool-lane-picker';
+import { PoolLanePicker, type JointLane, type PoolPick } from '@/features/pool/pool-lane-picker';
 import { dropSplash } from '@/features/splash/actions';
 import { summarizeSplash, type SplashSummary } from '@/features/splash/summary';
 import type { MyCategory } from '@/lib/queries/profile';
@@ -90,17 +90,23 @@ export function SplashComposer({
   const [icon, setIcon] = useState('');
   const [bodyText, setBodyText] = useState('');
   const [laneId, setLaneId] = useState<string | null>(null);
-  // From a pool: a linked pool lane, or a joint splash on one (H23).
+  // From a pool: a pool lane (a joint splash), or one of my linked lanes (H23).
   const [pick, setPick] = useState<PoolPick>(null);
-  // My lane for my first ripple on a joint splash whose pool lane I left unlinked.
-  const [jointMyLane, setJointMyLane] = useState<string | null>(null);
+  // My lane for my ripple on a joint splash whose pool lane I left unlinked,
+  // and whether to link it on drop.
+  const freshJointLane: JointLane = { myCategoryId: null, linkIt: true };
+  const [jointLane, setJointLane] = useState<JointLane>(freshJointLane);
   // Edited by hand, the audience stays as set; untouched, it follows the lane.
   const [audienceEdited, setAudienceEdited] = useState<string[] | null>(null);
   const joint = pick?.kind === 'joint';
   // Only pools where the lane is linked can take the post (C5), edited or not.
   const linkedHere = defaultAudience(laneId, links);
-  const audience = joint
-    ? []
+  // From a pool there is no audience to choose: what is written there is in
+  // that pool, and only there.
+  const audience = pool
+    ? joint
+      ? []
+      : [pool.poolId]
     : (audienceEdited ?? linkedHere).filter((poolId) => linkedHere.includes(poolId));
   const jointLink = joint
     ? (pool?.lanes.find((l) => l.id === pick.poolLaneId)?.myCategoryId ?? null)
@@ -130,9 +136,8 @@ export function SplashComposer({
   const poolReady =
     !pool ||
     (joint
-      ? pick.poolLaneId !== null &&
-        (title.length > 0 || body.length > 0) &&
-        (body.length === 0 || (jointLink ?? jointMyLane) !== null)
+      ? (title.length > 0 || body.length > 0) &&
+        (body.length === 0 || (jointLink ?? jointLane.myCategoryId) !== null)
       : laneId !== null);
   const annotationOk = !annotation || annotationVerdict(annotation) === 'ok';
 
@@ -220,7 +225,12 @@ export function SplashComposer({
               : { author: initials }),
           }
         : null;
-    const myJointLane = jointLink ?? jointMyLane;
+    const myJointLane = jointLink ?? jointLane.myCategoryId;
+    // "Link it": the pool lane takes the lane I filed my ripple under.
+    const linkFirst =
+      joint && !jointLink && jointLane.linkIt && jointLane.myCategoryId
+        ? jointLane.myCategoryId
+        : null;
 
     onDrop({
       splash,
@@ -228,17 +238,26 @@ export function SplashComposer({
       note: body.length > 0 ? body : null,
       ...(pool && poolCard ? { pool: { poolId: pool.poolId, card: poolCard } } : {}),
       commit: joint
-        ? () =>
-            createJointSplash({
+        ? async () => {
+            if (linkFirst) {
+              const linked = await linkLane({
+                poolId: pool!.poolId,
+                poolLaneId: pick.poolLaneId,
+                myCategoryId: linkFirst,
+              });
+              if (!linked.ok) return linked;
+            }
+            return createJointSplash({
               id,
               poolId: pool!.poolId,
-              poolLaneId: pick.poolLaneId!,
+              poolLaneId: pick.poolLaneId,
               title,
               icon: icon || null,
               body,
               myCategoryId: myJointLane,
               occurredOn: a?.date ?? null,
-            })
+            });
+          }
         : async () => {
             const made = await dropSplash(input);
             if (!made.ok || shared.length === 0) return made;
@@ -254,7 +273,7 @@ export function SplashComposer({
     setBodyText('');
     setLaneId(null);
     setPick(null);
-    setJointMyLane(null);
+    setJointLane(freshJointLane);
     setAudienceEdited(null);
     setAnnotation(fresh());
     setMediaPaths([]);
@@ -319,62 +338,50 @@ export function SplashComposer({
       />
 
       {/* The declared lane: where every block of this post starts (H21f).
-          From a pool, its lanes as I linked them, and Joint splash (H23). */}
-      {/* From a pool its two-line lane chips need the row's width; the chip
-          takes its own line under them. */}
-      <div className={pool ? 'flex flex-col items-start gap-3' : 'flex items-start gap-2'}>
-        <div className="w-full min-w-0 flex-1">
-          {pool ? (
-            <PoolLanePicker
-              scope={pool}
-              categories={categories}
-              pick={pick}
-              onPick={(next) => {
-                setPick(next);
-                setLaneId(next?.kind === 'lane' ? next.myCategoryId : null);
-              }}
-            />
-          ) : (
+          From a pool: Pool lanes | My lanes, and no audience (H23). */}
+      {pool ? (
+        <PoolLanePicker
+          scope={pool}
+          categories={categories}
+          pick={pick}
+          onPick={(next) => {
+            setPick(next);
+            setLaneId(next?.kind === 'lane' ? next.myCategoryId : null);
+            setJointLane(freshJointLane);
+          }}
+          jointLane={jointLane}
+          onJointLane={setJointLane}
+        />
+      ) : (
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
             <LaneChips
               categories={categories}
               selectedId={laneId}
               onSelect={setLaneId}
               surface="white"
             />
-          )}
+          </div>
+          {/* Where it is shared (H23): only from Home. */}
+          {pools.length > 0 ? (
+            <AudienceChip
+              shared={audience}
+              linked={pools
+                .filter((p) => linkedHere.includes(p.id))
+                .map((p) => ({ poolId: p.id, name: p.name }))}
+              unlinked={pools
+                .filter((p) => !linkedHere.includes(p.id))
+                .map((p) => ({ poolId: p.id, name: p.name }))}
+              onToggle={(poolId, on) => {
+                const base = audienceEdited ?? linkedHere;
+                setAudienceEdited(
+                  on ? [...new Set([...base, poolId])] : base.filter((id) => id !== poolId),
+                );
+              }}
+            />
+          ) : null}
         </div>
-        {/* Where it is shared (H23); a joint splash belongs to its pool and has none. */}
-        {pools.length > 0 && !joint ? (
-          <AudienceChip
-            shared={audience}
-            linked={pools
-              .filter((p) => linkedHere.includes(p.id))
-              .map((p) => ({ poolId: p.id, name: p.name }))}
-            unlinked={pools
-              .filter((p) => !linkedHere.includes(p.id))
-              .map((p) => ({ poolId: p.id, name: p.name }))}
-            onToggle={(poolId, on) => {
-              const base = audienceEdited ?? linkedHere;
-              setAudienceEdited(
-                on ? [...new Set([...base, poolId])] : base.filter((id) => id !== poolId),
-              );
-            }}
-          />
-        ) : null}
-      </div>
-      {joint && pick.poolLaneId && !jointLink && body ? (
-        <div className="flex flex-col gap-2">
-          <span className="text-pool-500 text-xs">
-            That lane is not linked to yours. File your ripple under
-          </span>
-          <LaneChips
-            categories={categories}
-            selectedId={jointMyLane}
-            onSelect={setJointMyLane}
-            surface="white"
-          />
-        </div>
-      ) : null}
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <AnnotationControl annotation={annotation} today={today} onChange={setAnnotation} />

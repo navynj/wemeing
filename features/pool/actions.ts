@@ -405,3 +405,33 @@ export async function deleteJointSplash(poolId: string, splashId: string): Promi
   revalidatePool(poolId);
   return { ok: true };
 }
+
+/**
+ * "Link it" (compose from a pool): one pool lane to one of my lanes, made on
+ * the spot when I write a joint ripple on a pool lane I had not linked. RLS
+ * holds the rules — my lane, a pool I am in, one link per pool lane.
+ */
+export async function linkLane(input: {
+  poolId: string;
+  poolLaneId: string;
+  myCategoryId: string;
+}): Promise<Done> {
+  const parsed = z
+    .object({ poolId: z.uuid(), poolLaneId: z.uuid(), myCategoryId: z.uuid() })
+    .safeParse(input);
+  if (!parsed.success) return { ok: false, message: 'That link is not valid.' };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: 'Sign in again to link this.' };
+  const { error } = await supabase.from('lane_mappings').insert({
+    user_id: user.id,
+    pool_id: parsed.data.poolId,
+    pool_lane_id: parsed.data.poolLaneId,
+    my_category_id: parsed.data.myCategoryId,
+  });
+  if (error) return { ok: false, message: said(error) };
+  revalidatePool(parsed.data.poolId);
+  return { ok: true };
+}

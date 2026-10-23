@@ -10,12 +10,21 @@ vi.mock('@/features/splash/actions', () => ({
   },
 }));
 const placed: { splashId: string; pools: string[] }[] = [];
+const joints: Record<string, unknown>[] = [];
+const linked: Record<string, unknown>[] = [];
 vi.mock('@/features/pool/actions', () => ({
   placeNewSplash: (splashId: string, pools: string[]) => {
     placed.push({ splashId, pools });
     return Promise.resolve({ ok: true });
   },
-  createJointSplash: () => Promise.resolve({ ok: true, id: 'j' }),
+  createJointSplash: (input: Record<string, unknown>) => {
+    joints.push(input);
+    return Promise.resolve({ ok: true, id: input.id });
+  },
+  linkLane: (input: Record<string, unknown>) => {
+    linked.push(input);
+    return Promise.resolve({ ok: true });
+  },
 }));
 const pathname = '/';
 vi.mock('next/navigation', () => ({
@@ -30,6 +39,7 @@ vi.mock('@/lib/supabase/client', () => ({
   }),
 }));
 
+import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
 import {
   SHEET_MAX_HEIGHT,
   SplashSheet,
@@ -73,6 +83,8 @@ const LINKS = [
 beforeEach(() => {
   drops.length = 0;
   placed.length = 0;
+  joints.length = 0;
+  linked.length = 0;
   handoffs.length = 0;
   window.URL.createObjectURL = () => 'blob:preview';
 });
@@ -345,5 +357,114 @@ describe('the Audience chip (H23)', () => {
     fireEvent.click(view.drop());
     await waitFor(() => expect(placed).toHaveLength(1));
     expect(placed[0].pools.sort()).toEqual(['p-crew', 'p-ours']);
+  });
+});
+
+describe('compose from a pool (H23)', () => {
+  // Our Pool's lanes: Trips is linked to my Place, Notes to nothing.
+  const SCOPE = {
+    poolId: 'p-ours',
+    poolName: 'Our Pool',
+    lanes: [
+      { id: 'pl-trips', name: 'Trips', icon: '🏕', myCategoryId: 'c-place' },
+      { id: 'pl-notes', name: 'Notes', icon: '📓', myCategoryId: null },
+    ],
+  };
+  function poolSheet() {
+    const onDrop = vi.fn((drop: DropHandoff) => void drop.commit());
+    const view = render(
+      <InputSheetProvider>
+        <SplashSheet
+          context={{
+            categories: LANES,
+            timeZone: TZ,
+            today: TODAY,
+            links: LINKS,
+            pools: POOLS,
+            initials: 'YL',
+          }}
+          pool={SCOPE}
+          onClose={() => {}}
+          onDrop={onDrop}
+        />
+      </InputSheetProvider>,
+    );
+    return { ...view, onDrop, drop: () => view.getByText('Drop') as HTMLButtonElement };
+  }
+
+  it('opens on Pool lanes and drops a joint splash on the chosen pool lane', async () => {
+    const view = poolSheet();
+    expect(view.getByRole('tab', { name: 'Pool lanes' }).getAttribute('aria-selected')).toBe(
+      'true',
+    );
+    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Rematch Friday' } });
+    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-trips"]')!);
+    fireEvent.click(view.drop());
+    await waitFor(() => expect(joints).toHaveLength(1));
+    // The linked lane files my ripple; nothing is placed, nothing linked.
+    expect(joints[0]).toMatchObject({
+      poolId: 'p-ours',
+      poolLaneId: 'pl-trips',
+      myCategoryId: 'c-place',
+    });
+    expect(placed).toEqual([]);
+    expect(linked).toEqual([]);
+  });
+
+  it('lists only my lanes linked to this pool, and places my splash here', async () => {
+    const view = poolSheet();
+    fireEvent.click(view.getByRole('tab', { name: 'My lanes' }));
+    const offered = [...view.container.querySelectorAll('[data-pick-my-lane]')].map((el) =>
+      el.getAttribute('data-pick-my-lane'),
+    );
+    // Mood is linked in pools, but not in this one: not offered.
+    expect(offered).toEqual(['c-place']);
+    expect(view.getByText('→ Trips')).toBeTruthy();
+    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Twin Falls' } });
+    fireEvent.click(view.container.querySelector('[data-pick-my-lane="c-place"]')!);
+    fireEvent.click(view.drop());
+    await waitFor(() => expect(placed).toHaveLength(1));
+    expect(drops[0]).toMatchObject({ declaredLaneId: 'c-place' });
+    expect(placed[0].pools).toEqual(['p-ours']);
+    expect(joints).toEqual([]);
+  });
+
+  it('has no Audience chip', () => {
+    const view = poolSheet();
+    expect(view.container.querySelector('[data-audience-chip]')).toBeNull();
+    fireEvent.click(view.getByRole('tab', { name: 'My lanes' }));
+    fireEvent.click(view.container.querySelector('[data-pick-my-lane="c-place"]')!);
+    expect(view.container.querySelector('[data-audience-chip]')).toBeNull();
+  });
+
+  it('links an unlinked pool lane on drop when "Link it" is checked', async () => {
+    const view = poolSheet();
+    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Chapter 3' } });
+    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-notes"]')!);
+    expect(view.getByText('Not linked to your lanes')).toBeTruthy();
+    const box = view.container.querySelector('[data-link-it]') as HTMLInputElement;
+    expect(box.checked).toBe(true);
+    // No lane of mine yet: the drop waits for one.
+    expect(view.drop().disabled).toBe(true);
+    fireEvent.change(view.getByLabelText('Your lane for this ripple'), {
+      target: { value: 'c-mood' },
+    });
+    fireEvent.click(view.drop());
+    await waitFor(() => expect(joints).toHaveLength(1));
+    expect(linked).toEqual([{ poolId: 'p-ours', poolLaneId: 'pl-notes', myCategoryId: 'c-mood' }]);
+    expect(joints[0]).toMatchObject({ poolLaneId: 'pl-notes', myCategoryId: 'c-mood' });
+  });
+
+  it('does not link when "Link it" is unchecked', async () => {
+    const view = poolSheet();
+    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Chapter 4' } });
+    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-notes"]')!);
+    fireEvent.change(view.getByLabelText('Your lane for this ripple'), {
+      target: { value: 'c-mood' },
+    });
+    fireEvent.click(view.container.querySelector('[data-link-it]')!);
+    fireEvent.click(view.drop());
+    await waitFor(() => expect(joints).toHaveLength(1));
+    expect(linked).toEqual([]);
   });
 });

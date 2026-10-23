@@ -39,6 +39,13 @@ jobs:
             if [ -z "${!name}" ]; then echo "✖ $name is not set"; missing=1; fi
           done
           case "$BACKUP_AGE_PUBLIC_KEY" in age1*) ;; *) echo "✖ BACKUP_AGE_PUBLIC_KEY is not an age public key"; missing=1 ;; esac
+          # The direct connection (db.<ref>.supabase.co) is IPv6 only, and
+          # GitHub's runners have no IPv6: the Session pooler is required.
+          # Only the verdict is printed, never the host.
+          if python3 -c 'import os, sys, urllib.parse; h = urllib.parse.urlsplit(os.environ["SUPABASE_DB_URL"]).hostname or ""; sys.exit(0 if h.startswith("db.") and h.endswith(".supabase.co") else 1)'; then
+            echo "✖ SUPABASE_DB_URL is the direct connection (IPv6 only). Use Connect → Session pooler (port 5432)."
+            missing=1
+          fi
           exit $missing
 
       - name: Mask the database password on its own

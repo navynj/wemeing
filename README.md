@@ -1,4 +1,4 @@
-# WeMeing
+# Weming
 
 A one-line diary that assembles itself. While you write it, your presence shows on the
 surface for a few close friends.

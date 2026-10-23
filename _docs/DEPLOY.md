@@ -1,4 +1,4 @@
-# Shipping WeMeing
+# Shipping Weming
 
 P1's last session: cloud Supabase, Vercel, during.today. Written as a
 checklist because it is done once and then referred to when something breaks.

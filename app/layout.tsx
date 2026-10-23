@@ -16,11 +16,11 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: 'WeMeing',
+  title: 'Weming',
   description: 'A one-line diary that assembles itself.',
   // Installed on a phone it is an app, so it gets an app's name and an
   // app's status bar rather than a browser's.
-  appleWebApp: { capable: true, title: 'WeMeing', statusBarStyle: 'default' },
+  appleWebApp: { capable: true, title: 'Weming', statusBarStyle: 'default' },
   icons: { apple: '/apple-touch-icon.png' },
   // Next emits only the modern `mobile-web-app-capable`. iOS before 16.4 reads
   // the Apple-prefixed name and nothing else, and 16.4+ ignores it in favour

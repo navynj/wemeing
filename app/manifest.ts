@@ -12,8 +12,8 @@ import type { MetadataRoute } from 'next';
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'WeMeing',
-    short_name: 'WeMeing',
+    name: 'Weming',
+    short_name: 'Weming',
     description: 'A one-line diary that assembles itself.',
     start_url: '/',
     display: 'standalone',

@@ -1,6 +1,6 @@
 /**
  * Day boundaries are the author's, not the server's: `occurred_on` is a
- * wall-clock date in the author's timezone, and During is used across
+ * wall-clock date in the author's timezone, and WeMeing is used across
  * Vancouver and Korea from week one.
  */
 

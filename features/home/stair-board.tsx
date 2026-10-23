@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useId, useRef } from 'react';
 import { motion, useTransform, type PanInfo } from 'motion/react';
 
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
@@ -32,7 +32,7 @@ export const STACK_PX = CARD_PX + DOWN * STEP_PX;
  */
 const DOWN_TINTS = [0, 0.08, 0.04, 0.02];
 const FROST = [235, 235, 251] as const;
-const UP_FILL = 0.4;
+const UP_FILL = 0.5;
 const UP_INK = 0.6;
 
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
@@ -253,6 +253,9 @@ function Step({
 
   const onTop = to === 0;
   const stair = to === 0 ? 'top' : to < 0 ? 'up' : 'down';
+  // A moving card keeps the face it had until it lands: a card sliding up
+  // out of the top keeps its words, rather than going blank in flight.
+  const shown = moving ? (from === 0 ? 'top' : from < 0 ? 'up' : 'down') : stair;
   const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
 
   return (
@@ -262,54 +265,94 @@ function Step({
       data-stair={stair}
       data-step={Math.abs(to)}
       data-moving={moving ? (to < from ? 'up' : 'down') : undefined}
-      className={`absolute inset-x-0 top-0 origin-center overflow-hidden rounded-[24px] ${
-        stair === 'up' ? 'frosted' : ''
-      }`}
-      style={{
-        y,
-        scale,
-        opacity,
-        background,
-        ['--face' as string]: background,
-        ['--ink-opacity' as string]: inkOpacity,
-        zIndex,
-        height,
-      }}
+      className="absolute inset-x-0 top-0 origin-center"
+      style={{ y, scale, opacity, zIndex, height }}
       onPanStart={onTop ? onPanStart : undefined}
       onPan={onTop ? onPan : undefined}
       onPanEnd={onTop ? onPanEnd : undefined}
     >
-      {onTop ? (
-        <>
-          <CardFace
-            card={card}
-            lane={lane}
-            initials={initials}
-            edge="full"
-            onClickCapture={guard}
-          />
-          <CardMenu card={card} pinned={pinned} onPin={onPin} onDelete={onDelete} />
-        </>
-      ) : (
-        <>
-          {/* A step: its visible edge is a seat, one tap to the top. */}
-          <button
-            type="button"
-            data-step-card={card.splash.id}
-            aria-label={`Bring ${title} to the top`}
-            onClick={() => bringForward(card.splash.id)}
-            className={`absolute inset-x-0 z-10 cursor-pointer ${stair === 'up' ? 'top-0' : 'bottom-0'}`}
-            style={{ height: stair === 'up' ? UP_STEP_PX : STEP_PX }}
-          />
-          <CardFace
-            card={card}
-            lane={lane}
-            initials={initials}
-            edge={stair === 'up' ? 'top' : 'bottom'}
-            ink={stair === 'up' ? 'white' : 'blue'}
-          />
-        </>
-      )}
+      {/* The face, clipped to the card's corners so the frost stays inside. */}
+      <motion.div
+        className={`absolute inset-0 overflow-hidden rounded-[24px] ${stair === 'up' ? 'frosted' : ''}`}
+        style={{
+          background,
+          ['--face' as string]: background,
+          ['--ink-opacity' as string]: inkOpacity,
+        }}
+      >
+        {shown === 'top' ? (
+          <>
+            <CardFace
+              card={card}
+              lane={lane}
+              initials={initials}
+              edge="full"
+              onClickCapture={guard}
+            />
+            {onTop ? (
+              <CardMenu card={card} pinned={pinned} onPin={onPin} onDelete={onDelete} />
+            ) : null}
+          </>
+        ) : (
+          <>
+            {/* A step: its visible edge is a seat, one tap to the top. */}
+            <button
+              type="button"
+              data-step-card={card.splash.id}
+              aria-label={`Bring ${title} to the top`}
+              onClick={() => bringForward(card.splash.id)}
+              className={`absolute inset-x-0 z-10 cursor-pointer ${stair === 'up' ? 'top-0' : 'bottom-0'}`}
+              style={{ height: stair === 'up' ? UP_STEP_PX : STEP_PX }}
+            />
+            <CardFace
+              card={card}
+              lane={lane}
+              initials={initials}
+              edge={shown === 'up' ? 'top' : 'bottom'}
+              ink={shown === 'up' ? 'white' : 'blue'}
+            />
+          </>
+        )}
+      </motion.div>
+      {/* The ladder glyph hung over the read card's edge: a hint, not a control (review). */}
+      {shown === 'up' ? <LadderGlyph /> : null}
     </motion.div>
+  );
+}
+
+/**
+ * A small pool ladder hooked over the right end of the upper stair card's
+ * top edge (review, to the reference): two straight rails and three rungs,
+ * outlined, 2px, round caps, rising from inside the card some 30px up into
+ * the water; its stroke white where it meets the card and the water blue
+ * where it enters the water, the whole glyph at 60%. The same size at every
+ * width, undoing the card's own scale; the card beneath is the tap.
+ */
+function LadderGlyph() {
+  const gradient = useId();
+  return (
+    <svg
+      aria-hidden
+      data-ladder-glyph
+      width={24}
+      height={44}
+      viewBox="0 0 24 44"
+      fill="none"
+      stroke={`url(#${gradient})`}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="pointer-events-none absolute right-6 origin-top-right opacity-60"
+      style={{ top: -30, transform: `scale(${1 / STEP_SCALE})` }}
+    >
+      <defs>
+        <linearGradient id={gradient} x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset="0.45" stopColor="#ffffff" />
+          <stop offset="1" stopColor="#0507c9" />
+        </linearGradient>
+      </defs>
+      <path d="M3 2v40M21 2v40M3 14h18M3 26h18M3 38h18" />
+    </svg>
   );
 }

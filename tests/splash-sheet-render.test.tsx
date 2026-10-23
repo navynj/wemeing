@@ -451,7 +451,7 @@ describe('compose from a pool (H23)', () => {
     const view = poolSheet();
     fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-trips"]')!);
     const filled = [...view.container.querySelectorAll('[data-pool-lane-picker] .bg-ink')];
-    // Only the chosen lane chip is filled; the tabs and Everyone's | Just mine are text.
+    // Only the chosen lane chip is filled in ink; the tabs are text.
     expect(filled.map((el) => el.getAttribute('data-pick-pool-lane'))).toEqual(['pl-trips']);
     expect(view.container.querySelector('[data-joint-unlinked]')).toBeNull();
     expect(view.getByRole('tab', { name: 'Pool lanes' }).className).toContain('border-ink');
@@ -481,13 +481,13 @@ describe('Just mine from a pool (0014)', () => {
         />
       </InputSheetProvider>,
     );
-    expect(view.container.querySelector('[data-whose]')).toBeNull();
+    // One switch at the tabs' right end, off (everyone's) by default.
+    const justMine = view.getByRole('switch', { name: 'Just mine' });
+    expect(justMine.getAttribute('aria-checked')).toBe('false');
     fireEvent.change(view.getByLabelText('Content'), { target: { value: 'my notes' } });
     fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-notes"]')!);
-    expect(view.getByRole('tab', { name: "Everyone's" }).getAttribute('aria-selected')).toBe(
-      'true',
-    );
-    fireEvent.click(view.getByRole('tab', { name: 'Just mine' }));
+    fireEvent.click(justMine);
+    expect(justMine.getAttribute('aria-checked')).toBe('true');
     // No lane of mine asked for, no link offered, no audience.
     expect(view.queryByText('Not linked to your lanes')).toBeNull();
     expect(view.container.querySelector('[data-audience-chip]')).toBeNull();

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, Plus, Settings, Users } from 'lucide-react';
+import { ChevronDown, Plus, Settings } from 'lucide-react';
 
 import { GroundFoot } from '@/features/home/ground-foot';
 import type { Card } from '@/features/home/grid';
@@ -195,18 +195,27 @@ export function PoolGround({
               <ChevronDown aria-hidden size={22} strokeWidth={2.5} className="shrink-0" />
             </button>
             <span className="flex shrink-0 items-center">
-              {current.slice(0, HEADER_AVATARS).map((member, at) => (
-                <span
-                  key={member.userId}
-                  aria-hidden
-                  // Solid, so an avatar never shows the one beneath it (review).
-                  className={`text-main-900/60 ring-main-900 flex h-8 w-8 items-center justify-center rounded-full bg-[#8283EE] text-[10px] font-medium ring-2 ${
-                    at > 0 ? '-ml-2' : ''
-                  }`}
-                >
-                  {member.initials}
-                </span>
-              ))}
+              {/* The members' faces are the way to the member list (review). */}
+              <button
+                type="button"
+                aria-label="Members"
+                data-pool-members
+                onClick={() => setSheet('members')}
+                className="flex items-center"
+              >
+                {current.slice(0, HEADER_AVATARS).map((member, at) => (
+                  <span
+                    key={member.userId}
+                    aria-hidden
+                    // Solid, so an avatar never shows the one beneath it (review).
+                    className={`text-main-900/60 ring-main-900 flex h-8 w-8 items-center justify-center rounded-full bg-[#8283EE] text-[10px] font-medium ring-2 ${
+                      at > 0 ? '-ml-2' : ''
+                    }`}
+                  >
+                    {member.initials}
+                  </span>
+                ))}
+              </button>
               <button
                 type="button"
                 aria-label="Invite"
@@ -217,14 +226,6 @@ export function PoolGround({
                 <Plus aria-hidden size={16} />
               </button>
             </span>
-            <Link
-              href={`/pool/${poolId}/settings`}
-              aria-label="Pool settings"
-              data-pool-settings
-              className="ml-1 flex h-9 w-9 shrink-0 items-center justify-center text-white"
-            >
-              <Settings aria-hidden size={20} />
-            </Link>
           </header>
 
           <div className="flex shrink-0 items-center gap-3 px-4 pt-4 pb-6">
@@ -240,15 +241,14 @@ export function PoolGround({
             <div className="min-w-0 flex-1">
               <SegmentedToggle view={kind} onChange={setKind} options={VIEWS} />
             </div>
-            <button
-              type="button"
-              aria-label="Members"
-              data-pool-members
-              onClick={() => setSheet('members')}
+            <Link
+              href={`/pool/${poolId}/settings`}
+              aria-label="Pool settings"
+              data-pool-settings
               className="flex h-9 w-9 shrink-0 items-center justify-center text-white"
             >
-              <Users aria-hidden size={20} />
-            </button>
+              <Settings aria-hidden size={20} />
+            </Link>
           </div>
 
           {dropMessage || pinned.message ? (

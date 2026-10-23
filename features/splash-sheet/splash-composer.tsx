@@ -341,6 +341,18 @@ export function SplashComposer({
         className="text-ink placeholder:text-ink min-h-12 w-full resize-none text-base/relaxed font-light outline-none placeholder:opacity-20"
       />
 
+      {/* The date and a photo come first, above the lane (review). */}
+      <div className="flex flex-wrap items-center gap-2">
+        <AnnotationControl annotation={annotation} today={today} onChange={setAnnotation} />
+        <AddImageAffordance attach={media.attach} busy={media.busy} input={media.input} />
+      </div>
+      <MediaPreviews
+        paths={mediaPaths}
+        previews={media.previews}
+        failed={media.failed}
+        onChange={setMediaPaths}
+      />
+
       {/* The declared lane: where every block of this post starts (H21f).
           From a pool: Pool lanes | My lanes, and no audience (H23). */}
       {pool ? (
@@ -383,18 +395,6 @@ export function SplashComposer({
           ) : null}
         </div>
       )}
-
-      <div className="flex flex-wrap items-center gap-2">
-        <AnnotationControl annotation={annotation} today={today} onChange={setAnnotation} />
-        <AddImageAffordance attach={media.attach} busy={media.busy} input={media.input} />
-      </div>
-
-      <MediaPreviews
-        paths={mediaPaths}
-        previews={media.previews}
-        failed={media.failed}
-        onChange={setMediaPaths}
-      />
 
       {/* Blue means action: the one filled thing here commits (H20f). */}
       <button

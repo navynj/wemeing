@@ -520,7 +520,7 @@ function Mark({
   onPick: (id: string) => void;
 }) {
   const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
-  const surface = !icon ? 'border border-white/60' : dived ? 'bg-white/35' : 'bg-white';
+  const surface = !icon ? 'border border-white/60' : dived ? 'bg-white/20' : 'bg-white';
   return (
     <span className="relative flex items-center justify-center">
       {ring !== null ? (

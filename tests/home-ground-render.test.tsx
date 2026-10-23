@@ -268,14 +268,6 @@ describe('the water ground (H22)', () => {
     }
     expect(container.querySelector('[data-avatar]')!.textContent).toBe('YL');
   });
-
-  it('shows the title as text with its menu, and nothing of Pools or Friends', () => {
-    const { container, queryByText } = ground();
-    expect(container.querySelector('[data-home-menu-button]')!.textContent).toBe('Home');
-    expect(queryByText(/pool|friends|my lanes/i)).toBeNull();
-    expect(container.querySelector('[data-tab-bar]')).toBeNull();
-    expect(container.querySelector('[data-month-scrubber]')).toBeNull();
-  });
 });
 
 describe('the lane grid', () => {
@@ -569,28 +561,6 @@ describe('the diving board, a staircase', () => {
     expect(container.querySelector('[data-sheet-open="splash"]')).not.toBeNull();
   });
 
-  it('carries Home, Locker and Sessions as tabs at the nav\u2019s left, Sessions opening the sheet', () => {
-    const { container, getByRole } = ground();
-    const nav = container.querySelector('[data-ground-nav]')!;
-    const tabs = [...nav.querySelectorAll('[data-ground-tab]')].map((t) =>
-      t.getAttribute('data-ground-tab'),
-    );
-    expect(tabs).toEqual(['home', 'locker', 'sessions']);
-    expect(nav.querySelector('[data-ground-tab="locker"]')!.getAttribute('href')).toBe('/locker');
-    expect(nav.querySelector('[data-ground-tab="home"]')!.getAttribute('aria-current')).toBe(
-      'page',
-    );
-    expect(nav.querySelector('[data-ground-tab="locker"]')!.className).toContain('opacity-50');
-    expect(
-      nav.compareDocumentPosition(nav.querySelector('[data-compose]')!) &
-        Node.DOCUMENT_POSITION_CONTAINED_BY,
-    ).toBeTruthy();
-    fireEvent.click(nav.querySelector('[data-ground-tab="sessions"]')!);
-    expect(
-      getByRole('dialog', { name: 'Sessions' }).querySelector('[data-session-schedule]'),
-    ).not.toBeNull();
-  });
-
   it('keeps its height whatever is on top, so the grid never moves', async () => {
     const { container } = ground();
     const stack = container.querySelector<HTMLElement>('[data-stack]')!;
@@ -695,26 +665,6 @@ describe('the post just dropped', () => {
   });
 });
 
-describe('the menu', () => {
-  it('reaches the Locker, the sessions sheet and the lanes sheet', () => {
-    const { container, getByRole } = ground();
-    fireEvent.click(container.querySelector('[data-home-menu-button]')!);
-    const menu = container.querySelector('[data-home-menu]')!;
-    expect(menu.className).toContain('bg-ink');
-    expect(menu.querySelector('a[href="/locker"]')!.textContent).toBe('Locker');
-    fireEvent.click(within(menu as HTMLElement).getByText('Sessions'));
-    expect(
-      getByRole('dialog', { name: 'Sessions' }).querySelector('[data-session-schedule]'),
-    ).not.toBeNull();
-    fireEvent.click(getByRole('button', { name: 'Close' }));
-    fireEvent.click(container.querySelector('[data-home-menu-button]')!);
-    fireEvent.click(
-      within(container.querySelector('[data-home-menu]') as HTMLElement).getByText('Lanes'),
-    );
-    expect(getByRole('dialog', { name: 'Edit lanes' })).toBeTruthy();
-  });
-});
-
 describe('?m= as a scroll target', () => {
   it('opens with the month\u2019s newest post on top, and scrolls the grid to the month', () => {
     const { container } = ground(POSTS, null, null, LANES, '2026-08');
@@ -739,73 +689,5 @@ describe('the pinned bar (H21g)', () => {
   it('is absent when nothing is pinned', () => {
     const { container } = ground(POSTS.filter((p) => !p.pinnedAt));
     expect(container.querySelector('[data-pinned-bar]')).toBeNull();
-  });
-});
-
-const openLanes = (container: HTMLElement): void => {
-  fireEvent.click(container.querySelector('[data-home-menu-button]')!);
-  fireEvent.click(container.querySelector('[data-home-menu] [data-edit-lanes]')!);
-};
-
-describe('the lanes sheet from the menu', () => {
-  it('edits every lane’s icon and name in one sheet', async () => {
-    savedLanes.length = 0;
-    const { getByRole, getByText, container } = ground();
-    openLanes(container);
-    const sheet = getByRole('dialog', { name: 'Edit lanes' });
-    expect(sheet.querySelectorAll('[data-lane-row]')).toHaveLength(3);
-    expect((getByText('Save') as HTMLButtonElement).disabled).toBe(true);
-    const food = sheet.querySelector('[data-lane-row="c-food"]')!;
-    fireEvent.change(food.querySelector('input[aria-label^="Icon"]')!, {
-      target: { value: '🍣' },
-    });
-    fireEvent.change(food.querySelector('input[aria-label="Lane name"]')!, {
-      target: { value: 'Meals' },
-    });
-    fireEvent.click(getByText('Save'));
-    await waitFor(() => expect(savedLanes).toHaveLength(1));
-    expect(savedLanes[0]).toEqual({ id: 'c-food', name: 'Meals', icon: '🍣' });
-    await waitFor(() => expect(container.querySelector('[data-lanes-sheet]')).toBeNull());
-  });
-
-  it('reorders the lanes by dragging a grip, keeping up with a fast drag, and saves the order', async () => {
-    orders.length = 0;
-    const { getByLabelText, getByRole, getByText, container } = ground();
-    openLanes(container);
-    const sheet = getByRole('dialog', { name: 'Edit lanes' });
-    const order = (): (string | null)[] =>
-      [...sheet.querySelectorAll('[data-lane-row]')].map((r) => r.getAttribute('data-lane-row'));
-    for (const row of sheet.querySelectorAll<HTMLElement>('[data-lane-row]')) {
-      row.getBoundingClientRect = () => {
-        const index = order().indexOf(row.getAttribute('data-lane-row'));
-        return { top: index * 40, height: 40 } as DOMRect;
-      };
-    }
-    const grip = getByLabelText('Move Day');
-    fireEvent.pointerDown(grip, { pointerId: 1, clientY: 100 });
-    fireEvent.pointerMove(grip, { pointerId: 1, clientY: 10 });
-    fireEvent.pointerMove(grip, { pointerId: 1, clientY: 50 });
-    expect(order()).toEqual(['c-food', 'c-day', 'c-place']);
-    fireEvent.pointerUp(grip, { pointerId: 1 });
-    fireEvent.click(getByText('Save'));
-    await waitFor(() => expect(orders).toHaveLength(1));
-    expect(orders[0]).toEqual(['c-food', 'c-day', 'c-place']);
-  });
-
-  it('deletes an empty lane at once, and brings one with records back with the refusal', async () => {
-    deletes.length = 0;
-    const { getByLabelText, getByRole, getByText, container } = ground();
-    openLanes(container);
-    const sheet = getByRole('dialog', { name: 'Edit lanes' });
-    fireEvent.click(getByLabelText('Delete Day'));
-    fireEvent.click(getByText('Delete'));
-    await waitFor(() => expect(sheet.querySelector('[data-lane-row="c-day"]')).toBeNull());
-    await act(async () =>
-      deletes[0].resolve({ ok: false, message: 'This lane holds 2 records, so it stays.' }),
-    );
-    await waitFor(() =>
-      expect(within(sheet).getByText('This lane holds 2 records, so it stays.')).toBeTruthy(),
-    );
-    expect(sheet.querySelector('[data-lane-row="c-day"]')).not.toBeNull();
   });
 });

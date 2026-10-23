@@ -195,72 +195,7 @@ export function HomeGround({
       >
         <div className="flex min-h-0 flex-1 flex-col lg:min-w-0 lg:flex-1">
           <header className="relative flex shrink-0 items-center px-6 pt-4 pb-1">
-            <button
-              type="button"
-              data-home-menu-button
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen((open) => !open)}
-              className="flex items-center gap-1 text-2xl font-semibold text-white"
-            >
               Home
-              <ChevronDown aria-hidden size={18} className="mt-0.5" />
-            </button>
-            {menuOpen ? (
-              <>
-                <button
-                  type="button"
-                  aria-label="Close menu"
-                  onClick={() => setMenuOpen(false)}
-                  className="fixed inset-0 z-30"
-                />
-                {/* The menu in ink: the selection channel on the water. */}
-                <ul
-                  role="menu"
-                  data-home-menu
-                  className="bg-ink absolute top-full left-6 z-40 flex w-44 flex-col rounded-xl py-1 text-sm text-white shadow-lg"
-                >
-                  <li>
-                    <Link
-                      role="menuitem"
-                      href="/locker"
-                      onClick={() => setMenuOpen(false)}
-                      className="block px-4 py-2.5"
-                    >
-                      Locker
-                    </Link>
-                  </li>
-                  <li>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      data-manage-sessions
-                      onClick={() => {
-                        setMenuOpen(false);
-                        setSessionsOpen(true);
-                      }}
-                      className="w-full px-4 py-2.5 text-left"
-                    >
-                      Sessions
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      data-edit-lanes
-                      onClick={() => {
-                        setMenuOpen(false);
-                        setEditingLanes(true);
-                      }}
-                      className="w-full px-4 py-2.5 text-left"
-                    >
-                      Lanes
-                    </button>
-                  </li>
-                </ul>
-              </>
-            ) : null}
           </header>
 
           {dropMessage || lanes.message ? (
@@ -330,7 +265,7 @@ export function HomeGround({
               <Home aria-hidden size={20} strokeWidth={2.25} />
               <span className="text-xs/none">Home</span>
             </Link>
-            <Link
+            {/* <Link
               href="/locker"
               data-ground-tab="locker"
               className="flex flex-col items-center gap-1 font-medium opacity-50"
@@ -347,7 +282,7 @@ export function HomeGround({
             >
               <CalendarDays aria-hidden size={20} />
               <span className="text-xs/none">Sessions</span>
-            </button>
+            </button> */}
           </div>
           <button
             type="button"

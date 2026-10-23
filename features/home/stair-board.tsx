@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, useSpring, useTransform, type MotionValue, type PanInfo } from 'motion/react';
 
+import { useBackdropFrost } from '@/components/ui/use-backdrop-frost';
 import { useWide } from '@/components/ui/use-wide';
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
 import type { MyCategory } from '@/lib/queries/profile';
 
-import { CARD_PX, CardFace, face, SPINE_PX } from './card-face';
+import { CARD_PX, CardFace, face, SPINE_PX, TINT_STEP } from './card-face';
 import { CardMenu } from './card-menu';
 import { cardLane, type Card } from './grid';
 import { FLIP_SPRING, type Flip } from './use-flip';
@@ -26,16 +27,15 @@ export const STACK_PX = CARD_PX + DOWN * STEP_PX;
 /** Sideways, the top card is never narrower than this; fewer cards fan to the right before it would be. */
 const MIN_CARD_WIDTH_PX = 320;
 /**
- * The fills, one family centred on the top card (review): below it the pale
- * tint, then back toward white — as fractions of the water blue mixed into
- * white. Above it the one read card is **frosted glass** under the water:
- * the pale tint at 50% over a blurred backdrop (`.frosted`, with the solid
- * fallback where blur is unsupported), so the marks and ropes behind soften
- * instead of showing through; no edge line; its words white at 60%.
+ * The fills, one family centred on the top card (review): below it each step
+ * is another 8% of the water blue mixed into white. Above it the one read
+ * card is **frosted glass** (`.frosted`): white at 20% over a blurred
+ * backdrop, or solid `#3739D4` when blur is unavailable; its words white
+ * at 60%.
  */
-const DOWN_TINTS = [0, 0.08, 0.04, 0.02];
-const FROST = [235, 235, 251] as const;
-const UP_FILL = 0.5;
+const DOWN_TINTS = [0, TINT_STEP, TINT_STEP * 2, TINT_STEP * 3] as const;
+const UP_ALPHA = 0.2;
+const UP_SOLID = [0x37, 0x39, 0xd4] as const;
 const UP_INK = 0.6;
 
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
@@ -64,6 +64,7 @@ export type Stair = {
 export function seat(
   d: number,
   stair: Stair,
+  frostGlass = true,
 ): {
   x: number;
   y: number;
@@ -97,18 +98,26 @@ export function seat(
     );
     return { x, y, scale, opacity, background: face(tint), ink: 1 };
   }
-  // Under the water: on its way from the top card a white card becomes
-  // the frost.
   const rise = Math.min(1, steps);
-  const alpha = lerp(1, UP_FILL, rise);
-  const channel = (white: number, frost: number): number => Math.round(lerp(white, frost, rise));
   const ink = lerp(1, UP_INK, rise);
+  if (frostGlass) {
+    const alpha = lerp(1, UP_ALPHA, rise);
+    return {
+      x,
+      y,
+      scale,
+      opacity,
+      background: `rgba(255, 255, 255, ${alpha.toFixed(3)})`,
+      ink,
+    };
+  }
+  const channel = (white: number, solid: number): number => Math.round(lerp(white, solid, rise));
   return {
     x,
     y,
     scale,
     opacity,
-    background: `rgba(${channel(255, FROST[0])}, ${channel(255, FROST[1])}, ${channel(255, FROST[2])}, ${alpha.toFixed(3)})`,
+    background: `rgb(${channel(255, UP_SOLID[0])}, ${channel(255, UP_SOLID[1])}, ${channel(255, UP_SOLID[2])})`,
     ink,
   };
 }
@@ -116,7 +125,7 @@ export function seat(
 /**
  * The diving board as a staircase (H22, review): the top card is the
  * current step. Unread cards step down below it, each peeking below the one
- * before by a step, smaller and a shade paler, three at most; the one card
+ * before by a step, smaller and a shade darker, three at most; the one card
  * read last steps up above it by a shorter step — a bookmark — free to sit
  * over the grid's bottom edge; earlier read cards are reached through their
  * marks. A peeking card shows its lane emoji and title on its visible edge,
@@ -349,32 +358,37 @@ function Step({
   onDelete: () => void;
 }) {
   const reducedMotion = usePrefersReducedMotion();
+  const frostGlass = useBackdropFrost();
   const { p, n, next, bringForward } = flip;
   const i = index;
   const from = i - n;
   const to = i - next;
   const moving = from !== to;
   const { horizontal } = stair;
+  // Frost only when the read card is at rest on the upper step; while it
+  // moves to or from the top, use the solid fallback so the full face is
+  // not read through 20% white.
+  const frostFill = frostGlass && !(moving && (from < 0 || to < 0));
 
   // The card's distance from the top as the stack's depth moves.
   const d = useTransform(p, (v) => (reducedMotion ? to : lerp(from, to, clamp01(v))));
-  const y = useTransform(d, (v) => seat(v, stair).y);
-  const x = useTransform(d, (v) => seat(v, stair).x);
-  const scale = useTransform(d, (v) => seat(v, stair).scale);
+  const y = useTransform(d, (v) => seat(v, stair, frostFill).y);
+  const x = useTransform(d, (v) => seat(v, stair, frostFill).x);
+  const scale = useTransform(d, (v) => seat(v, stair, frostFill).scale);
   const opacity = useTransform([d, p], ([v, pv]) => {
-    const at = seat(v as number, stair).opacity;
+    const at = seat(v as number, stair, frostFill).opacity;
     if (!reducedMotion || !moving) return at;
     // Reduced motion: the old top fades out as the new one fades in.
     if (from === 0) return at * (1 - clamp01(pv as number));
     if (to === 0) return at * clamp01(pv as number);
     return at;
   });
-  const background = useTransform(d, (v) => seat(v, stair).background);
+  const background = useTransform(d, (v) => seat(v, stair, frostFill).background);
   // A card moving to or from the top carries both faces and crossfades them
   // on its distance from the top, so nothing switches when it lands.
   const fullOpacity = useTransform(d, (v) => 1 - clamp01(Math.abs(v)));
   const edgeOpacity = useTransform(d, (v) => clamp01(Math.abs(v)));
-  const inkOpacity = useTransform(d, (v) => seat(v, stair).ink);
+  const inkOpacity = useTransform(d, (v) => seat(v, stair, frostFill).ink);
   // Nearer the top, nearer the eye; a card rising from below over one sliding up.
   const zIndex = useTransform(d, (v) => Math.round((30 - Math.abs(v)) * 10) + (v >= 0 ? 1 : 0));
 
@@ -385,7 +399,7 @@ function Step({
   const touchesTop = moving && (from === 0 || to === 0);
   const side = touchesTop ? (from < 0 || to < 0 ? 'up' : 'down') : from < 0 ? 'up' : 'down';
   const edgeSide = moving ? side : stairSide === 'up' ? 'up' : 'down';
-  const frosted = stairSide === 'up' || (moving && from < 0);
+  const frosted = frostFill && stairSide === 'up';
   const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
   const edge = horizontal
     ? edgeSide === 'up'

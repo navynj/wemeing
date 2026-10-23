@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, useTransform, type PanInfo } from 'motion/react';
 
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
@@ -20,7 +20,7 @@ export const STEP_SCALE = 0.94;
 /** How many unread cards show below the top, and how many read cards above it: exactly one (review). */
 const DOWN = 3;
 const UP = 1;
-/** The board's box: the top card and the lower stair; the upper stair rises above it, into the water. */
+/** The board's box on a phone: the top card and the lower stair; the upper stair rises above it, into the water. */
 export const STACK_PX = CARD_PX + DOWN * STEP_PX;
 /**
  * The fills, one family centred on the top card (review): below it the pale
@@ -45,7 +45,10 @@ const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
  * is smaller about its centre, so its translate makes up the difference and
  * its visible edge stays exactly one step.
  */
-export function seat(d: number): {
+export function seat(
+  d: number,
+  cardHeight: number = CARD_PX,
+): {
   y: number;
   scale: number;
   opacity: number;
@@ -55,7 +58,7 @@ export function seat(d: number): {
 } {
   const steps = Math.abs(d);
   const scale = STEP_SCALE ** steps;
-  const height = CARD_PX;
+  const height = cardHeight;
   const shrink = (height * (1 - scale)) / 2;
   const y = d >= 0 ? STEP_PX * d + shrink : UP_STEP_PX * d - shrink;
   let opacity: number;
@@ -126,6 +129,21 @@ export function StairBoard({
   const { ids, n, next } = flip;
   const byId = new Map(cards.map((card) => [card.splash.id, card]));
 
+  // On a wide screen the board fills its half, and the top card grows with
+  // the room (review): the box is measured, the lower stair's steps come
+  // off it, the rest is the card. On a phone the box is the card's own.
+  const box = useRef<HTMLDivElement>(null);
+  const [room, setRoom] = useState<number | null>(null);
+  useEffect(() => {
+    const el = box.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => setRoom(el.clientHeight));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  const cardHeight = Math.max(CARD_PX, (room ?? 0) - DOWN * STEP_PX);
+  const stackHeight = cardHeight + DOWN * STEP_PX;
+
   // The finger on the top card: up flips forward, down flips back; which is
   // not known until it has moved, so the grab waits for the first move.
   const panned = useRef(false);
@@ -165,12 +183,17 @@ export function StairBoard({
   for (let i = first; i <= last; i += 1) pages.push(i);
 
   return (
-    <div data-diving-board data-board="stair" className="relative z-10 shrink-0 px-4">
+    <div
+      ref={box}
+      data-diving-board
+      data-board="stair"
+      className="relative z-10 shrink-0 px-4 lg:min-h-0 lg:flex-1"
+    >
       {cards.length > 0 ? (
         <div
           data-stack
           className="relative select-none"
-          style={{ height: STACK_PX, touchAction: 'none' }}
+          style={{ height: stackHeight, touchAction: 'none' }}
         >
           {pages.map((i) => {
             const card = byId.get(ids[i]);
@@ -186,6 +209,7 @@ export function StairBoard({
                 onPan={onPan}
                 onPanEnd={onPanEnd}
                 guard={guard}
+                cardHeight={cardHeight}
                 pinned={pinnedIds.has(card.splash.id)}
                 onPin={(pinned) => onPin(card, pinned)}
                 onDelete={() => onDelete(card)}
@@ -209,6 +233,7 @@ function Step({
   onPan,
   onPanEnd,
   guard,
+  cardHeight,
   pinned,
   onPin,
   onDelete,
@@ -222,6 +247,7 @@ function Step({
   onPan: (event: PointerEvent, info: PanInfo) => void;
   onPanEnd: (event: PointerEvent, info: PanInfo) => void;
   guard: (event: React.MouseEvent) => void;
+  cardHeight: number;
   pinned: boolean;
   onPin: (pinned: boolean) => void;
   onDelete: () => void;
@@ -235,23 +261,23 @@ function Step({
 
   // The card's distance from the top as the stack's depth moves.
   const d = useTransform(p, (v) => (reducedMotion ? to : lerp(from, to, clamp01(v))));
-  const y = useTransform(d, (v) => seat(v).y);
-  const scale = useTransform(d, (v) => seat(v).scale);
+  const y = useTransform(d, (v) => seat(v, cardHeight).y);
+  const scale = useTransform(d, (v) => seat(v, cardHeight).scale);
   const opacity = useTransform([d, p], ([v, pv]) => {
-    const at = seat(v as number).opacity;
+    const at = seat(v as number, cardHeight).opacity;
     if (!reducedMotion || !moving) return at;
     // Reduced motion: the old top fades out as the new one fades in.
     if (from === 0) return at * (1 - clamp01(pv as number));
     if (to === 0) return at * clamp01(pv as number);
     return at;
   });
-  const background = useTransform(d, (v) => seat(v).background);
+  const background = useTransform(d, (v) => seat(v, cardHeight).background);
   // A card moving to or from the top carries both faces and crossfades them
   // on its distance from the top, so nothing switches when it lands.
   const fullOpacity = useTransform(d, (v) => 1 - clamp01(Math.abs(v)));
   const edgeOpacity = useTransform(d, (v) => clamp01(Math.abs(v)));
-  const height = useTransform(d, (v) => seat(v).height);
-  const inkOpacity = useTransform(d, (v) => seat(v).ink);
+  const height = useTransform(d, (v) => seat(v, cardHeight).height);
+  const inkOpacity = useTransform(d, (v) => seat(v, cardHeight).ink);
   // Nearer the top, nearer the eye; a card rising from below over one sliding up.
   const zIndex = useTransform(d, (v) => Math.round((30 - Math.abs(v)) * 10) + (v >= 0 ? 1 : 0));
 

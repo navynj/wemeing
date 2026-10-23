@@ -785,8 +785,11 @@ describe('pinned posts as cards (round 3)', () => {
     const cardsIn = strip.querySelectorAll('[data-pinned-card]');
     expect(cardsIn).toHaveLength(2);
     const card = strip.querySelector<HTMLElement>('[data-pinned-card="aug"]')!;
-    expect(card.className).toContain('bg-white/15');
-    expect(card.className).toContain('rounded-[24px]');
+    expect(card.className).toContain('bg-white/20');
+    // The lane plainly, no chip; the title large; initials and the latest ripple.
+    const lane = card.querySelector<HTMLElement>('[data-pinned-lane]')!;
+    expect(lane.className).not.toMatch(/bg-|rounded/);
+    expect(card.querySelector('[data-pinned-title]')!.className).toContain('text-2xl');
     expect(card.textContent).toContain('Whistler');
     expect(card.textContent).toContain('Place');
     expect(card.textContent).toContain('YL');

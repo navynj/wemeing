@@ -8,9 +8,10 @@ import type { MyCategory } from '@/lib/queries/profile';
 import { cardLane, type Card } from './grid';
 
 /**
- * Pinned posts as cards (round 3), replacing the black strip: white at 15%
- * on the water, rounded like the stack's cards, each its lane chip, title,
- * and one line of its words after the author's initials. One card wide;
+ * Pinned posts as cards (round 3), replacing the black strip: white at 20%
+ * on the water. Three lines (review): the lane plainly, no chip; the title
+ * large, the contrast carried by size; the author's initials and the latest
+ * ripple on one line. One card wide;
  * with several, a horizontal snap scroller with the next card peeking at
  * the right edge. A tap brings that post to the top of the stack, and the
  * grid or the list scrolls to it with the ring. Unpinning stays in the top
@@ -49,7 +50,8 @@ export function PinnedCards({
         {cards.map((card) => {
           const lane = categories.find((c) => c.id === cardLane(card.splash)) ?? null;
           const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
-          const excerpt = card.ripples[0]?.note ?? card.body;
+          // The latest ripple: the thread runs oldest first.
+          const excerpt = card.ripples.at(-1)?.note ?? card.body;
           return (
             <li
               key={card.splash.id}
@@ -59,29 +61,29 @@ export function PinnedCards({
                 type="button"
                 data-pinned-card={card.splash.id}
                 onClick={() => onPick(card.splash.id)}
-                className="flex w-full flex-col gap-1.5 rounded-[24px] bg-white/15 px-4 py-3 text-left text-white"
+                className="flex w-full flex-col gap-1 rounded-[28px] bg-white/20 px-5 py-4 text-left text-white"
               >
-                <span className="flex min-w-0 items-center gap-2">
-                  {lane ? (
-                    <span className="inline-flex h-5 shrink-0 items-center gap-1 rounded-full bg-white/20 px-2 text-[10px]">
-                      {lane.icon ? <span aria-hidden>{lane.icon}</span> : null}
-                      {lane.name}
-                    </span>
-                  ) : null}
-                  <span className="min-w-0 truncate text-sm font-semibold">
-                    {card.splash.icon ? <span aria-hidden>{card.splash.icon} </span> : null}
-                    {title}
+                {lane ? (
+                  <span data-pinned-lane className="flex min-w-0 items-center gap-1 text-sm">
+                    {lane.icon ? <span aria-hidden>{lane.icon}</span> : null}
+                    <span className="truncate">{lane.name}</span>
                   </span>
+                ) : null}
+                <span data-pinned-title className="min-w-0 truncate text-2xl font-semibold">
+                  {card.splash.icon ? <span aria-hidden>{card.splash.icon} </span> : null}
+                  {title}
                 </span>
                 {excerpt ? (
-                  <span className="flex min-w-0 items-center gap-2 text-xs text-white/70">
+                  <span className="mt-1 flex min-w-0 items-center gap-3 text-sm text-white/60">
                     <span
                       aria-hidden
-                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/20 text-[10px] font-medium"
+                      className="text-main-900/50 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/40 text-xs"
                     >
                       {initials}
                     </span>
-                    <span className="min-w-0 truncate">{excerpt}</span>
+                    <span data-pinned-excerpt className="min-w-0 truncate">
+                      {excerpt}
+                    </span>
                   </span>
                 ) : null}
               </button>

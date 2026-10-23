@@ -15,7 +15,14 @@ import type { SplashSummary } from '@/features/splash/summary';
  * the server has it (CLAUDE.md, the principle) — so the ground can seat its
  * pill at once and play the commit ripple there.
  */
-export type OpenSheet = { kind: 'splash'; pool: PoolScope | null } | null;
+export type OpenSheet =
+  | { kind: 'splash'; pool: PoolScope | null }
+  /** The same sheet in edit mode (review): a splash's title, icon, dates, lane, audience. */
+  | { kind: 'edit'; splashId: string }
+  | null;
+
+/** A splash edited a moment ago, as every surface should show it until the re-read lands. */
+export type PendingEdit = { title: string; icon: string | null; declaredLaneId?: string | null };
 
 /**
  * `pool`: dropped from a pool (H23) — the card as that pool's grid should
@@ -32,6 +39,11 @@ type SheetApi = {
   sheet: OpenSheet;
   /** From a pool, with that pool as the default (H23); from Home, with none. */
   openSheet: (pool?: PoolScope | null) => void;
+  /** The pencil on a card or a splash's page: the sheet in edit mode. */
+  openEdit: (splashId: string) => void;
+  pendingEdits: Record<string, PendingEdit>;
+  markEdited: (splashId: string, edit: PendingEdit) => void;
+  clearEdited: (splashId: string) => void;
   closeSheet: () => void;
   /** The post just dropped, until the ground has read it back. */
   pendingDrop: PendingDrop | null;
@@ -62,6 +74,22 @@ export function InputSheetProvider({ children }: { children: ReactNode }) {
     [],
   );
   const closeSheet = useCallback(() => setSheet(null), []);
+  const openEdit = useCallback((splashId: string) => setSheet({ kind: 'edit', splashId }), []);
+  const [pendingEdits, setPendingEdits] = useState<Record<string, PendingEdit>>({});
+  const markEdited = useCallback(
+    (splashId: string, edit: PendingEdit) =>
+      setPendingEdits((current) => ({ ...current, [splashId]: edit })),
+    [],
+  );
+  const clearEdited = useCallback(
+    (splashId: string) =>
+      setPendingEdits((current) => {
+        const rest = { ...current };
+        delete rest[splashId];
+        return rest;
+      }),
+    [],
+  );
   const markDropped = useCallback((drop: PendingDrop) => {
     setDropMessage(null);
     setPendingDrop(drop);
@@ -77,6 +105,10 @@ export function InputSheetProvider({ children }: { children: ReactNode }) {
       sheet,
       openSheet,
       closeSheet,
+      openEdit,
+      pendingEdits,
+      markEdited,
+      clearEdited,
       pendingDrop,
       markDropped,
       clearDropped,
@@ -89,6 +121,10 @@ export function InputSheetProvider({ children }: { children: ReactNode }) {
       sheet,
       openSheet,
       closeSheet,
+      openEdit,
+      pendingEdits,
+      markEdited,
+      clearEdited,
       pendingDrop,
       markDropped,
       clearDropped,

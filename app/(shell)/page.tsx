@@ -175,6 +175,8 @@ export default async function HomePage({ searchParams }: PageProps<'/'>) {
           : undefined,
       );
     })
+    // My own splashes carry the pencil; a post of one has no row to edit yet.
+    .map((card) => (mineIds.has(card.splash.id) ? { ...card, editable: true } : card))
     // Where each is or was in a pool, on its card (0015).
     .map((card) => {
       const tags = originTags.get(card.splash.id);

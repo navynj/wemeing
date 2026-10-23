@@ -2,7 +2,9 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, Pencil } from 'lucide-react';
+
+import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 
 import { splashHref } from '@/features/home/scope';
 import { monthKey } from '@/features/splash/summary';
@@ -28,9 +30,25 @@ export function CardMenu({
 }) {
   const [menu, setMenu] = useState<'closed' | 'open' | 'delete'>('closed');
   const { count } = card.splash;
+  const { openEdit } = useInputSheet();
 
   return (
-    <div className="absolute top-3 right-3 z-20" onPointerDown={(e) => e.stopPropagation()}>
+    <div
+      className="absolute top-3 right-3 z-20 flex items-center"
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      {card.editable ? (
+        // Edit, beside the menu (review): the compose sheet in edit mode.
+        <button
+          type="button"
+          aria-label="Edit"
+          data-card-edit
+          onClick={() => openEdit(card.splash.id)}
+          className="text-pool-500 flex h-8 w-8 items-center justify-center rounded-full"
+        >
+          <Pencil aria-hidden size={16} />
+        </button>
+      ) : null}
       <button
         type="button"
         aria-label="More"

@@ -401,3 +401,31 @@ describe('Just mine in the pool (0014)', () => {
     expect(container.querySelector(`[data-cell="${ME}"] [data-mark="s-own"]`)).not.toBeNull();
   });
 });
+
+describe('re-tapping Pool (review)', () => {
+  it('cycles Lane → Swimmers → Date → Lane, the toggle following, and keeps the last per device', () => {
+    setView('lane');
+    const { container } = ground(A);
+    const tab = container.querySelector('[data-home-foot="phone"] [data-pool-tab]') as HTMLElement;
+    const selected = (): string | null =>
+      container
+        .querySelector('[data-view-option][aria-selected="true"]')!
+        .getAttribute('data-view-option');
+    expect(
+      [...container.querySelectorAll('[data-view-option]')].map((o) =>
+        o.getAttribute('data-view-option'),
+      ),
+    ).toEqual(['lane', 'swimmers', 'date']);
+    expect(selected()).toBe('lane');
+    fireEvent.click(tab);
+    expect(selected()).toBe('swimmers');
+    fireEvent.click(tab);
+    expect(selected()).toBe('date');
+    expect(window.localStorage.getItem('weming.pool-view')).toBe('date');
+    fireEvent.click(tab);
+    expect(selected()).toBe('lane');
+    // The desktop rail cycles too.
+    fireEvent.click(container.querySelector('[data-home-foot="wide"] [data-pool-tab]')!);
+    expect(selected()).toBe('swimmers');
+  });
+});

@@ -82,7 +82,7 @@ export function SplashPage({
   poolTags?: string[];
 }) {
   const router = useRouter();
-  const { markDeleted } = useInputSheet();
+  const { markDeleted, openEdit, pendingEdits } = useInputSheet();
   const [editor, setEditor] = useState<EditorTarget | null>(null);
   const {
     value: page,
@@ -239,6 +239,18 @@ export function SplashPage({
     void ensureSplash().then((id) => id && setEditor({ kind: 'add', splashId: id }));
   }
 
+  // An edit made from the sheet a moment ago shows at once (review).
+  const edited = pendingEdits[page.splash.id];
+  const headerSplash = edited
+    ? {
+        ...page.splash,
+        title: edited.title,
+        icon: edited.icon,
+        declaredLaneId:
+          edited.declaredLaneId !== undefined ? edited.declaredLaneId : page.splash.declaredLaneId,
+      }
+    : page.splash;
+
   return (
     <div
       data-splash-page
@@ -255,13 +267,16 @@ export function SplashPage({
         </Link>
 
         <SplashHeader
-          key={page.splash.id}
-          splash={page.splash}
+          // Remounted when an edit from the sheet lands, so it reads the new words.
+          key={`${headerSplash.id}:${headerSplash.title}:${headerSplash.icon ?? ''}`}
+          splash={headerSplash}
           categories={categories}
           today={today}
           onEdit={editHeader}
           onPin={pin}
           audience={audience}
+          // A post of one has no row to edit yet; it gets one from the header itself.
+          onOpenEdit={page.splash.orphan ? null : () => openEdit(page.splash.id)}
           onDelete={async () => {
             // Gone the moment it is asked for, from every surface (CLAUDE.md,
             // the principle): back where it came from, and the rows follow. A

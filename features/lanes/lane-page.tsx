@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 
-import { type Card } from '@/features/home/grid';
+import { withEdits, type Card } from '@/features/home/grid';
 import { DAY_LIST_TEMPLATE, DateDay } from '@/features/home/date-day';
 import { GroundFoot } from '@/features/home/ground-foot';
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
@@ -52,7 +52,7 @@ export function LanePage({
   topParam?: string | null;
 }) {
   const router = useRouter();
-  const { openSheet } = useInputSheet();
+  const { openSheet, pendingEdits } = useInputSheet();
   const saved = useOptimisticAction({ name: lane.name, icon: lane.icon ?? '' });
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(lane.name);
@@ -64,8 +64,8 @@ export function LanePage({
     cards.filter((card) => card.splash.pinnedAt).map((card) => card.splash.id),
   );
   const shown = useMemo(
-    () => cards.filter((card) => !removed.value.includes(card.splash.id)),
-    [cards, removed.value],
+    () => withEdits(cards, pendingEdits).filter((card) => !removed.value.includes(card.splash.id)),
+    [cards, pendingEdits, removed.value],
   );
   const ids = useMemo(() => shown.map((card) => card.splash.id), [shown]);
   const [initialTop] = useState(() =>

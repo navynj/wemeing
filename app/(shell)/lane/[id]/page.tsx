@@ -41,7 +41,14 @@ export default async function LaneRoute({ params, searchParams }: PageProps<'/la
     .filter((summary) => cardLane(summary) === id)
     .map((summary) => {
       const thread = threads.get(summary.id) ?? [];
-      return placeCard(summary, thread.map((r) => r.note).join('\n\n'), profile.timezone, thread);
+      const card = placeCard(
+        summary,
+        thread.map((r) => r.note).join('\n\n'),
+        profile.timezone,
+        thread,
+      );
+      // My own splash carries the pencil; a post of one has no row to edit yet.
+      return summary.orphan ? card : { ...card, editable: true };
     })
     .sort(byNewest);
 

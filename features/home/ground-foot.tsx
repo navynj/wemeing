@@ -19,8 +19,10 @@ export function GroundFoot({
   slot = 'phone',
   here,
   onHome,
+  onPool,
   onCompose,
   homeLabel,
+  poolLabel,
 }: {
   slot?: 'phone' | 'wide';
   here: 'home' | 'pool';
@@ -29,6 +31,9 @@ export function GroundFoot({
   onCompose: () => void;
   /** Home's accessible name, which says what a tap will do. */
   homeLabel?: string;
+  /** Pool's own tap, when a pool is where we are: the view cycle (review). */
+  onPool?: () => void;
+  poolLabel?: string;
 }) {
   const item = 'flex flex-col items-center gap-1 font-semibold text-white';
   const faded = 'opacity-40';
@@ -75,9 +80,22 @@ export function GroundFoot({
           </Link>
         )}
         {here === 'pool' ? (
-          <span data-pool-tab aria-current="page" className={item}>
-            {pool}
-          </span>
+          onPool ? (
+            <button
+              type="button"
+              data-pool-tab
+              aria-current="page"
+              aria-label={poolLabel}
+              onClick={onPool}
+              className={item}
+            >
+              {pool}
+            </button>
+          ) : (
+            <span data-pool-tab aria-current="page" className={item}>
+              {pool}
+            </span>
+          )
         ) : (
           <Link href="/pool" data-pool-tab className={`${item} ${faded}`}>
             {pool}

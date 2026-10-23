@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ChevronDown, Plus, Settings } from 'lucide-react';
 
 import { GroundFoot } from '@/features/home/ground-foot';
-import type { Card } from '@/features/home/grid';
+import { withEdits, type Card } from '@/features/home/grid';
 import { LaneGrid, type Ring } from '@/features/home/lane-grid';
 import { LaneIcon } from '@/features/home/lane-icon';
 import { PinnedCards } from '@/features/home/pinned-cards';
@@ -28,10 +28,17 @@ import { rememberVisit, usePoolView } from './remembered';
 import { PoolSheet, SheetTitle } from './sheet';
 import { PoolSwitcher } from './switcher';
 
+/** The view after this one, in the toggle's order. */
+function nextView(view: PoolViewKind): PoolViewKind {
+  const at = VIEWS.findIndex((v) => v.value === view);
+  return VIEWS[(at + 1) % VIEWS.length].value;
+}
+
+// Lane | Swimmers | Date (review): re-tapping Pool walks them in this order.
 const VIEWS = [
   { value: 'lane', label: 'Lane' },
-  { value: 'date', label: 'Date' },
   { value: 'swimmers', label: 'Swimmers' },
+  { value: 'date', label: 'Date' },
 ] as const satisfies readonly { value: PoolViewKind; label: string }[];
 
 /** How many members' initials the header shows before the `+`. */
@@ -69,8 +76,15 @@ export function PoolGround({
   const poolId = view.pool.id;
   const [kind, setKind] = usePoolView();
   const [sheet, setSheet] = useState<Sheet>(null);
-  const { openSheet, pendingDrop, clearDropped, pendingDeletes, markDeleted, dropMessage } =
-    useInputSheet();
+  const {
+    openSheet,
+    pendingDrop,
+    clearDropped,
+    pendingDeletes,
+    markDeleted,
+    dropMessage,
+    pendingEdits,
+  } = useInputSheet();
 
   // Opening a pool makes it the one the Pool tab opens, seen as of now.
   useEffect(() => rememberVisit(poolId), [poolId]);
@@ -82,7 +96,10 @@ export function PoolGround({
   const dropHere = pendingDrop?.pool?.poolId === poolId ? pendingDrop.pool.card : null;
   const landed = dropHere !== null && cards.some((c) => c.splash.id === dropHere.splash.id);
   const shown = useMemo(() => {
-    const kept = cards.filter((c) => !pendingDeletes.includes(c.splash.id));
+    // An edit made a moment ago shows at once (review).
+    const kept = withEdits(cards, pendingEdits).filter(
+      (c) => !pendingDeletes.includes(c.splash.id),
+    );
     if (!dropHere || landed) return kept;
     // In Swimmers my drop sits in my column, and a joint splash's first ripple branches into it.
     const seated: Card =
@@ -94,7 +111,7 @@ export function PoolGround({
           }
         : dropHere;
     return [seated, ...kept];
-  }, [cards, pendingDeletes, dropHere, landed, kind, me]);
+  }, [cards, pendingEdits, pendingDeletes, dropHere, landed, kind, me]);
   useEffect(() => {
     if (!landed) return;
     const timer = window.setTimeout(clearDropped, 1800);
@@ -149,6 +166,8 @@ export function PoolGround({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [droppedId]);
 
+  // Re-tapping Pool while in a pool walks the views; the toggle follows (review).
+  const cycleView = (): void => setKind(nextView(kind));
   // Compose from here defaults to this pool, its lanes as I linked them (H23).
   const composeHere = (): void =>
     openSheet({
@@ -296,11 +315,22 @@ export function PoolGround({
             onDelete={remove}
             hrefFor={(id) => shown.find((c) => c.splash.id === id)?.href ?? `/pool/${poolId}`}
           />
-          <GroundFoot here="pool" onCompose={composeHere} />
+          <GroundFoot
+            here="pool"
+            onPool={cycleView}
+            poolLabel={`Pool, showing ${kind}; tap for ${nextView(kind)}`}
+            onCompose={composeHere}
+          />
         </div>
 
         {/* Wide: Home, Pool and compose stacked at the right edge. */}
-        <GroundFoot slot="wide" here="pool" onCompose={composeHere} />
+        <GroundFoot
+          slot="wide"
+          here="pool"
+          onPool={cycleView}
+          poolLabel={`Pool, showing ${kind}; tap for ${nextView(kind)}`}
+          onCompose={composeHere}
+        />
       </div>
 
       {sheet === 'switcher' ? (

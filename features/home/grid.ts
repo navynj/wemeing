@@ -41,6 +41,11 @@ export type Card = {
   href?: string;
   /** What the top card's menu offers; both when absent. In a pool, only what is mine to do. */
   menu?: { pin: boolean; delete: boolean };
+  /**
+   * The pencil beside the menu (review): my own splash, or a joint splash in
+   * a pool I am in. Absent: no pencil.
+   */
+  editable?: boolean;
 };
 
 /** A ripple as a card reads it: its words, when it was written, and in a pool whose it is. */
@@ -222,4 +227,28 @@ export function initialsOf(name: string): string {
 /** The newest card of a month, for `?m=`: the ground opens with it on top. */
 export function newestIn(cards: Card[], month: string): Card | null {
   return cards.find((card) => monthKey(card.day) === month) ?? null;
+}
+
+/**
+ * Cards with the edits made a moment ago laid over them (review): the title,
+ * icon and declared lane show at once, before the re-read lands.
+ */
+export function withEdits(
+  cards: Card[],
+  edits: Record<string, { title: string; icon: string | null; declaredLaneId?: string | null }>,
+): Card[] {
+  if (Object.keys(edits).length === 0) return cards;
+  return cards.map((card) => {
+    const edit = edits[card.splash.id];
+    if (!edit) return card;
+    return {
+      ...card,
+      splash: {
+        ...card.splash,
+        title: edit.title,
+        icon: edit.icon,
+        ...(edit.declaredLaneId !== undefined ? { declaredLaneId: edit.declaredLaneId } : {}),
+      },
+    };
+  });
 }

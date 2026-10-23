@@ -504,6 +504,32 @@ describe('a link’s direction (0017)', () => {
   });
 });
 
+describe('editing a joint splash (review)', () => {
+  it('lets any current member change its title and icon, and nobody outside', async () => {
+    const joint = '0e600000-0000-0000-0000-000000000001';
+    await asUser(ana).rpc('create_joint_splash', {
+      p_id: joint,
+      p_pool: pool,
+      p_pool_lane: tripsLane,
+      p_title: 'Opened by Ana',
+    });
+    // Ben did not open it, and edits it all the same.
+    const edited = await asUser(ben)
+      .from('splashes')
+      .update({ title: 'Renamed by Ben', icon: '🎲' })
+      .eq('id', joint)
+      .select('title, icon')
+      .single();
+    expect(edited.data).toEqual({ title: 'Renamed by Ben', icon: '🎲' });
+    const outside = await asUser(cal)
+      .from('splashes')
+      .update({ title: 'Cal was here' })
+      .eq('id', joint)
+      .select('id');
+    expect(outside.data).toEqual([]);
+  });
+});
+
 describe('writing', () => {
   it('refuses a block written into another member’s post', async () => {
     const { error } = await asUser(ben)

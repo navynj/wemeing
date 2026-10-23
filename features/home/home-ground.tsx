@@ -15,7 +15,7 @@ import { useOptimisticAction } from '@/lib/use-optimistic-action';
 
 import { FlipBoard } from './diving-board-flip';
 import { GroundFoot } from './ground-foot';
-import { byNewest, newestIn, placeCard, type Card, type GridColumn } from './grid';
+import { byNewest, newestIn, placeCard, withEdits, type Card, type GridColumn } from './grid';
 import { LaneGrid, type GridHandle, type Ring } from './lane-grid';
 import { LaneIcon } from './lane-icon';
 import { PinnedCards } from './pinned-cards';
@@ -92,8 +92,15 @@ export function HomeGround({
   const [newLane, setNewLane] = useState(false);
   const [editingLanes, setEditingLanes] = useState(manageLanes);
   const [view, setView] = useHomeView();
-  const { openSheet, pendingDrop, clearDropped, dropMessage, pendingDeletes, markDeleted } =
-    useInputSheet();
+  const {
+    openSheet,
+    pendingDrop,
+    clearDropped,
+    dropMessage,
+    pendingDeletes,
+    markDeleted,
+    pendingEdits,
+  } = useInputSheet();
   const router = useRouter();
   const lanes = useOptimisticAction(categories);
   // Pinned from the card's menu shows at once (CLAUDE.md, the principle).
@@ -124,12 +131,15 @@ export function HomeGround({
   const landed =
     pendingDrop !== null && cards.some(({ splash }) => splash.id === pendingDrop.splash.id);
   const shown = useMemo(() => {
-    const kept = cards.filter(({ splash }) => !pendingDeletes.includes(splash.id));
+    // An edit made a moment ago shows at once (review).
+    const kept = withEdits(cards, pendingEdits).filter(
+      ({ splash }) => !pendingDeletes.includes(splash.id),
+    );
     if (!pendingDrop || landed) return kept;
     return [...kept, placeCard(pendingDrop.splash, pendingDrop.note ?? '', timeZone)].sort(
       byNewest,
     );
-  }, [cards, pendingDeletes, pendingDrop, landed, timeZone]);
+  }, [cards, pendingEdits, pendingDeletes, pendingDrop, landed, timeZone]);
 
   useEffect(() => {
     if (!landed) return;

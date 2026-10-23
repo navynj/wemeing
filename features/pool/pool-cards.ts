@@ -93,6 +93,7 @@ export function poolCards(
         })),
         href,
         menu: { pin: true, delete: blocks.every((r) => r.author_id === me) },
+        editable: true,
       });
       continue;
     }
@@ -112,6 +113,7 @@ export function poolCards(
       origins,
       // My own post: my pin and my delete, as on Home. Someone else's: neither.
       menu: { pin: mine, delete: mine },
+      editable: mine,
     });
   }
   return cards.sort(byNewest);

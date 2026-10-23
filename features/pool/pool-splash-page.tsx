@@ -68,11 +68,10 @@ export function PoolSplashPage({
 }) {
   const thread = useOptimisticAction(entries);
   const [body, setBody] = useState('');
-  const [laneId, setLaneId] = useState<string | null>(myLane);
 
   const add = (): void => {
     const note = body.trim();
-    if (!note || !laneId) return;
+    if (!note) return;
     setBody('');
     thread.run(
       (current) => [
@@ -86,7 +85,8 @@ export function PoolSplashPage({
           clock: null,
         },
       ],
-      () => addJointRipple({ splashId, poolId, myCategoryId: laneId, body: note }),
+      // My linked lane, or none when I have not linked this pool lane (0016).
+      () => addJointRipple({ splashId, poolId, myCategoryId: myLane, body: note }),
     );
   };
 
@@ -178,33 +178,15 @@ export function PoolSplashPage({
             className="text-ink placeholder:text-ink w-full resize-none text-base/relaxed outline-none placeholder:opacity-30"
           />
           <div className="flex items-center justify-between gap-3">
-            {myLane ? (
-              <span className="text-pool-500 text-xs">
-                Filed under your {categories.find((c) => c.id === myLane)?.name ?? 'lane'} lane
-              </span>
-            ) : (
-              <label className="text-pool-500 flex items-center gap-2 text-xs">
-                Your lane
-                <select
-                  value={laneId ?? ''}
-                  onChange={(event) => setLaneId(event.target.value || null)}
-                  data-joint-lane
-                  className="border-pool-200 text-ink h-9 rounded-lg border bg-white px-2 text-sm"
-                >
-                  <option value="">Pick one</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.icon ? `${c.icon} ` : ''}
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
+            <span className="text-pool-500 text-xs">
+              {myLane
+                ? `Filed under your ${categories.find((c) => c.id === myLane)?.name ?? ''} lane`
+                : 'On this pool lane only'}
+            </span>
             <button
               type="button"
               data-joint-add-button
-              disabled={!body.trim() || !laneId}
+              disabled={!body.trim()}
               onClick={add}
               className="bg-main-900 rounded-full px-5 py-2 text-sm font-semibold text-white disabled:opacity-40"
             >

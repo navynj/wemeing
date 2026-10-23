@@ -308,7 +308,7 @@ const Joint = z.object({
   title: z.string().trim().max(120),
   icon: ICON,
   body: z.string().trim().max(8000),
-  /** My lane for my ripple: the one linked to this pool lane, else the one I chose. */
+  /** My lane for my ripple: the one linked to this pool lane, or none (0016). */
   myCategoryId: z.uuid().nullable(),
   occurredOn: z
     .string()
@@ -321,9 +321,6 @@ export async function createJointSplash(input: z.infer<typeof Joint>): Promise<M
   const parsed = Joint.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'That joint splash is incomplete.' };
   const joint = parsed.data;
-  if (joint.body && !joint.myCategoryId) {
-    return { ok: false, message: 'Pick one of your lanes for your ripple.' };
-  }
   const supabase = await createClient();
   const {
     data: { user },
@@ -362,14 +359,15 @@ export async function createJointSplash(input: z.infer<typeof Joint>): Promise<M
 export async function addJointRipple(input: {
   splashId: string;
   poolId: string;
-  myCategoryId: string;
+  /** My lane linked to the joint splash's pool lane, or none (0016). */
+  myCategoryId: string | null;
   body: string;
 }): Promise<Done> {
   const parsed = z
     .object({
       splashId: z.uuid(),
       poolId: z.uuid(),
-      myCategoryId: z.uuid(),
+      myCategoryId: z.uuid().nullable(),
       body: z.string().trim().min(1).max(8000),
     })
     .safeParse(input);
@@ -404,36 +402,6 @@ export async function deleteJointSplash(poolId: string, splashId: string): Promi
   // Hard deletes include the objects (CLAUDE.md); every ripple was mine.
   await removeRippleMedia((blocks ?? []).flatMap((b) => b.media));
   revalidatePool(poolId);
-  return { ok: true };
-}
-
-/**
- * "Link it" (compose from a pool): one pool lane to one of my lanes, made on
- * the spot when I write a joint ripple on a pool lane I had not linked. RLS
- * holds the rules — my lane, a pool I am in, one link per pool lane.
- */
-export async function linkLane(input: {
-  poolId: string;
-  poolLaneId: string;
-  myCategoryId: string;
-}): Promise<Done> {
-  const parsed = z
-    .object({ poolId: z.uuid(), poolLaneId: z.uuid(), myCategoryId: z.uuid() })
-    .safeParse(input);
-  if (!parsed.success) return { ok: false, message: 'That link is not valid.' };
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, message: 'Sign in again to link this.' };
-  const { error } = await supabase.from('lane_mappings').insert({
-    user_id: user.id,
-    pool_id: parsed.data.poolId,
-    pool_lane_id: parsed.data.poolLaneId,
-    my_category_id: parsed.data.myCategoryId,
-  });
-  if (error) return { ok: false, message: said(error) };
-  revalidatePool(parsed.data.poolId);
   return { ok: true };
 }
 

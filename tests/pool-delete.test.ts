@@ -130,6 +130,14 @@ beforeAll(async () => {
   await asUser(ana)
     .from('ripples')
     .insert({ author_id: ana, category_id: ANA_TRIPS, note: 'ana in', splash_id: JOINT });
+  // Ben's most recent ripple there: lane-less, Games being unlinked for him (0016).
+  await asUser(ben).from('ripples').insert({
+    author_id: ben,
+    category_id: null,
+    note: 'ben unlinked',
+    splash_id: JOINT,
+    created_at: '2026-10-23T18:00:00.000Z',
+  });
 });
 
 afterAll(async () => {
@@ -239,6 +247,33 @@ describe('deleting a pool (0015)', () => {
       .eq('note', 'ana in')
       .single();
     expect(anas.data!.splash_id).not.toBe([...posts][0]);
+  });
+
+  it('puts a lane-less joint ripple into the lane made from the pool lane, beside the linked ones (0016)', async () => {
+    const lanes = await asUser(ben).from('my_categories').select('id, name');
+    const games = lanes.data!.find((l) => l.name === 'Games (Delete Me)')!;
+    const late = await asUser(ben)
+      .from('ripples')
+      .select('category_id, splash_id')
+      .eq('note', 'ben unlinked')
+      .single();
+    expect(late.data!.category_id).toBe(games.id);
+    const early = await asUser(ben)
+      .from('ripples')
+      .select('splash_id')
+      .eq('note', 'ben 1')
+      .single();
+    // One post for all four, each ripple keeping its own lane.
+    expect(late.data!.splash_id).toBe(early.data!.splash_id);
+    const post = await asUser(ben)
+      .from('splashes')
+      .select('declared_lane_id')
+      .eq('id', late.data!.splash_id!)
+      .single();
+    // Its declared lane is its most recent ripple's: the lane made from Games.
+    expect(post.data!.declared_lane_id).toBe(games.id);
+    // One lane for Ben from Games, for Just mine and joint alike.
+    expect(lanes.data!.filter((l) => l.name.startsWith('Games (')).length).toBe(1);
   });
 
   it('moves Just-mine splashes into a lane made from the pool lane, suffixed when the name is taken', async () => {

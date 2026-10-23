@@ -24,19 +24,35 @@ function summary(id: string): SplashSummary {
   } as unknown as SplashSummary;
 }
 
-const JOINT_POOL = new Map([['s-joint', 'p-ours']]);
-const POOL_NAME = new Map([['p-ours', 'Our Pool']]);
-
-describe('the pool badge on Home (H23)', () => {
-  it('marks a joint splash entry with its pool, opening the pool’s page', () => {
-    const card = withPoolBadge(placeCard(summary('s-joint'), '', 'UTC'), JOINT_POOL, POOL_NAME);
+describe('the pool badge on Home (H23, 0016)', () => {
+  it('puts a joint entry whose latest ripple has no lane in its pool’s column, with the badge and tag', () => {
+    const card = withPoolBadge(placeCard(summary('s-joint'), '', 'UTC'), {
+      poolId: 'p-ours',
+      poolName: 'Our Pool',
+      latestLane: null,
+      poolLane: { name: 'Games', icon: '🎲' },
+    });
+    expect(card.column).toBe('pool:p-ours');
     expect(card.pools).toEqual(['Our Pool']);
+    expect(card.origins).toEqual(['Our Pool · 🎲 Games']);
     expect(card.href).toBe('/pool/p-ours/splash/s-joint');
   });
 
+  it('keeps a joint entry whose latest ripple is linked in that lane’s column', () => {
+    const card = withPoolBadge(placeCard(summary('s-joint'), '', 'UTC'), {
+      poolId: 'p-ours',
+      poolName: 'Our Pool',
+      latestLane: 'my-media',
+      poolLane: { name: 'Games', icon: '🎲' },
+    });
+    expect(card.column).toBe('my-media');
+    expect(card.pools).toEqual(['Our Pool']);
+  });
+
   it('leaves my own splash shared to a pool unbadged', () => {
-    const card = withPoolBadge(placeCard(summary('s-mine'), '', 'UTC'), JOINT_POOL, POOL_NAME);
+    const card = withPoolBadge(placeCard(summary('s-mine'), '', 'UTC'), undefined);
     expect(card.pools).toBeUndefined();
     expect(card.href).toBeUndefined();
+    expect(card.column).toBeUndefined();
   });
 });

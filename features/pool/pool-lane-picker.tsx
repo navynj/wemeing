@@ -10,8 +10,8 @@ import type { PoolScope } from './compose-scope';
 
 /**
  * The choice when composing from a pool (H23): a pool lane — a joint
- * splash the pool owns — or one of my lanes linked here — my own splash,
- * placed in this pool.
+ * splash the pool owns, or "Just mine" on it — or one of my lanes linked
+ * here — my own splash, placed in this pool.
  */
 export type PoolPick =
   | { kind: 'joint'; poolLaneId: string }
@@ -22,51 +22,42 @@ export type PoolPick =
 
 type Segment = 'pool' | 'mine';
 
-/** My lane for my ripple on a joint splash whose pool lane I have not linked. */
-export type JointLane = { myCategoryId: string | null; linkIt: boolean };
-
-// Selection is ink, never blue (H20f): blue stays for actions.
+/** A lane chip: the one filled element here — ink when chosen (H20f), outlined otherwise. */
 const chip = (selected: boolean): string =>
   `flex shrink-0 flex-col items-start rounded-2xl px-3.5 py-2 text-left ${
     selected ? 'bg-ink text-white' : 'border-pool-200 text-ink border'
   }`;
 
 /**
- * Composing from a pool: *Pool lanes* | *My lanes*, Pool lanes first.
- * Pool lanes are this pool's lanes; picking one makes a joint splash on it.
- * My lanes are only those linked to this pool, each naming the pool lane it
- * lands in; picking one makes my splash, placed here. There is no audience
- * here: what is written in a pool is in that pool.
+ * Composing from a pool (review): the lane is the one decision, and the two
+ * toggles qualify it. *Pool lanes | My lanes* are text tabs above the chips
+ * — the chosen one in ink with a 2px underline, the other muted, at a
+ * section label's size. The lane chips are the only filled element. Under
+ * Pool lanes, once a lane is chosen, *Everyone's | Just mine* is a small
+ * text toggle beneath the chips, the chosen option in ink and weight. My
+ * ripple on a joint splash takes the lane I linked to that pool lane, or
+ * none (0016) — nothing to ask. There is no audience here: what is written
+ * in a pool is in that pool.
  */
 export function PoolLanePicker({
   scope,
   categories,
   pick,
   onPick,
-  jointLane,
-  onJointLane,
 }: {
   scope: PoolScope;
   categories: Pick<MyCategory, 'id' | 'name' | 'icon'>[];
   pick: PoolPick;
   onPick: (pick: PoolPick) => void;
-  jointLane: JointLane;
-  onJointLane: (lane: JointLane) => void;
 }) {
   const { closeSheet } = useInputSheet();
   const [segment, setSegment] = useState<Segment>('pool');
   const linked = scope.lanes.filter((lane) => lane.myCategoryId);
   const onPoolLane = pick?.kind === 'joint' || pick?.kind === 'own';
-  const chosenPoolLane = onPoolLane ? scope.lanes.find((l) => l.id === pick.poolLaneId) : undefined;
 
   return (
     <div data-pool-lane-picker className="flex flex-col gap-3">
-      <div
-        role="tablist"
-        aria-label="Lanes"
-        data-lane-segment
-        className="bg-pool-100 flex self-start rounded-full p-0.5 text-sm font-medium"
-      >
+      <div role="tablist" aria-label="Lanes" data-lane-segment className="flex gap-5 text-xs">
         {(
           [
             ['pool', 'Pool lanes'],
@@ -84,8 +75,10 @@ export function PoolLanePicker({
               setSegment(value);
               onPick(null);
             }}
-            className={`rounded-full px-4 py-1.5 ${
-              segment === value ? 'bg-ink text-white' : 'text-pool-500'
+            className={`border-b-2 pb-1 ${
+              segment === value
+                ? 'border-ink text-ink font-semibold'
+                : 'text-pool-500 border-transparent'
             }`}
           >
             {label}
@@ -122,15 +115,9 @@ export function PoolLanePicker({
               );
             })}
           </div>
-          {chosenPoolLane ? (
-            // Whose splash it is: the pool's (everyone writes in it), or mine
-            // alone on that lane (0014). Ink for the chosen one (H20f).
-            <div
-              role="tablist"
-              aria-label="Whose"
-              data-whose
-              className="bg-pool-100 flex self-start rounded-full p-0.5 text-xs font-medium"
-            >
+          {onPoolLane ? (
+            // Whose splash it is: the pool's, or mine alone on that lane (0014).
+            <div role="tablist" aria-label="Whose" data-whose className="flex gap-4 text-xs">
               {(
                 [
                   ['joint', "Everyone's"],
@@ -141,52 +128,14 @@ export function PoolLanePicker({
                   key={kind}
                   type="button"
                   role="tab"
-                  aria-selected={pick?.kind === kind}
+                  aria-selected={pick.kind === kind}
                   data-whose-option={kind}
-                  onClick={() => onPick({ kind, poolLaneId: chosenPoolLane.id })}
-                  className={`rounded-full px-3 py-1 ${
-                    pick?.kind === kind ? 'bg-ink text-white' : 'text-pool-500'
-                  }`}
+                  onClick={() => onPick({ kind, poolLaneId: pick.poolLaneId })}
+                  className={pick.kind === kind ? 'text-ink font-semibold' : 'text-pool-500'}
                 >
                   {label}
                 </button>
               ))}
-            </div>
-          ) : null}
-          {chosenPoolLane && pick?.kind === 'joint' && !chosenPoolLane.myCategoryId ? (
-            // A ripple is always filed under one of my lanes (ripples.category_id).
-            <div
-              data-joint-unlinked
-              className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs"
-            >
-              <span className="text-pool-500">Not linked to your lanes</span>
-              <select
-                value={jointLane.myCategoryId ?? ''}
-                aria-label="Your lane for this ripple"
-                data-joint-my-lane
-                onChange={(event) =>
-                  onJointLane({ ...jointLane, myCategoryId: event.target.value || null })
-                }
-                className="border-pool-200 text-ink h-8 rounded-lg border bg-white px-2 text-sm"
-              >
-                <option value="">Pick your lane</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.icon ? `${c.icon} ` : ''}
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              <label className="text-ink flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  data-link-it
-                  checked={jointLane.linkIt}
-                  onChange={(event) => onJointLane({ ...jointLane, linkIt: event.target.checked })}
-                  className="accent-ink"
-                />
-                Link it
-              </label>
             </div>
           ) : null}
         </>
@@ -224,7 +173,7 @@ export function PoolLanePicker({
             href={`/pool/${scope.poolId}/settings`}
             onClick={closeSheet}
             data-link-a-lane
-            className="border-pool-200 text-pool-500 flex h-auto shrink-0 items-center rounded-2xl border border-dashed px-3.5 text-sm"
+            className="border-pool-200 text-pool-500 flex shrink-0 items-center rounded-2xl border border-dashed px-3.5 text-sm"
           >
             + Link a lane
           </Link>

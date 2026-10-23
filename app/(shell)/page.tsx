@@ -70,11 +70,44 @@ export default async function HomePage({ searchParams }: PageProps<'/'>) {
   const summaries = summarizeSplashes(boards, ripples, profile.timezone, now);
   const poolName = new Map(pools.map((p) => [p.id, p.name]));
   const jointPool = new Map(joints.map((j) => [j.id, j.pool_id!]));
+  const latestAt = new Map<string, string>();
+  // A joint entry sits where my most recent ripple on it is filed: its lane,
+  // or its pool's column when that ripple has none (0016).
+  const latestLane = new Map<string, string | null>();
+  for (const r of ripples) {
+    if (!r.splash_id || !jointPool.has(r.splash_id)) continue;
+    const seen = latestLane.get(r.splash_id);
+    if (seen === undefined || r.created_at > (latestAt.get(r.splash_id) ?? '')) {
+      latestLane.set(r.splash_id, r.category_id);
+      latestAt.set(r.splash_id, r.created_at);
+    }
+  }
+  // The joint splash's pool lane, for its tag "<Pool> · <emoji> <pool lane>".
+  const jointLane = new Map<string, { name: string; icon: string | null }>();
+  if (joints.length > 0) {
+    const { data: lanes } = await supabase
+      .from('pool_lanes')
+      .select('id, name, icon')
+      .in('id', [...new Set(joints.map((j) => j.pool_lane_id!))]);
+    const laneById = new Map((lanes ?? []).map((l) => [l.id, l]));
+    for (const j of joints) {
+      const lane = laneById.get(j.pool_lane_id!);
+      if (lane) jointLane.set(j.id, { name: lane.name, icon: lane.icon });
+    }
+  }
 
   // Just mine (0014): a column per pool after my lanes, headed by the pool's
   // monogram and name — "A pool you left" with a neutral tile once I cannot
   // read it — and each mark showing its pool lane's emoji while I can.
-  const ownPools = [...new Set(mine.flatMap((s) => (s.own_pool_id ? [s.own_pool_id] : [])))];
+  const ownPools = [
+    ...new Set([
+      ...mine.flatMap((s) => (s.own_pool_id ? [s.own_pool_id] : [])),
+      // A joint entry whose latest ripple of mine has no lane lives there too (0016).
+      ...[...latestLane.entries()].flatMap(([id, lane]) =>
+        lane === null ? [jointPool.get(id)!] : [],
+      ),
+    ]),
+  ];
   const ownLaneIcon = new Map<string, string | null>();
   if (ownPools.length > 0) {
     const placed = await getMyPlacements(supabase, profile.id);
@@ -129,7 +162,18 @@ export default async function HomePage({ searchParams }: PageProps<'/'>) {
           },
         };
       }
-      return withPoolBadge(card, jointPool, poolName);
+      const pool = jointPool.get(summary.id);
+      return withPoolBadge(
+        card,
+        pool
+          ? {
+              poolId: pool,
+              poolName: poolName.get(pool) ?? null,
+              latestLane: latestLane.get(summary.id) ?? null,
+              poolLane: jointLane.get(summary.id) ?? null,
+            }
+          : undefined,
+      );
     })
     // Where each is or was in a pool, on its card (0015).
     .map((card) => {

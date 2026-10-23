@@ -336,6 +336,61 @@ describe('Just mine (0014)', () => {
   });
 });
 
+describe('a joint ripple with no lane of mine (0016)', () => {
+  const DAYS_JOINT = '0e400000-0000-0000-0000-000000000001';
+  let days: string;
+
+  it('saves on an unlinked pool lane with no lane, and linking later moves it in; unlinking moves nothing', async () => {
+    days = (await asUser(ben).from('pool_lanes').select('id').eq('name', 'Days').single()).data!.id;
+    await asUser(ben).rpc('create_joint_splash', {
+      p_id: DAYS_JOINT,
+      p_pool: pool,
+      p_pool_lane: days,
+      p_title: 'Daily',
+    });
+    const saved = await asUser(ben)
+      .from('ripples')
+      .insert({ author_id: ben, category_id: null, note: 'unlinked day', splash_id: DAYS_JOINT })
+      .select('id, category_id')
+      .single();
+    expect(saved.error).toBeNull();
+    expect(saved.data!.category_id).toBeNull();
+
+    const linked = await asUser(ben).rpc('set_lane_links', {
+      p_pool: pool,
+      p_links: [
+        { pool_lane_id: tripsLane, my_category_id: BEN_TRIPS },
+        { pool_lane_id: days, my_category_id: BEN_TRIPS },
+      ],
+    });
+    expect(linked.error).toBeNull();
+    const moved = await asUser(ben)
+      .from('ripples')
+      .select('category_id')
+      .eq('id', saved.data!.id)
+      .single();
+    expect(moved.data!.category_id).toBe(BEN_TRIPS);
+
+    await asUser(ben).rpc('set_lane_links', {
+      p_pool: pool,
+      p_links: [{ pool_lane_id: tripsLane, my_category_id: BEN_TRIPS }],
+    });
+    const kept = await asUser(ben)
+      .from('ripples')
+      .select('category_id')
+      .eq('id', saved.data!.id)
+      .single();
+    expect(kept.data!.category_id).toBe(BEN_TRIPS);
+  });
+
+  it('is still refused on an ordinary personal splash', async () => {
+    const { error } = await asUser(ben)
+      .from('ripples')
+      .insert({ author_id: ben, category_id: null, note: 'no lane', splash_id: BEN_OLD_POST });
+    expect(error?.code).toBe('23514');
+  });
+});
+
 describe('writing', () => {
   it('refuses a block written into another member’s post', async () => {
     const { error } = await asUser(ben)

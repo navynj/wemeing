@@ -1,26 +1,41 @@
-import type { Card } from '@/features/home/grid';
+import { ownPoolColumn, type Card } from '@/features/home/grid';
 
+import { originTag } from './origin-tag';
 import { poolSplashHref } from './pool-cards';
 
+/** What Home knows about a joint splash I have written in. */
+export type JointOnHome = {
+  poolId: string;
+  /** Null once I cannot read the pool (I left it). */
+  poolName: string | null;
+  /** The lane of my most recent ripple on it; null when that ripple has none (0016). */
+  latestLane: string | null;
+  /** Its pool lane, while I can read it. */
+  poolLane: { name: string; icon: string | null } | null;
+};
+
 /**
- * A card on Home, as pools touch it (H23): a joint splash — my ripples on a
- * splash a pool owns — carries the pool's monogram, opens the pool's page,
- * and is neither pinned nor deleted from here. My own splash merely shared
- * to a pool carries nothing on Home: its audience shows on its page's
- * Audience chip.
+ * A card on Home, as pools touch it (H23, 0016): a joint splash — my
+ * ripples on a splash a pool owns — carries the pool's monogram, opens the
+ * pool's page, and is neither pinned nor deleted from here. It sits where my
+ * most recent ripple on it is filed: that lane's column, or its pool's
+ * column when the ripple has no lane of mine; and it carries its tag,
+ * "<Pool> · <emoji> <pool lane>". My own splash merely shared to a pool
+ * carries no badge on Home: its audience shows on its page's Audience chip.
  */
-export function withPoolBadge(
-  card: Card,
-  jointPool: ReadonlyMap<string, string>,
-  poolName: ReadonlyMap<string, string>,
-): Card {
-  const pool = jointPool.get(card.splash.id);
-  if (!pool) return card;
-  const name = poolName.get(pool);
+export function withPoolBadge(card: Card, joint: JointOnHome | undefined): Card {
+  if (!joint) return card;
+  const name = joint.poolName;
   return {
     ...card,
     pools: name ? [name] : [],
-    href: poolSplashHref(pool, card.splash.id),
+    href: poolSplashHref(joint.poolId, card.splash.id),
     menu: { pin: false, delete: false },
+    column: joint.latestLane ?? ownPoolColumn(joint.poolId),
+    ...(joint.poolLane
+      ? {
+          origins: [originTag(name ?? 'A pool you left', joint.poolLane.icon, joint.poolLane.name)],
+        }
+      : {}),
   };
 }

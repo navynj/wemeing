@@ -11,7 +11,6 @@ vi.mock('@/features/splash/actions', () => ({
 }));
 const placed: { splashId: string; pools: string[] }[] = [];
 const joints: Record<string, unknown>[] = [];
-const linked: Record<string, unknown>[] = [];
 const owns: Record<string, unknown>[] = [];
 vi.mock('@/features/pool/actions', () => ({
   placeNewSplash: (splashId: string, pools: string[]) => {
@@ -25,10 +24,6 @@ vi.mock('@/features/pool/actions', () => ({
   dropOwnPoolSplash: (input: Record<string, unknown>) => {
     owns.push(input);
     return Promise.resolve({ ok: true, id: input.id });
-  },
-  linkLane: (input: Record<string, unknown>) => {
-    linked.push(input);
-    return Promise.resolve({ ok: true });
   },
 }));
 const pathname = '/';
@@ -89,7 +84,6 @@ beforeEach(() => {
   drops.length = 0;
   placed.length = 0;
   joints.length = 0;
-  linked.length = 0;
   owns.length = 0;
   handoffs.length = 0;
   window.URL.createObjectURL = () => 'blob:preview';
@@ -407,14 +401,13 @@ describe('compose from a pool (H23)', () => {
     fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-trips"]')!);
     fireEvent.click(view.drop());
     await waitFor(() => expect(joints).toHaveLength(1));
-    // The linked lane files my ripple; nothing is placed, nothing linked.
+    // The linked lane files my ripple, with no prompt; nothing is placed.
     expect(joints[0]).toMatchObject({
       poolId: 'p-ours',
       poolLaneId: 'pl-trips',
       myCategoryId: 'c-place',
     });
     expect(placed).toEqual([]);
-    expect(linked).toEqual([]);
   });
 
   it('lists only my lanes linked to this pool, and places my splash here', async () => {
@@ -443,35 +436,25 @@ describe('compose from a pool (H23)', () => {
     expect(view.container.querySelector('[data-audience-chip]')).toBeNull();
   });
 
-  it('links an unlinked pool lane on drop when "Link it" is checked', async () => {
+  it('drops a joint ripple on an unlinked pool lane with no lane of mine, asking nothing', async () => {
     const view = poolSheet();
     fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Chapter 3' } });
     fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-notes"]')!);
-    expect(view.getByText('Not linked to your lanes')).toBeTruthy();
-    const box = view.container.querySelector('[data-link-it]') as HTMLInputElement;
-    expect(box.checked).toBe(true);
-    // No lane of mine yet: the drop waits for one.
-    expect(view.drop().disabled).toBe(true);
-    fireEvent.change(view.getByLabelText('Your lane for this ripple'), {
-      target: { value: 'c-mood' },
-    });
+    expect(view.queryByText('Not linked to your lanes')).toBeNull();
+    expect(view.container.querySelector('[data-link-it]')).toBeNull();
     fireEvent.click(view.drop());
     await waitFor(() => expect(joints).toHaveLength(1));
-    expect(linked).toEqual([{ poolId: 'p-ours', poolLaneId: 'pl-notes', myCategoryId: 'c-mood' }]);
-    expect(joints[0]).toMatchObject({ poolLaneId: 'pl-notes', myCategoryId: 'c-mood' });
+    expect(joints[0]).toMatchObject({ poolLaneId: 'pl-notes', myCategoryId: null });
   });
 
-  it('does not link when "Link it" is unchecked', async () => {
+  it('renders one filled row — the lane chips — and no link row', () => {
     const view = poolSheet();
-    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Chapter 4' } });
-    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-notes"]')!);
-    fireEvent.change(view.getByLabelText('Your lane for this ripple'), {
-      target: { value: 'c-mood' },
-    });
-    fireEvent.click(view.container.querySelector('[data-link-it]')!);
-    fireEvent.click(view.drop());
-    await waitFor(() => expect(joints).toHaveLength(1));
-    expect(linked).toEqual([]);
+    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-trips"]')!);
+    const filled = [...view.container.querySelectorAll('[data-pool-lane-picker] .bg-ink')];
+    // Only the chosen lane chip is filled; the tabs and Everyone's | Just mine are text.
+    expect(filled.map((el) => el.getAttribute('data-pick-pool-lane'))).toEqual(['pl-trips']);
+    expect(view.container.querySelector('[data-joint-unlinked]')).toBeNull();
+    expect(view.getByRole('tab', { name: 'Pool lanes' }).className).toContain('border-ink');
   });
 });
 
@@ -512,6 +495,5 @@ describe('Just mine from a pool (0014)', () => {
     await waitFor(() => expect(owns).toHaveLength(1));
     expect(owns[0]).toMatchObject({ poolId: 'p-ours', poolLaneId: 'pl-notes', body: 'my notes' });
     expect(joints).toEqual([]);
-    expect(linked).toEqual([]);
   });
 });

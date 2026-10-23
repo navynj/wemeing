@@ -7,6 +7,7 @@ import type { MyCategory } from '@/lib/queries/profile';
 import type { useOptimisticAction } from '@/lib/use-optimistic-action';
 
 import { deleteLane, saveLane } from './actions';
+import { EmojiInput } from './emoji-input';
 
 /**
  * What a lane gets when its author never picks a glyph. Shown as a
@@ -61,14 +62,7 @@ export function CategorySheet({
         style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom, 0px))' }}
       >
         <div className="flex items-center gap-3">
-          <input
-            value={icon}
-            onChange={(event) => setIcon(event.target.value)}
-            aria-label="Icon"
-            placeholder={DEFAULT_ICON}
-            maxLength={8}
-            className="bg-pool-100 h-12 w-12 shrink-0 rounded-full text-center text-xl outline-none placeholder:opacity-30"
-          />
+          <EmojiInput value={icon} onChange={setIcon} label="Icon" placeholder={DEFAULT_ICON} />
           <input
             value={name}
             onChange={(event) => setName(event.target.value)}

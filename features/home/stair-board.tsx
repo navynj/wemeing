@@ -10,7 +10,7 @@ import type { MyCategory } from '@/lib/queries/profile';
 
 import { CARD_PX, CardFace, face, SPINE_PX, TINT_STEP } from './card-face';
 import { CardMenu } from './card-menu';
-import { cardLane, type Card } from './grid';
+import { laneOfCard, type Card, type CardLane } from './grid';
 import { FLIP_SPRING, type Flip } from './use-flip';
 
 /** Each step of the lower stair: how far a card peeks below the one in front, its visible edge. */
@@ -164,7 +164,7 @@ export function StairBoard({
   /** Newest first, in the order `flip.ids` follows. */
   cards: Card[];
   flip: Flip;
-  categories: MyCategory[];
+  categories: Pick<MyCategory, 'id' | 'icon' | 'name'>[];
   initials: string;
   pinnedIds: ReadonlySet<string>;
   onPin: (card: Card, pinned: boolean) => void;
@@ -324,7 +324,7 @@ export function StairBoard({
                 stair={stair}
                 cardWidth={cardWidth}
                 cardLeft={cardLeft}
-                lane={categories.find((c) => c.id === cardLane(card.splash)) ?? null}
+                lane={laneOfCard(card, categories)}
                 initials={initials}
                 onPanStart={onPanStart}
                 onPan={onPan}
@@ -368,7 +368,7 @@ function Step({
   stair: Stair;
   cardWidth: MotionValue<number>;
   cardLeft: MotionValue<number>;
-  lane: MyCategory | null;
+  lane: CardLane | null;
   initials: string;
   onPanStart: () => void;
   onPan: (event: PointerEvent, info: PanInfo) => void;

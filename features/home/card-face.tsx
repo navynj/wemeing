@@ -6,9 +6,9 @@ import { OutlineChip } from '@/components/ui/chips/category-chip';
 import { splashFromHome } from '@/features/home/scope';
 import { RippleThread } from '@/features/splash/ripple-thread';
 import { DETAIL_TITLE_CLASS } from '@/features/splash/splash-header';
-import type { MyCategory } from '@/lib/queries/profile';
+import { Monogram } from '@/components/ui/monogram';
 
-import { cardDate, postIcon, type Card } from './grid';
+import { cardDate, postIcon, type Card, type CardLane } from './grid';
 
 /** The top card's height, fixed so the grid above never moves when the stack changes. */
 export const CARD_PX = 200;
@@ -49,7 +49,7 @@ export function CardFace({
   onClickCapture,
 }: {
   card: Card;
-  lane: MyCategory | null;
+  lane: CardLane | null;
   initials: string;
   /** Everything, or the title line on the edge that shows: a top or bottom band, or a left or right spine. */
   edge: 'full' | 'top' | 'bottom' | 'left' | 'right';
@@ -116,7 +116,7 @@ export function CardFace({
   }
   return (
     <Link
-      href={href ?? splashFromHome(card.splash.id)}
+      href={href ?? card.href ?? splashFromHome(card.splash.id)}
       data-card-link={card.splash.id}
       onClickCapture={onClickCapture}
       draggable={false}
@@ -128,17 +128,24 @@ export function CardFace({
         <span data-card-date className="text-main-900 text-sm font-medium tabular-nums">
           {cardDate(card.day)}
         </span>
-        {lane ? <OutlineChip icon={lane.icon} name={lane.name} /> : null}
+        <span className="flex shrink-0 items-center gap-1">
+          {/* Where the post is shared (H23): one monogram per pool. */}
+          {(card.pools ?? []).map((pool) => (
+            <Monogram key={pool} name={pool} size="chip" />
+          ))}
+          {lane ? <OutlineChip icon={lane.icon} name={lane.name} /> : null}
+        </span>
       </span>
       <span data-card-body className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         {/* Each ripple an entry of its own, threaded avatar to avatar (round 3). */}
         <RippleThread
-          initials={initials}
+          initials={card.author ?? initials}
           entries={(card.ripples.length > 0
             ? card.ripples
-            : [{ id: card.splash.id, note: card.body, createdAt: '' }]
+            : [{ id: card.splash.id, note: card.body, createdAt: '', initials: card.author }]
           ).map((ripple) => ({
             id: ripple.id,
+            initials: ripple.initials,
             body: (
               <span className="text-ink/80 text-[13px]/relaxed whitespace-pre-wrap">
                 {ripple.note}

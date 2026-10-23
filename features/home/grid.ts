@@ -22,10 +22,44 @@ export type Card = {
   body: string;
   /** Every block with words, oldest first: the card's thread, one entry per ripple. */
   ripples: CardRipple[];
+  /**
+   * In a pool (H23), where the mark sits — the pool lane in the Lane view,
+   * the author in Swimmers — and what the card names as its lane. Absent on
+   * Home, where both come from the post's own lane.
+   */
+  column?: string;
+  lane?: CardLane | null;
+  /** In a pool: the author's initials, under the mark's title and on the card. */
+  author?: string;
+  /** A joint splash (H23): drawn as a band across the columns, each ripple a branch. */
+  branches?: Branch[];
+  /** On Home: the pools this post is shared to, as monogram chips. */
+  pools?: string[];
+  /** Where the top card opens, when not the post's own page from Home. */
+  href?: string;
+  /** What the top card's menu offers; both when absent. In a pool, only what is mine to do. */
+  menu?: { pin: boolean; delete: boolean };
 };
 
-/** A ripple as a card reads it: its words, and when it was written. */
-export type CardRipple = { id: string; note: string; createdAt: string };
+/** A ripple as a card reads it: its words, when it was written, and in a pool whose it is. */
+export type CardRipple = { id: string; note: string; createdAt: string; initials?: string };
+
+/** What a card names as its lane: an emoji and a name. */
+export type CardLane = { icon: string | null; name: string };
+
+/** A joint splash's ripple, as a branch off its band: the column it drops into, and whose it is. */
+export type Branch = { id: string; column: string; initials: string };
+
+/** A column of the grid: a lane of mine on Home, a pool lane or a member in a pool. */
+export type GridColumn = {
+  id: string;
+  name: string;
+  icon: string | null;
+  /** A member's column shows their initials on a disc instead of an emoji. */
+  avatar?: string;
+  /** Where the header goes: a lane's page on Home; null for no link. */
+  href?: string | null;
+};
 
 /**
  * Where a post sits (H22): on the last day of its display range, else the
@@ -62,7 +96,7 @@ export function byNewest(a: Card, b: Card): number {
 /** The glyph a post shows as (0008): its own icon when set, else its lane's emoji. */
 export function postIcon(
   splash: Pick<SplashSummary, 'icon'>,
-  lane: Pick<MyCategory, 'icon'> | null,
+  lane: Pick<CardLane, 'icon'> | null,
 ): string | null {
   return splash.icon ?? lane?.icon ?? null;
 }
@@ -72,10 +106,25 @@ export function cardLane(splash: SplashSummary): string | null {
   return splash.declaredLaneId ?? representativeLane(splash);
 }
 
-/** True when the post's lane is none of mine: it takes the unlabelled column. */
-export function isOrphanCard(card: Card, categories: MyCategory[]): boolean {
-  const lane = cardLane(card.splash);
-  return lane === null || !categories.some((c) => c.id === lane);
+/** The column a mark sits in: the pool's choice where there is one (H23), else its lane. */
+export function cardColumn(card: Card): string | null {
+  return card.column ?? cardLane(card.splash);
+}
+
+/** What a card names as its lane: its own (a pool lane), else one of mine. */
+export function laneOfCard(
+  card: Card,
+  categories: Pick<MyCategory, 'id' | 'icon' | 'name'>[],
+): CardLane | null {
+  if (card.lane !== undefined) return card.lane;
+  const id = cardLane(card.splash);
+  return categories.find((c) => c.id === id) ?? null;
+}
+
+/** True when the post's column is none of the grid's: it takes the unlabelled column. */
+export function isOrphanCard(card: Card, columns: Pick<GridColumn, 'id'>[]): boolean {
+  const column = cardColumn(card);
+  return column === null || !columns.some((c) => c.id === column);
 }
 
 /** `2026-10-21`, the day before. */

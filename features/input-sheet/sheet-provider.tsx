@@ -2,6 +2,8 @@
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
+import type { Card } from '@/features/home/grid';
+import type { PoolScope } from '@/features/pool/compose-scope';
 import type { SplashSummary } from '@/features/splash/summary';
 
 /**
@@ -13,13 +15,23 @@ import type { SplashSummary } from '@/features/splash/summary';
  * the server has it (CLAUDE.md, the principle) — so the ground can seat its
  * pill at once and play the commit ripple there.
  */
-export type OpenSheet = { kind: 'splash' } | null;
+export type OpenSheet = { kind: 'splash'; pool: PoolScope | null } | null;
 
-export type PendingDrop = { splash: SplashSummary; month: string; note: string | null };
+/**
+ * `pool`: dropped from a pool (H23) — the card as that pool's grid should
+ * show it, so the pool seats it before the server has it, as Home does.
+ */
+export type PendingDrop = {
+  splash: SplashSummary;
+  month: string;
+  note: string | null;
+  pool?: { poolId: string; card: Card };
+};
 
 type SheetApi = {
   sheet: OpenSheet;
-  openSheet: () => void;
+  /** From a pool, with that pool as the default (H23); from Home, with none. */
+  openSheet: (pool?: PoolScope | null) => void;
   closeSheet: () => void;
   /** The post just dropped, until the ground has read it back. */
   pendingDrop: PendingDrop | null;
@@ -45,7 +57,10 @@ export function InputSheetProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const openSheet = useCallback(() => setSheet({ kind: 'splash' }), []);
+  const openSheet = useCallback(
+    (pool: PoolScope | null = null) => setSheet({ kind: 'splash', pool }),
+    [],
+  );
   const closeSheet = useCallback(() => setSheet(null), []);
   const markDropped = useCallback((drop: PendingDrop) => {
     setDropMessage(null);

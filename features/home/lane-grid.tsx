@@ -2,6 +2,7 @@
 
 import {
   forwardRef,
+  Fragment,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -18,21 +19,25 @@ import { useAxisLock } from '@/components/ui/use-axis-lock';
 import { CommitRing } from '@/components/ui/waves';
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
 import { monthKey } from '@/features/splash/summary';
-import type { MyCategory } from '@/lib/queries/profile';
 import type { IsoDate } from '@/lib/time';
 
+import { Monogram } from '@/components/ui/monogram';
+
 import {
-  cardLane,
+  cardColumn,
   daysDown,
   EVEN_COLUMNS_MAX,
   FIXED_COLUMN_PX,
   gridBounds,
   isOrphanCard,
+  laneOfCard,
   monthAbbrev,
   weekdayOf,
   type Card,
+  type GridColumn,
 } from './grid';
 import { DAY_RAIL_PX, DateDay } from './date-day';
+import { JointBand, JointRows } from './joint-band';
 import { PostRow } from './post-row';
 
 /** The date rail's width and the `+` column's, both fixed; the lanes share the rest. */
@@ -104,17 +109,20 @@ export const LaneGrid = forwardRef<
   {
     /** Newest first. */
     cards: Card[];
-    categories: MyCategory[];
+    /** The columns: my lanes on Home; a pool's lanes, or its members, in a pool (H23). */
+    categories: GridColumn[];
     today: IsoDate;
     /** The mark to ring, once per `seq`. */
     ring: Ring | null;
     /** Every post but the one on top of the board: their marks read translucent (review). */
     waterIds: ReadonlySet<string>;
-    initials: string;
+    /** The avatar above the headers; null in a pool, whose header names its members. */
+    initials: string | null;
     /** `?m=`: the month to scroll the grid to; the newest day of it lands under the headers. */
     scrollToMonth: string | null;
     onPick: (id: string) => void;
-    onCreateLane: () => void;
+    /** The `+` column after the last lane; absent where lanes are not made here. */
+    onCreateLane?: () => void;
     /**
      * The Lane view (the grid) or the Date view (round 3): the same scroller,
      * rail, window, `?m=` target and ring; in the Date view a day's posts are
@@ -161,7 +169,8 @@ export const LaneGrid = forwardRef<
     Math.max(WINDOW_MIN, daysDown(top, `${monthKey(top)}-01`).length),
   );
 
-  const orphans = cards.some((card) => isOrphanCard(card, categories));
+  const plusColumn = onCreateLane !== undefined;
+  const orphans = cards.some((card) => !card.branches && isOrphanCard(card, categories));
   const columns = categories.length + (orphans ? 1 : 0);
   const even = dateView || columns <= EVEN_COLUMNS_MAX;
   // Every mark carries its short title (round 3). Past six lanes a column
@@ -170,20 +179,24 @@ export const LaneGrid = forwardRef<
   const titled = !dateView;
   const share =
     viewportWidth !== null
-      ? Math.max(MIN_COLUMN_PX, Math.floor((viewportWidth - RAIL_PX - PLUS_PX) / EVEN_COLUMNS_MAX))
+      ? Math.max(
+          MIN_COLUMN_PX,
+          Math.floor((viewportWidth - RAIL_PX - (plusColumn ? PLUS_PX : 0)) / EVEN_COLUMNS_MAX),
+        )
       : FIXED_COLUMN_PX;
   const template = dateView
     ? `${RAIL_PX}px minmax(0, 1fr)`
     : `${RAIL_PX}px repeat(${Math.max(columns, 1)}, ${
         even ? 'minmax(0, 1fr)' : `${share}px`
-      }) ${PLUS_PX}px`;
-  const byLaneId = useMemo(() => new Map(categories.map((lane) => [lane.id, lane])), [categories]);
+      })${plusColumn ? ` ${PLUS_PX}px` : ''}`;
 
   // Each day's cards by lane, so a cell is one lookup.
   const byCell = useMemo(() => {
     const map = new Map<string, Card[]>();
     for (const card of cards) {
-      const lane = isOrphanCard(card, categories) ? '' : (cardLane(card.splash) ?? '');
+      // A joint splash is a band, never a mark in a cell (H23).
+      if (card.branches) continue;
+      const lane = isOrphanCard(card, categories) ? '' : (cardColumn(card) ?? '');
       const key = `${card.day}|${lane}`;
       const cell = map.get(key);
       if (cell) cell.push(card);
@@ -348,14 +361,16 @@ export const LaneGrid = forwardRef<
       className="no-scrollbar relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
     >
       {/* The avatar: large, centred, scrolling away with the days. */}
-      <div data-avatar-row className="flex justify-center pt-5 pb-6">
-        <span
-          data-avatar
-          className="flex h-20 w-20 items-center justify-center rounded-full bg-white/25 text-2xl font-medium text-white/70"
-        >
-          {initials}
-        </span>
-      </div>
+      {initials !== null ? (
+        <div data-avatar-row className="flex justify-center pt-5 pb-6">
+          <span
+            data-avatar
+            className="flex h-20 w-20 items-center justify-center rounded-full bg-white/25 text-2xl font-medium text-white/70"
+          >
+            {initials}
+          </span>
+        </div>
+      ) : null}
 
       {/* The lane headers: one bar sticky at the top, on the water so rows
           pass beneath, moved sideways with the columns. A header opens its
@@ -371,32 +386,22 @@ export const LaneGrid = forwardRef<
               style={{ gridTemplateColumns: headTemplate }}
             >
               {categories.map((lane) => (
-                <Link
-                  key={lane.id}
-                  href={`/lane/${lane.id}`}
-                  data-lane-header={lane.id}
-                  className="flex flex-col items-center gap-0.5 px-0.5 pb-2 text-white"
-                >
-                  <span aria-hidden className="text-2xl/none">
-                    {lane.icon}
-                  </span>
-                  <span className="max-w-full truncate text-[11px]/tight font-semibold">
-                    {lane.name}
-                  </span>
-                </Link>
+                <ColumnHeader key={lane.id} column={lane} />
               ))}
               {orphans ? <div data-lane-header="" className="pb-2" /> : null}
-              <div className="flex items-start justify-center pb-2">
-                <button
-                  type="button"
-                  aria-label="New lane"
-                  data-new-lane
-                  onClick={onCreateLane}
-                  className="flex h-7 w-7 items-center justify-center rounded-full border border-white/40 text-white/60"
-                >
-                  <Plus aria-hidden size={14} />
-                </button>
-              </div>
+              {plusColumn ? (
+                <div className="flex items-start justify-center pb-2">
+                  <button
+                    type="button"
+                    aria-label="New lane"
+                    data-new-lane
+                    onClick={onCreateLane}
+                    className="flex h-7 w-7 items-center justify-center rounded-full border border-white/40 text-white/60"
+                  >
+                    <Plus aria-hidden size={14} />
+                  </button>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -427,7 +432,7 @@ export const LaneGrid = forwardRef<
                   from={row.from}
                   to={row.to}
                   columns={dateView ? 0 : columns}
-                  plus={!dateView}
+                  plus={!dateView && plusColumn}
                 />
               );
             }
@@ -441,7 +446,8 @@ export const LaneGrid = forwardRef<
                 <Mark
                   key={card.splash.id}
                   card={card}
-                  icon={card.splash.icon ?? icon}
+                  // A member's column has no emoji: the post's own lane stands in (H23).
+                  icon={card.splash.icon ?? card.lane?.icon ?? icon}
                   dived={waterIds.has(card.splash.id)}
                   ring={ringAt?.id === card.splash.id ? ringAt.seq : null}
                   titled={titled}
@@ -451,32 +457,62 @@ export const LaneGrid = forwardRef<
             if (dateView) {
               return (
                 <DateDay key={day} day={day} monthChanges={monthChanges}>
-                  {(byDay.get(day) ?? []).map((card) => {
-                    const laneId = cardLane(card.splash);
-                    return (
-                      <PostRow
+                  {(byDay.get(day) ?? []).map((card) =>
+                    card.branches ? (
+                      <JointRows
                         key={card.splash.id}
                         card={card}
-                        lane={laneId ? (byLaneId.get(laneId) ?? null) : null}
+                        lane={laneOfCard(card, categories)}
                         current={!waterIds.has(card.splash.id)}
                         ring={ringAt?.id === card.splash.id ? ringAt.seq : null}
                         onPick={onPick}
                       />
-                    );
-                  })}
+                    ) : (
+                      <PostRow
+                        key={card.splash.id}
+                        card={card}
+                        lane={laneOfCard(card, categories)}
+                        current={!waterIds.has(card.splash.id)}
+                        ring={ringAt?.id === card.splash.id ? ringAt.seq : null}
+                        onPick={onPick}
+                      />
+                    ),
+                  )}
                 </DateDay>
               );
             }
+            // A day holding only joint splashes is named on its first band's rail.
+            const joints = (byDay.get(day) ?? []).filter((card) => card.branches);
+            const plain = (byDay.get(day) ?? []).length > joints.length;
             return (
-              <DayRow key={day} day={day} monthChanges={monthChanges}>
-                {categories.map((lane, at) => (
-                  <Cell key={lane.id} lane={lane.id} first={at === 0}>
-                    {marks(lane.id, lane.icon)}
-                  </Cell>
+              <Fragment key={day}>
+                {plain ? (
+                  <DayRow day={day} monthChanges={monthChanges}>
+                    {categories.map((lane, at) => (
+                      <Cell key={lane.id} lane={lane.id} first={at === 0}>
+                        {marks(lane.id, lane.icon)}
+                      </Cell>
+                    ))}
+                    {orphans ? <Cell lane="">{marks('', null)}</Cell> : null}
+                    {plusColumn ? <Cell lane="+" /> : null}
+                  </DayRow>
+                ) : null}
+                {joints.map((card, at) => (
+                  <JointBand
+                    key={card.splash.id}
+                    card={card}
+                    day={day}
+                    label={!plain && at === 0 ? { monthChanges } : null}
+                    columns={categories}
+                    orphans={orphans}
+                    plus={plusColumn}
+                    icon={card.splash.icon ?? laneOfCard(card, categories)?.icon ?? null}
+                    dived={waterIds.has(card.splash.id)}
+                    ring={ringAt?.id === card.splash.id ? ringAt.seq : null}
+                    onPick={onPick}
+                  />
                 ))}
-                {orphans ? <Cell lane="">{marks('', null)}</Cell> : null}
-                <Cell lane="+" />
-              </DayRow>
+              </Fragment>
             );
           })}
 
@@ -486,6 +522,44 @@ export const LaneGrid = forwardRef<
     </div>
   );
 });
+
+/**
+ * A column's header: a lane's emoji over its name, opening its page on
+ * Home; in a pool's Swimmers view a member's initials on a disc over their
+ * name (H23). A pool's lane opens nothing here: lane management is the glyph
+ * at the header's left, as on Home.
+ */
+function ColumnHeader({ column }: { column: GridColumn }) {
+  const href = column.href === undefined ? `/lane/${column.id}` : column.href;
+  const body = (
+    <>
+      {column.avatar !== undefined ? (
+        <span
+          aria-hidden
+          data-column-avatar
+          className="text-main-900/60 flex h-9 w-9 items-center justify-center rounded-full bg-white/40 text-xs font-medium"
+        >
+          {column.avatar}
+        </span>
+      ) : (
+        <span aria-hidden className="text-2xl/none">
+          {column.icon}
+        </span>
+      )}
+      <span className="max-w-full truncate text-[11px]/tight font-semibold">{column.name}</span>
+    </>
+  );
+  const className = 'flex flex-col items-center gap-0.5 px-0.5 pb-2 text-white';
+  return href ? (
+    <Link href={href} data-lane-header={column.id} className={className}>
+      {body}
+    </Link>
+  ) : (
+    <div data-lane-header={column.id} className={className}>
+      {body}
+    </div>
+  );
+}
 
 /** A day's row: its label on the rail, then a cell per column. */
 function DayRow({
@@ -655,6 +729,12 @@ function Mark({
             {icon}
           </span>
         ) : null}
+        {card.pools && card.pools.length > 0 ? (
+          // Shared to a pool (H23): its monogram on the disc's shoulder.
+          <span className="absolute -top-1.5 -right-2.5" data-mark-pool>
+            <Monogram name={card.pools[0]} size="chip" />
+          </span>
+        ) : null}
       </button>
     </span>
   );
@@ -673,6 +753,15 @@ function Mark({
       >
         {title}
       </button>
+      {card.author ? (
+        // Whose it is, in a pool's Lane view (H23).
+        <span
+          data-mark-author
+          className={`text-[10px]/none font-medium text-white/60 ${dived ? 'opacity-60' : ''}`}
+        >
+          {card.author}
+        </span>
+      ) : null}
     </span>
   );
 }

@@ -1,9 +1,7 @@
 'use client';
 
 import { CommitRing } from '@/components/ui/waves';
-import type { MyCategory } from '@/lib/queries/profile';
-
-import { postIcon, type Card } from './grid';
+import { postIcon, type Card, type CardLane } from './grid';
 
 /** The icon disc's diameter, and the ring's bound around it. */
 const DISC_PX = 28;
@@ -27,7 +25,7 @@ export function PostRow({
   onPick,
 }: {
   card: Card;
-  lane: MyCategory | null;
+  lane: CardLane | null;
   /** The post the stack is reading: the one row at full white. */
   current: boolean;
   /** The ring's sequence number while it plays here, else null. */
@@ -79,6 +77,12 @@ export function PostRow({
       >
         {title}
       </span>
+      {card.author ? (
+        // In a pool's Date view each row says whose it is (H23).
+        <span data-row-author className="shrink-0 text-[10px] font-medium text-white/70">
+          {card.author}
+        </span>
+      ) : null}
       {showLane && lane ? (
         <span className="inline-flex h-5 shrink-0 items-center gap-1 rounded-full border border-white/25 px-2 text-[10px] text-white/80">
           {lane.icon ? <span aria-hidden>{lane.icon}</span> : null}

@@ -5,7 +5,8 @@ import { z } from 'zod';
 
 import { createClient } from '@/lib/supabase/server';
 
-export type LaneResult = { ok: true } | { ok: false; message: string };
+/** `id` is the lane written: the new one's, so a caller can link it at once (H23). */
+export type LaneResult = { ok: true; id?: string } | { ok: false; message: string };
 
 const Lane = z.object({
   id: z.uuid().nullable(),
@@ -44,18 +45,25 @@ export async function saveLane(input: Lane): Promise<LaneResult> {
       .limit(1)
       .maybeSingle();
 
-    const { error } = await supabase.from('my_categories').insert({
-      user_id: user.id,
-      name: lane.name,
-      icon: lane.icon,
-      position: (last?.position ?? -1) + 1,
-    });
+    const { data: made, error } = await supabase
+      .from('my_categories')
+      .insert({
+        user_id: user.id,
+        name: lane.name,
+        icon: lane.icon,
+        position: (last?.position ?? -1) + 1,
+      })
+      .select('id')
+      .single();
     if (error) return { ok: false, message: error.message };
+    revalidatePath('/lanes');
+    revalidatePath('/');
+    return { ok: true, id: made.id };
   }
 
   revalidatePath('/lanes');
   revalidatePath('/');
-  return { ok: true };
+  return { ok: true, id: lane.id };
 }
 
 /**

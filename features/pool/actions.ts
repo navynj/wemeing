@@ -116,7 +116,7 @@ export async function setLaneLinks(poolId: string, links: z.infer<typeof LINKS>)
 }
 
 export type Invite =
-  { ok: true; token: string; expiresAt: string } | { ok: false; message: string };
+  { ok: true; id: string; token: string; expiresAt: string } | { ok: false; message: string };
 
 /** "Create invite link": a fresh token, seven days, revocable. */
 export async function createInvite(poolId: string): Promise<Invite> {
@@ -125,8 +125,15 @@ export async function createInvite(poolId: string): Promise<Invite> {
   const { data, error } = await supabase.rpc('create_invite', { p_pool: poolId });
   const row = data?.[0];
   if (error || !row) return { ok: false, message: said(error) };
+  // Readable by members, so the link can be revoked the moment it exists.
+  const { data: made } = await supabase
+    .from('pool_invites')
+    .select('id')
+    .eq('token', row.token)
+    .single();
+  if (!made) return { ok: false, message: 'The link was made but could not be read back.' };
   revalidatePool(poolId);
-  return { ok: true, token: row.token, expiresAt: row.expires_at };
+  return { ok: true, id: made.id, token: row.token, expiresAt: row.expires_at };
 }
 
 export async function revokeInvite(poolId: string, inviteId: string): Promise<Done> {

@@ -16,7 +16,8 @@ export function RippleThread({
   initials,
   className = '',
 }: {
-  entries: { id: string; body: ReactNode; meta?: ReactNode }[];
+  /** `initials` per entry in a pool, where each ripple keeps its author (H23). */
+  entries: { id: string; body: ReactNode; meta?: ReactNode; initials?: string }[];
   initials: string;
   className?: string;
 }) {
@@ -38,7 +39,7 @@ export function RippleThread({
                 className="bg-pool-100 text-pool-500 flex shrink-0 items-center justify-center rounded-full text-[10px] font-medium"
                 style={{ width: AVATAR_PX, height: AVATAR_PX }}
               >
-                {initials}
+                {entry.initials ?? initials}
               </span>
               {last ? null : (
                 // The thread: from under this avatar down to the next one.

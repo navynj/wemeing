@@ -58,35 +58,39 @@ export function CardMenu({
             <li>
               <Link
                 role="menuitem"
-                href={splashHref(card.splash.id, monthKey(card.day))}
+                href={card.href ?? splashHref(card.splash.id, monthKey(card.day))}
                 className="block px-4 py-2.5"
               >
                 Open
               </Link>
             </li>
-            <li>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenu('closed');
-                  onPin(!pinned);
-                }}
-                className="w-full px-4 py-2.5 text-left"
-              >
-                {pinned ? 'Unpin' : 'Pin'}
-              </button>
-            </li>
-            <li>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => setMenu('delete')}
-                className="w-full px-4 py-2.5 text-left text-white/70"
-              >
-                Delete
-              </button>
-            </li>
+            {card.menu?.pin === false ? null : (
+              <li>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenu('closed');
+                    onPin(!pinned);
+                  }}
+                  className="w-full px-4 py-2.5 text-left"
+                >
+                  {pinned ? 'Unpin' : 'Pin'}
+                </button>
+              </li>
+            )}
+            {card.menu?.delete === false ? null : (
+              <li>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => setMenu('delete')}
+                  className="w-full px-4 py-2.5 text-left text-white/70"
+                >
+                  Delete
+                </button>
+              </li>
+            )}
           </ul>
         </>
       ) : null}

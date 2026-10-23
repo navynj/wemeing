@@ -5,7 +5,7 @@ import { useRef } from 'react';
 import { useAxisLock } from '@/components/ui/use-axis-lock';
 import type { MyCategory } from '@/lib/queries/profile';
 
-import { cardLane, type Card } from './grid';
+import { laneOfCard, type Card } from './grid';
 
 /**
  * Pinned posts as cards (round 3), replacing the black strip: white at 20%
@@ -28,7 +28,7 @@ export function PinnedCards({
   slot: 'phone' | 'wide';
   /** Pinned posts, most recently pinned first. */
   cards: Card[];
-  categories: MyCategory[];
+  categories: Pick<MyCategory, 'id' | 'icon' | 'name'>[];
   initials: string;
   onPick: (id: string) => void;
 }) {
@@ -48,7 +48,7 @@ export function PinnedCards({
         style={{ scrollPaddingLeft: 16 }}
       >
         {cards.map((card) => {
-          const lane = categories.find((c) => c.id === cardLane(card.splash)) ?? null;
+          const lane = laneOfCard(card, categories);
           const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
           // The latest ripple: the thread runs oldest first.
           const excerpt = card.ripples.at(-1)?.note ?? card.body;
@@ -79,7 +79,7 @@ export function PinnedCards({
                       aria-hidden
                       className="text-main-900/50 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/40 text-xs"
                     >
-                      {initials}
+                      {card.ripples.at(-1)?.initials ?? card.author ?? initials}
                     </span>
                     <span data-pinned-excerpt className="min-w-0 truncate">
                       {excerpt}

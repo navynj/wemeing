@@ -1,0 +1,117 @@
+import { byNewest, placeCard, type Card, type GridColumn } from '@/features/home/grid';
+import { summarizeSplash, type SplashSummary } from '@/features/splash/summary';
+import type { PoolRipple, PoolView } from '@/lib/queries/pools';
+
+/** A pool's three views (H23). Lane and Date as on Home; Swimmers by member. */
+export type PoolViewKind = 'lane' | 'date' | 'swimmers';
+
+/** Where a post of a pool opens: its page in the pool, coming back to this pool. */
+export function poolSplashHref(poolId: string, splashId: string): string {
+  return `/pool/${poolId}/splash/${splashId}`;
+}
+
+/**
+ * The grid's columns (H23): the pool's lanes in the Lane view; in Swimmers
+ * the current members, me first then join order (D7) — never a former
+ * member, whose kept records sit in the unlabelled column.
+ */
+export function poolColumns(view: PoolView, kind: PoolViewKind): GridColumn[] {
+  if (kind === 'swimmers') {
+    return view.members
+      .filter((m) => !m.former)
+      .map((m) => ({ id: m.userId, name: m.name, icon: null, avatar: m.initials, href: null }));
+  }
+  return view.lanes.map((lane) => ({ id: lane.id, name: lane.name, icon: lane.icon, href: null }));
+}
+
+/**
+ * Every placed post and joint splash as a card, newest first, with its
+ * column for the view: a placed post sits in the pool lane it was placed in,
+ * or in its author's column; a joint splash is a band, each ripple a branch
+ * in the band's lane (Lane) or in its author's column (Swimmers). Days are
+ * read in my zone: the pool is read from where I am.
+ */
+export function poolCards(
+  view: PoolView,
+  kind: PoolViewKind,
+  me: string,
+  timeZone: string,
+  now: Date = new Date(),
+): Card[] {
+  const initialsOf = new Map(view.members.map((m) => [m.userId, m.initials]));
+  const laneOf = new Map(view.lanes.map((lane) => [lane.id, lane]));
+  const byPost = new Map<string, PoolRipple[]>();
+  for (const r of view.ripples) {
+    if (!r.splash_id) continue;
+    const list = byPost.get(r.splash_id);
+    if (list) list.push(r);
+    else byPost.set(r.splash_id, [r]);
+  }
+  const placementOf = new Map(view.placements.map((p) => [p.splashId, p]));
+
+  const cards: Card[] = [];
+  for (const splash of view.splashes) {
+    const blocks = (byPost.get(splash.id) ?? []).sort((a, b) =>
+      a.created_at.localeCompare(b.created_at),
+    );
+    const summary: SplashSummary = summarizeSplash(splash, blocks, timeZone, now);
+    const thread = blocks
+      .filter((r) => r.note)
+      .map((r) => ({
+        id: r.id,
+        note: r.note!,
+        createdAt: r.created_at,
+        initials: initialsOf.get(r.author_id) ?? '',
+      }));
+    const href = poolSplashHref(view.pool.id, splash.id);
+    if (splash.owner_id === null) {
+      // A joint splash: the pool's, so its pin is shared (any member) and it
+      // is deleted only while every ripple on it is mine.
+      const lane = splash.pool_lane_id ? laneOf.get(splash.pool_lane_id) : undefined;
+      const card = placeCard(summary, thread.map((r) => r.note).join('\n\n'), timeZone, thread);
+      cards.push({
+        ...card,
+        column: splash.pool_lane_id ?? undefined,
+        lane: lane ? { icon: lane.icon, name: lane.name } : null,
+        branches: blocks.map((r) => ({
+          id: r.id,
+          column: kind === 'swimmers' ? r.author_id : (splash.pool_lane_id ?? ''),
+          initials: initialsOf.get(r.author_id) ?? '',
+        })),
+        href,
+        menu: { pin: true, delete: blocks.every((r) => r.author_id === me) },
+      });
+      continue;
+    }
+    const placement = placementOf.get(splash.id);
+    const lane = placement ? laneOf.get(placement.poolLaneId) : undefined;
+    const author = initialsOf.get(splash.owner_id) ?? '';
+    const card = placeCard(summary, thread.map((r) => r.note).join('\n\n'), timeZone, thread);
+    const mine = splash.owner_id === me;
+    cards.push({
+      ...card,
+      column: kind === 'swimmers' ? splash.owner_id : placement?.poolLaneId,
+      lane: lane ? { icon: lane.icon, name: lane.name } : null,
+      author,
+      href,
+      // My own post: my pin and my delete, as on Home. Someone else's: neither.
+      menu: { pin: mine, delete: mine },
+    });
+  }
+  return cards.sort(byNewest);
+}
+
+/**
+ * Pinned in a pool (H23): my own pinned posts that are placed here, and
+ * joint splashes pinned by anyone — a joint splash's pin is the pool's.
+ */
+export function poolPinned(cards: Card[], me: string, view: PoolView): Card[] {
+  const owner = new Map(view.splashes.map((s) => [s.id, s.owner_id]));
+  return cards
+    .filter((card) => {
+      if (!card.splash.pinnedAt) return false;
+      const by = owner.get(card.splash.id);
+      return by === null || by === me;
+    })
+    .sort((a, b) => b.splash.pinnedAt!.localeCompare(a.splash.pinnedAt!));
+}

@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Home, Plus } from 'lucide-react';
 
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { CategorySheet } from '@/features/lanes/category-sheet';
@@ -15,6 +14,7 @@ import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
 
 import { FlipBoard } from './diving-board-flip';
+import { GroundFoot } from './ground-foot';
 import { byNewest, newestIn, placeCard, type Card } from './grid';
 import { LaneGrid, type GridHandle, type Ring } from './lane-grid';
 import { LaneIcon } from './lane-icon';
@@ -297,34 +297,14 @@ export function HomeGround({
             <FlipBoard cards={shown} flip={flip} categories={lanes.value} initials={initials} />
           )}
 
-          {/* The foot: Home at the left — each tap switches the view, Lane
-              to Date and back (review) — and compose at the right, a white
-              disc with the blue plus: on the water, white carries the action. */}
-          <div
-            data-home-foot
-            className="flex shrink-0 items-center justify-between px-6 pt-2 lg:px-0"
-            style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }}
-          >
-            <button
-              type="button"
-              data-home-tab
-              aria-label={`Home, showing the ${view} view; tap to switch`}
-              onClick={() => setView(view === 'lane' ? 'date' : 'lane')}
-              className="flex flex-col items-center gap-1 font-semibold text-white"
-            >
-              <Home aria-hidden size={22} strokeWidth={2.25} />
-              <span className="text-xs/none">Home</span>
-            </button>
-            <button
-              type="button"
-              aria-label="Drop a splash"
-              data-compose
-              onClick={openSheet}
-              className="text-main-900 flex h-12 w-12 items-center justify-center rounded-full bg-white"
-            >
-              <Plus aria-hidden size={24} />
-            </button>
-          </div>
+          {/* The foot (H23): Home — each tap switches the view, Lane to
+              Date and back (review) — then Pool, and compose at the right. */}
+          <GroundFoot
+            here="home"
+            homeLabel={`Home, showing the ${view} view; tap to switch`}
+            onHome={() => setView(view === 'lane' ? 'date' : 'lane')}
+            onCompose={() => openSheet()}
+          />
         </div>
       </div>
 

@@ -1,12 +1,19 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { ArrowRight, ChevronDown, X } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
 
 import { EmojiInput } from '@/features/lanes/emoji-input';
 import type { MyCategory } from '@/lib/queries/profile';
 
-import type { Links, MatchLane } from './match';
+import {
+  DEFAULT_DIRECTION,
+  DIRECTION_CAPTION,
+  DIRECTION_GLYPH,
+  nextDirection,
+  type LinkDirection,
+} from './direction';
+import type { Directions, Links, MatchLane } from './match';
 
 /**
  * Step 2 of 2 (1d), shared by create, join and Pool settings: one row per
@@ -24,6 +31,8 @@ export function LaneMatch({
   categories,
   links,
   onLinksChange,
+  directions,
+  onDirectionsChange,
   includeHistory,
   onIncludeHistoryChange,
   onCreateLane,
@@ -35,6 +44,9 @@ export function LaneMatch({
   categories: Pick<MyCategory, 'id' | 'name' | 'icon'>[];
   links: Links;
   onLinksChange: (links: Links) => void;
+  /** Each link's direction (0017); a lane not in it reads as both. */
+  directions: Directions;
+  onDirectionsChange: (directions: Directions) => void;
   /** Absent in settings: earlier records are a choice made at joining. */
   includeHistory?: boolean;
   onIncludeHistoryChange?: (on: boolean) => void;
@@ -44,6 +56,7 @@ export function LaneMatch({
   action: ReactNode;
 }) {
   const [making, setMaking] = useState(false);
+  const direction = (key: string): LinkDirection => directions[key] ?? DEFAULT_DIRECTION;
   const unconnected = lanes.filter((lane) => !links[lane.key]);
 
   return (
@@ -82,13 +95,28 @@ export function LaneMatch({
                   <span className="text-pool-500 truncate text-xs">{lane.description}</span>
                 ) : null}
               </span>
-              <span aria-hidden className="flex justify-center">
-                {off ? (
+              {off ? (
+                <span aria-hidden className="flex justify-center">
                   <X size={18} className="text-pool-500/50" />
-                ) : (
-                  <ArrowRight size={22} className="text-main-900" />
-                )}
-              </span>
+                </span>
+              ) : (
+                // The link's direction (0017): a tap cycles ↔ → → → ←. Ink,
+                // the selection channel; blue stays for actions.
+                <button
+                  type="button"
+                  data-match-direction={lane.key}
+                  aria-label={`Direction: ${DIRECTION_CAPTION[direction(lane.key)]}`}
+                  onClick={() =>
+                    onDirectionsChange({
+                      ...directions,
+                      [lane.key]: nextDirection(direction(lane.key)),
+                    })
+                  }
+                  className="text-ink flex h-9 w-9 items-center justify-center justify-self-center rounded-full bg-white text-lg/none font-semibold"
+                >
+                  {DIRECTION_GLYPH[direction(lane.key)]}
+                </button>
+              )}
               <label className="relative flex min-w-0">
                 <span className="sr-only">Your lane for {lane.name}</span>
                 <select
@@ -119,6 +147,14 @@ export function LaneMatch({
                   }`}
                 />
               </label>
+              {off ? null : (
+                <span
+                  data-match-caption={lane.key}
+                  className="text-pool-500 col-span-3 text-center text-[10px]"
+                >
+                  {DIRECTION_CAPTION[direction(lane.key)]}
+                </span>
+              )}
             </li>
           );
         })}
@@ -176,18 +212,26 @@ export function LaneMatch({
   );
 }
 
-/** A switch: blue when on — it commits a choice — pale when off. */
+/**
+ * A switch: blue when on — it commits a choice — pale when off; `tone="ink"`
+ * when it selects rather than commits (H20f), as Just mine does.
+ */
 export function Switch({
   on,
   onChange,
   label,
   disabled = false,
+  tone = 'blue',
+  size = 'md',
 }: {
   on: boolean;
   onChange: (on: boolean) => void;
   label: string;
   disabled?: boolean;
+  tone?: 'blue' | 'ink';
+  size?: 'md' | 'sm';
 }) {
+  const sm = size === 'sm';
   return (
     <button
       type="button"
@@ -196,15 +240,15 @@ export function Switch({
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange(!on)}
-      className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-40 ${
-        on ? 'bg-main-900' : 'bg-pool-200'
-      }`}
+      className={`relative shrink-0 rounded-full transition-colors disabled:opacity-40 ${
+        sm ? 'h-5 w-9' : 'h-7 w-12'
+      } ${on ? (tone === 'ink' ? 'bg-ink' : 'bg-main-900') : 'bg-pool-200'}`}
     >
       <span
         aria-hidden
-        className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow-sm transition-[left] ${
-          on ? 'left-[22px]' : 'left-0.5'
-        }`}
+        className={`absolute top-0.5 rounded-full bg-white shadow-sm transition-[left] ${
+          sm ? 'h-4 w-4' : 'h-6 w-6'
+        } ${on ? (sm ? 'left-[18px]' : 'left-[22px]') : 'left-0.5'}`}
       />
     </button>
   );

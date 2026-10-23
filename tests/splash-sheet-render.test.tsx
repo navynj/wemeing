@@ -366,8 +366,22 @@ describe('compose from a pool (H23)', () => {
     poolId: 'p-ours',
     poolName: 'Our Pool',
     lanes: [
-      { id: 'pl-trips', name: 'Trips', icon: '🏕', myCategoryId: 'c-place' },
-      { id: 'pl-notes', name: 'Notes', icon: '📓', myCategoryId: null },
+      {
+        id: 'pl-trips',
+        name: 'Trips',
+        icon: '🏕',
+        myCategoryId: 'c-place',
+        direction: 'both' as const,
+      },
+      { id: 'pl-notes', name: 'Notes', icon: '📓', myCategoryId: null, direction: null },
+      // Linked out only: my Mood shares into Moods, nothing comes back (0017).
+      {
+        id: 'pl-moods',
+        name: 'Moods',
+        icon: '🌤️',
+        myCategoryId: 'c-mood',
+        direction: 'out' as const,
+      },
     ],
   };
   function poolSheet() {
@@ -419,10 +433,47 @@ describe('compose from a pool (H23)', () => {
     expect(joints).toEqual([]);
   });
 
+  it('drops a joint ripple with no lane on a pool lane linked out only', async () => {
+    const view = poolSheet();
+    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'grey day' } });
+    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-moods"]')!);
+    expect(view.container.querySelector('[data-landing-hint]')!.textContent).toBe(
+      'Joint · pool only',
+    );
+    fireEvent.click(view.drop());
+    await waitFor(() => expect(joints).toHaveLength(1));
+    expect(joints[0]).toMatchObject({ poolLaneId: 'pl-moods', myCategoryId: null });
+  });
+
+  it('makes Just mine on an out-only lane a Just-mine splash with no lane', async () => {
+    const view = poolSheet();
+    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'mine only' } });
+    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-moods"]')!);
+    fireEvent.click(view.getByRole('switch', { name: 'Just mine' }));
+    expect(view.container.querySelector('[data-landing-hint]')!.textContent).toBe(
+      'Yours · pool only',
+    );
+    fireEvent.click(view.drop());
+    await waitFor(() => expect(owns).toHaveLength(1));
+    expect(owns[0]).toMatchObject({ poolLaneId: 'pl-moods' });
+  });
+
+  it('says where it lands under the chosen chip', () => {
+    const view = poolSheet();
+    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-trips"]')!);
+    expect(view.container.querySelector('[data-landing-hint]')!.textContent).toBe(
+      'Joint · your Place lane',
+    );
+    fireEvent.click(view.getByRole('switch', { name: 'Just mine' }));
+    expect(view.container.querySelector('[data-landing-hint]')!.textContent).toBe(
+      'Yours · Place lane',
+    );
+  });
+
   it('shows the pool’s lanes alone: no My lanes tab', () => {
     const view = poolSheet();
     expect(view.queryByRole('tab', { name: 'My lanes' })).toBeNull();
-    expect(view.container.querySelectorAll('[data-pick-pool-lane]')).toHaveLength(2);
+    expect(view.container.querySelectorAll('[data-pick-pool-lane]')).toHaveLength(3);
   });
 
   it('has no Audience chip', () => {
@@ -470,7 +521,9 @@ describe('Just mine from a pool (0014)', () => {
           pool={{
             poolId: 'p-ours',
             poolName: 'Our Pool',
-            lanes: [{ id: 'pl-notes', name: 'Notes', icon: '📓', myCategoryId: null }],
+            lanes: [
+              { id: 'pl-notes', name: 'Notes', icon: '📓', myCategoryId: null, direction: null },
+            ],
           }}
           onClose={() => {}}
           onDrop={(drop) => void drop.commit()}

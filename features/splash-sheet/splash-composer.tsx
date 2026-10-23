@@ -18,7 +18,8 @@ import {
 } from '@/features/input-sheet/media-field';
 import { placeCard, type Card } from '@/features/home/grid';
 import { createJointSplash, dropOwnPoolSplash, placeNewSplash } from '@/features/pool/actions';
-import { defaultAudience, type AudienceLink } from '@/features/pool/audience';
+import { defaultAudience, linkedPools, type AudienceLink } from '@/features/pool/audience';
+import { bringsIn } from '@/features/pool/direction';
 import { AudienceChip } from '@/features/pool/audience-sheet';
 import type { PoolScope } from '@/features/pool/compose-scope';
 import { poolSplashHref } from '@/features/pool/pool-cards';
@@ -98,19 +99,22 @@ export function SplashComposer({
   // "Just mine" (0014): my splash on the pool lane, with no lane of mine.
   const own = pick?.kind === 'own';
   // Only pools where the lane is linked can take the post (C5), edited or not.
-  const linkedHere = defaultAudience(laneId, links);
+  // Every pool the lane is linked in gets a switch; only out and both links
+  // are on by default (0017).
+  const linkedHere = linkedPools(laneId, links);
+  const sharedByDefault = defaultAudience(laneId, links);
   // From a pool there is no audience to choose: what is written there is in
   // that pool, and only there.
   const audience = pool
     ? joint || own
       ? []
       : [pool.poolId]
-    : (audienceEdited ?? linkedHere).filter((poolId) => linkedHere.includes(poolId));
-  // My ripple on a joint splash takes the lane I linked to its pool lane, or
-  // none when I have not linked it (0016): no prompt either way.
-  const jointLink = joint
-    ? (pool?.lanes.find((l) => l.id === pick.poolLaneId)?.myCategoryId ?? null)
-    : null;
+    : (audienceEdited ?? sharedByDefault).filter((poolId) => linkedHere.includes(poolId));
+  // My ripple on a joint splash takes the lane I linked to its pool lane
+  // when the link brings in (both, in), else none (0016, 0017): no prompt.
+  const jointPoolLane = joint ? pool?.lanes.find((l) => l.id === pick.poolLaneId) : undefined;
+  const jointLink =
+    jointPoolLane && bringsIn(jointPoolLane.direction) ? jointPoolLane.myCategoryId : null;
   // Today is in the field from the start (review): the chip opens set to the
   // date, no clock, and is removed with its × for a plain posted block.
   const [annotation, setAnnotation] = useState<Annotation | null>(fresh);
@@ -358,6 +362,7 @@ export function SplashComposer({
       {pool ? (
         <PoolLanePicker
           scope={pool}
+          categories={categories}
           pick={pick}
           onPick={(next) => {
             setPick(next);
@@ -385,7 +390,7 @@ export function SplashComposer({
                 .filter((p) => !linkedHere.includes(p.id))
                 .map((p) => ({ poolId: p.id, name: p.name }))}
               onToggle={(poolId, on) => {
-                const base = audienceEdited ?? linkedHere;
+                const base = audienceEdited ?? sharedByDefault;
                 setAudienceEdited(
                   on ? [...new Set([...base, poolId])] : base.filter((id) => id !== poolId),
                 );

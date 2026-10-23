@@ -37,6 +37,7 @@ export type Database = {
       lane_mappings: {
         Row: {
           created_at: string
+          direction: Database["public"]["Enums"]["lane_link_direction"]
           id: string
           my_category_id: string
           pool_id: string
@@ -45,6 +46,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          direction?: Database["public"]["Enums"]["lane_link_direction"]
           id?: string
           my_category_id: string
           pool_id: string
@@ -53,6 +55,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          direction?: Database["public"]["Enums"]["lane_link_direction"]
           id?: string
           my_category_id?: string
           pool_id?: string
@@ -940,6 +943,7 @@ export type Database = {
     }
     Enums: {
       audience_target: "list" | "pool" | "lock"
+      lane_link_direction: "out" | "both" | "in"
       pool_kind:
         | "couple_diary"
         | "study"
@@ -1081,6 +1085,7 @@ export const Constants = {
   public: {
     Enums: {
       audience_target: ["list", "pool", "lock"],
+      lane_link_direction: ["out", "both", "in"],
       pool_kind: [
         "couple_diary",
         "study",

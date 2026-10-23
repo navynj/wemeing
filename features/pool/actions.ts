@@ -12,8 +12,16 @@ export type Made = { ok: true; id: string } | { ok: false; message: string };
 
 const ICON = z.string().trim().max(16).nullable();
 const DESCRIPTION = z.string().trim().max(80).nullable();
+/** A link's direction (0017); absent reads as both. */
+const DIRECTION = z.enum(['out', 'both', 'in']);
 const LINKS = z
-  .array(z.object({ poolLaneId: z.uuid(), myCategoryId: z.uuid().nullable() }))
+  .array(
+    z.object({
+      poolLaneId: z.uuid(),
+      myCategoryId: z.uuid().nullable(),
+      direction: DIRECTION.optional(),
+    }),
+  )
   .max(24);
 
 /** Every surface a pool touches re-reads. */
@@ -43,6 +51,7 @@ const NewPool = z.object({
         icon: ICON,
         description: DESCRIPTION,
         myCategoryId: z.uuid().nullable(),
+        direction: DIRECTION.optional(),
       }),
     )
     .min(1)
@@ -67,6 +76,7 @@ export async function createPool(input: z.infer<typeof NewPool>): Promise<Made> 
       icon: lane.icon,
       description: lane.description,
       my_category_id: lane.myCategoryId,
+      direction: lane.direction ?? 'both',
     })),
     p_include_history: pool.includeHistory,
   });
@@ -91,6 +101,7 @@ export async function joinPool(input: z.infer<typeof Join>): Promise<Made> {
     p_links: parsed.data.links.map((l) => ({
       pool_lane_id: l.poolLaneId,
       my_category_id: l.myCategoryId,
+      direction: l.direction ?? 'both',
     })),
     p_include_history: parsed.data.includeHistory,
   });
@@ -109,6 +120,7 @@ export async function setLaneLinks(poolId: string, links: z.infer<typeof LINKS>)
     p_links: parsed.data.links.map((l) => ({
       pool_lane_id: l.poolLaneId,
       my_category_id: l.myCategoryId,
+      direction: l.direction ?? 'both',
     })),
   });
   if (error) return { ok: false, message: said(error) };

@@ -1,3 +1,4 @@
+import type { LinkDirection } from './direction';
 import { RESIDUAL_CATEGORY } from '@/features/auth/preset-categories';
 
 /** A pool lane as step 2 lists it: keyed, because on create it has no id yet. */
@@ -10,6 +11,9 @@ export type MatchLane = {
 
 /** Which of my lanes each pool lane takes; null is "Don't connect". */
 export type Links = Record<string, string | null>;
+
+/** Each link's direction (0017), by pool lane key; absent is both. */
+export type Directions = Record<string, LinkDirection>;
 
 /**
  * The join contract's starting point (SPEC 4, C5; H23): a pool lane takes my

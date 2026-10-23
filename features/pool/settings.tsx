@@ -11,7 +11,7 @@ import { setLaneLinks } from './actions';
 import { DeletePool } from './delete-pool';
 import { InvitePanel } from './invite-panel';
 import { LaneMatch } from './lane-match';
-import type { Links } from './match';
+import type { Directions, Links } from './match';
 import { PrimaryButton, StepPage } from './step-page';
 
 /**
@@ -38,10 +38,16 @@ export function PoolSettings({
     ]),
   );
   const [links, setLinks] = useState<Links>(initial);
+  const initialDirections: Directions = Object.fromEntries(
+    view.myLinks.map((l) => [l.poolLaneId, l.direction]),
+  );
+  const [directions, setDirections] = useState<Directions>(initialDirections);
   const [mine, setMine] = useState(categories);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const changed = JSON.stringify(links) !== JSON.stringify(initial);
+  const changed =
+    JSON.stringify(links) !== JSON.stringify(initial) ||
+    JSON.stringify(directions) !== JSON.stringify(initialDirections);
 
   return (
     <StepPage step={null} onBack={() => router.push(`/pool/${poolId}`)}>
@@ -65,6 +71,8 @@ export function PoolSettings({
           categories={mine}
           links={links}
           onLinksChange={setLinks}
+          directions={directions}
+          onDirectionsChange={setDirections}
           onCreateLane={async (lane) => {
             const made = await saveLane({ id: null, ...lane });
             if (!made.ok || !made.id) return { message: made.ok ? 'Try again.' : made.message };
@@ -89,6 +97,7 @@ export function PoolSettings({
                   view.lanes.map((lane) => ({
                     poolLaneId: lane.id,
                     myCategoryId: links[lane.id] ?? null,
+                    direction: directions[lane.id] ?? 'both',
                   })),
                 );
                 setBusy(false);

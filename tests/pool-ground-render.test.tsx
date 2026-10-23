@@ -113,7 +113,7 @@ const A: PoolView = {
     },
   ],
   lanes: [LANE('l-food', 'p-a', 'Food', '🍽️', 0), LANE('l-media', 'p-a', 'Media', '🎬', 1)],
-  myLinks: [{ poolLaneId: 'l-food', myCategoryId: 'my-lane' }],
+  myLinks: [{ poolLaneId: 'l-food', myCategoryId: 'my-lane', direction: 'both' }],
   placements: [
     { splashId: 's-mine', poolId: 'p-a', poolLaneId: 'l-food', shared: true, ownerId: ME },
     { splashId: 's-mina', poolId: 'p-a', poolLaneId: 'l-food', shared: true, ownerId: MINA },

@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { initialsOf } from '@/features/home/grid';
 import { PoolSplashPage } from '@/features/pool/pool-splash-page';
 import { originTag } from '@/features/pool/origin-tag';
+import { bringsIn } from '@/features/pool/direction';
 import { authorClock } from '@/features/pool/times';
 import { dayOf } from '@/lib/flow-key';
 import { signRippleMedia } from '@/lib/media';
@@ -65,8 +66,12 @@ export default async function PoolSplashRoute({ params }: PageProps<'/pool/[id]/
       }))}
       myInitials={initialsOf(profile.display_name)}
       myLane={
+        // My linked lane only when the link brings in (both, in; 0017), else none.
         joint
-          ? (view.myLinks.find((l) => l.poolLaneId === splash.pool_lane_id)?.myCategoryId ?? null)
+          ? (() => {
+              const link = view.myLinks.find((l) => l.poolLaneId === splash.pool_lane_id);
+              return link && bringsIn(link.direction) ? link.myCategoryId : null;
+            })()
           : null
       }
       categories={categories}

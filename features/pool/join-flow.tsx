@@ -9,7 +9,14 @@ import type { MyCategory } from '@/lib/queries/profile';
 
 import { joinPool } from './actions';
 import { LaneMatch } from './lane-match';
-import { joinLabel, linkedCount, prefillLinks, type Links, type MatchLane } from './match';
+import {
+  joinLabel,
+  linkedCount,
+  prefillLinks,
+  type Directions,
+  type Links,
+  type MatchLane,
+} from './match';
 import { PrimaryButton, StepPage } from './step-page';
 
 /**
@@ -35,6 +42,7 @@ export function JoinFlow({
   const [step, setStep] = useState<1 | 2>(1);
   const [mine, setMine] = useState(categories);
   const [links, setLinks] = useState<Links>(() => prefillLinks(lanes, categories));
+  const [directions, setDirections] = useState<Directions>({});
   const [includeHistory, setIncludeHistory] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -81,6 +89,8 @@ export function JoinFlow({
         categories={mine}
         links={links}
         onLinksChange={setLinks}
+        directions={directions}
+        onDirectionsChange={setDirections}
         includeHistory={includeHistory}
         onIncludeHistoryChange={setIncludeHistory}
         onCreateLane={async (lane) => {
@@ -110,6 +120,7 @@ export function JoinFlow({
                 links: lanes.map((lane) => ({
                   poolLaneId: lane.key,
                   myCategoryId: links[lane.key] ?? null,
+                  direction: directions[lane.key] ?? 'both',
                 })),
                 includeHistory,
               });

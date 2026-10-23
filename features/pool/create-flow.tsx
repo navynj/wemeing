@@ -10,7 +10,7 @@ import type { MyCategory } from '@/lib/queries/profile';
 import { createPool } from './actions';
 import { LaneMatch } from './lane-match';
 import { LaneEditor, type DraftLane } from './lane-editor';
-import { joinLabel, linkedCount, prefillLinks, type Links } from './match';
+import { joinLabel, linkedCount, prefillLinks, type Directions, type Links } from './match';
 import { PrimaryButton, StepPage } from './step-page';
 
 /**
@@ -29,6 +29,7 @@ export function CreateFlow({ categories }: { categories: MyCategory[] }) {
   const [lanes, setLanes] = useState<DraftLane[]>([]);
   const [mine, setMine] = useState<Pick<MyCategory, 'id' | 'name' | 'icon'>[]>(categories);
   const [links, setLinks] = useState<Links>({});
+  const [directions, setDirections] = useState<Directions>({});
   const [includeHistory, setIncludeHistory] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -45,6 +46,8 @@ export function CreateFlow({ categories }: { categories: MyCategory[] }) {
           categories={mine}
           links={links}
           onLinksChange={setLinks}
+          directions={directions}
+          onDirectionsChange={setDirections}
           includeHistory={includeHistory}
           onIncludeHistoryChange={setIncludeHistory}
           onCreateLane={async (lane) => {
@@ -76,6 +79,7 @@ export function CreateFlow({ categories }: { categories: MyCategory[] }) {
                     icon: lane.icon,
                     description: lane.description,
                     myCategoryId: links[lane.key] ?? null,
+                    direction: directions[lane.key] ?? 'both',
                   })),
                   includeHistory,
                 });

@@ -1,4 +1,5 @@
 import { initialsOf } from '@/features/home/grid';
+import type { LinkDirection } from '@/features/pool/direction';
 import { originTag } from '@/features/pool/origin-tag';
 import type { Splash } from '@/features/splash/summary';
 import type { Database } from '@/lib/database.types';
@@ -60,7 +61,7 @@ export type PoolView = {
   members: PoolMember[];
   lanes: PoolLane[];
   /** My links only: a member never reads another's (RLS). */
-  myLinks: { poolLaneId: string; myCategoryId: string }[];
+  myLinks: { poolLaneId: string; myCategoryId: string; direction: LinkDirection }[];
   placements: (Placement & { ownerId: string })[];
   /** Placed posts and joint splashes, as RLS lets me see them. */
   splashes: Splash[];
@@ -192,7 +193,7 @@ export async function getPoolView(
     supabase.from('pool_lanes').select('*').eq('pool_id', poolId).order('position'),
     supabase
       .from('lane_mappings')
-      .select('pool_lane_id, my_category_id')
+      .select('pool_lane_id, my_category_id, direction')
       .eq('pool_id', poolId)
       .eq('user_id', me),
     supabase
@@ -257,6 +258,7 @@ export async function getPoolView(
     myLinks: (links.data ?? []).map((l) => ({
       poolLaneId: l.pool_lane_id,
       myCategoryId: l.my_category_id,
+      direction: l.direction,
     })),
     placements: shown.map((p) => ({
       splashId: p.splash_id,
@@ -281,6 +283,8 @@ export type MyLink = {
   poolId: string;
   poolName: string;
   poolLaneId: string;
+  /** out, both or in (0017): whether my lane shares into the pool by default. */
+  direction: LinkDirection;
 };
 
 export async function getMyLinks(supabase: DuringClient, me: string): Promise<MyLink[]> {
@@ -289,7 +293,7 @@ export async function getMyLinks(supabase: DuringClient, me: string): Promise<My
   const [{ data: links, error }, pools] = await Promise.all([
     supabase
       .from('lane_mappings')
-      .select('my_category_id, pool_id, pool_lane_id')
+      .select('my_category_id, pool_id, pool_lane_id, direction')
       .eq('user_id', me),
     getMyPoolNames(supabase, me),
   ]);
@@ -303,6 +307,7 @@ export async function getMyLinks(supabase: DuringClient, me: string): Promise<My
       poolId: row.pool_id,
       poolName: nameOf.get(row.pool_id)!,
       poolLaneId: row.pool_lane_id,
+      direction: row.direction,
     }));
 }
 

@@ -391,6 +391,119 @@ describe('a joint ripple with no lane of mine (0016)', () => {
   });
 });
 
+describe('a link’s direction (0017)', () => {
+  const OUT_JOINT = '0e500000-0000-0000-0000-000000000001';
+
+  it('defaults to both', async () => {
+    const { data } = await asUser(ben)
+      .from('lane_mappings')
+      .select('direction')
+      .eq('pool_id', pool);
+    expect(data!.length).toBeGreaterThan(0);
+    expect(data!.every((l) => l.direction === 'both')).toBe(true);
+  });
+
+  it('moves earlier lane-less joint ripples in when out becomes both', async () => {
+    const days = (await asUser(ben).from('pool_lanes').select('id').eq('name', 'Days').single())
+      .data!.id;
+    const links = (direction: string) => [
+      { pool_lane_id: tripsLane, my_category_id: BEN_TRIPS },
+      { pool_lane_id: days, my_category_id: BEN_TRIPS, direction },
+    ];
+    await asUser(ben).rpc('set_lane_links', { p_pool: pool, p_links: links('out') });
+    await asUser(ben).rpc('create_joint_splash', {
+      p_id: OUT_JOINT,
+      p_pool: pool,
+      p_pool_lane: days,
+      p_title: 'Out days',
+    });
+    const ripple = await asUser(ben)
+      .from('ripples')
+      .insert({ author_id: ben, category_id: null, note: 'under out', splash_id: OUT_JOINT })
+      .select('id')
+      .single();
+    // Out brings nothing in: it stays lane-less through a save.
+    await asUser(ben).rpc('set_lane_links', { p_pool: pool, p_links: links('out') });
+    const still = await asUser(ben)
+      .from('ripples')
+      .select('category_id')
+      .eq('id', ripple.data!.id)
+      .single();
+    expect(still.data!.category_id).toBeNull();
+
+    await asUser(ben).rpc('set_lane_links', { p_pool: pool, p_links: links('both') });
+    const moved = await asUser(ben)
+      .from('ripples')
+      .select('category_id')
+      .eq('id', ripple.data!.id)
+      .single();
+    expect(moved.data!.category_id).toBe(BEN_TRIPS);
+    // Back to Trips alone for what follows.
+    await asUser(ben).rpc('set_lane_links', {
+      p_pool: pool,
+      p_links: [{ pool_lane_id: tripsLane, my_category_id: BEN_TRIPS }],
+    });
+  });
+
+  it('switches off a lane’s placements when both becomes in, and keeps one shared by hand after', async () => {
+    const post = '0e500000-0000-0000-0000-000000000002';
+    await asUser(ben)
+      .from('splashes')
+      .insert({ id: post, owner_id: ben, title: 'trip', declared_lane_id: BEN_TRIPS });
+    await asUser(ben)
+      .from('ripples')
+      .insert({ author_id: ben, category_id: BEN_TRIPS, note: 'trip', splash_id: post });
+    await asUser(ben)
+      .from('splash_placements')
+      .insert({ splash_id: post, pool_id: pool, pool_lane_id: tripsLane });
+    const shared = async (): Promise<boolean> =>
+      (await asUser(ben).from('splash_placements').select('shared').eq('splash_id', post).single())
+        .data!.shared;
+    expect(await shared()).toBe(true);
+
+    const inOnly = [{ pool_lane_id: tripsLane, my_category_id: BEN_TRIPS, direction: 'in' }];
+    await asUser(ben).rpc('set_lane_links', { p_pool: pool, p_links: inOnly });
+    expect(await shared()).toBe(false);
+
+    // Shared by hand under in (the Audience chip), then another save: it stays.
+    await asUser(ben).from('splash_placements').update({ shared: true }).eq('splash_id', post);
+    await asUser(ben).rpc('set_lane_links', { p_pool: pool, p_links: inOnly });
+    expect(await shared()).toBe(true);
+
+    await asUser(ben).rpc('set_lane_links', {
+      p_pool: pool,
+      p_links: [{ pool_lane_id: tripsLane, my_category_id: BEN_TRIPS }],
+    });
+  });
+
+  it('skips an in-only link when placing earlier records at join', async () => {
+    const made = await asUser(ben).rpc('create_pool', {
+      p_name: 'In only',
+      p_kind: null as unknown as 'friends',
+      p_lanes: [{ name: 'Trips', my_category_id: BEN_TRIPS, direction: 'in' }],
+      p_include_history: true,
+    });
+    pools.push(made.data!);
+    const placed = await asUser(ben)
+      .from('splash_placements')
+      .select('splash_id')
+      .eq('pool_id', made.data!);
+    expect(placed.data).toEqual([]);
+    const out = await asUser(ben).rpc('create_pool', {
+      p_name: 'Out',
+      p_kind: null as unknown as 'friends',
+      p_lanes: [{ name: 'Trips', my_category_id: BEN_TRIPS, direction: 'out' }],
+      p_include_history: true,
+    });
+    pools.push(out.data!);
+    const placedOut = await asUser(ben)
+      .from('splash_placements')
+      .select('splash_id')
+      .eq('pool_id', out.data!);
+    expect(placedOut.data!.length).toBeGreaterThan(0);
+  });
+});
+
 describe('writing', () => {
   it('refuses a block written into another member’s post', async () => {
     const { error } = await asUser(ben)

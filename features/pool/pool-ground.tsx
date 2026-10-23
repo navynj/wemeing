@@ -159,6 +159,7 @@ export function PoolGround({
         name: lane.name,
         icon: lane.icon,
         myCategoryId: view.myLinks.find((l) => l.poolLaneId === lane.id)?.myCategoryId ?? null,
+        direction: view.myLinks.find((l) => l.poolLaneId === lane.id)?.direction ?? null,
       })),
     });
   const waterIds = useMemo(() => new Set(ids.filter((id) => id !== heading)), [ids, heading]);

@@ -2,64 +2,49 @@
 
 import { useState } from 'react';
 
+import type { MyCategory } from '@/lib/queries/profile';
+
 import type { PoolScope } from './compose-scope';
 import { Switch } from './lane-match';
+import { landingHint, resolvePick, type PoolPick } from './pool-pick';
+
+export type { PoolPick } from './pool-pick';
 
 /**
- * The choice when composing from a pool (H23): a pool lane, and whose — a
- * joint splash the pool owns; or, Just mine, my own splash in the lane I
- * linked to it (placed here), or with no lane of mine when I linked none.
- */
-export type PoolPick =
-  | { kind: 'joint'; poolLaneId: string }
-  /** "Just mine" (0014): my splash on that pool lane, linked to no lane of mine. */
-  | { kind: 'own'; poolLaneId: string }
-  | { kind: 'lane'; poolLaneId: string; myCategoryId: string }
-  | null;
-
-/**
- * Composing from a pool (review): this pool's lanes, the chips the only
- * filled element, and under them at the right one *Just mine* switch.
- * Off (the default): a joint splash on the chosen pool lane, everyone's.
- * On: mine alone. On a pool lane I have linked, that is my own splash in
- * my linked lane, placed here — it shows in that lane on my Home too; on
- * one I have not, a Just-mine splash with no lane of mine (0014), in the
- * pool's column on my Home. No separate "My lanes": the link decides where
- * mine lands. My ripple on a joint splash takes my linked lane, or none
- * (0016) — nothing to ask. There is no audience here: what is written in a
+ * Composing from a pool (review): this pool's lane chips, the one filled
+ * element; under the chosen chip, one line saying where it lands; and under
+ * the chips at the right a small *Just mine* switch, off by default, ink
+ * when on. What lands where follows the switch and the pool lane's link
+ * (0017) — see resolvePick. There is no audience here: what is written in a
  * pool is in that pool.
  */
 export function PoolLanePicker({
   scope,
+  categories,
   pick,
   onPick,
 }: {
   scope: PoolScope;
+  categories: Pick<MyCategory, 'id' | 'name'>[];
   pick: PoolPick;
   onPick: (pick: PoolPick) => void;
 }) {
   const [justMine, setJustMine] = useState(false);
-  const chosen = pick?.poolLaneId ?? null;
-  const pickFor = (laneId: string, mine: boolean): PoolPick => {
-    if (!mine) return { kind: 'joint', poolLaneId: laneId };
-    const myLane = scope.lanes.find((l) => l.id === laneId)?.myCategoryId ?? null;
-    return myLane
-      ? { kind: 'lane', poolLaneId: laneId, myCategoryId: myLane }
-      : { kind: 'own', poolLaneId: laneId };
-  };
+  const chosen = scope.lanes.find((l) => l.id === pick?.poolLaneId) ?? null;
+  const nameOf = (id: string): string | null => categories.find((c) => c.id === id)?.name ?? null;
 
   return (
-    <div data-pool-lane-picker className="flex flex-col gap-3">
+    <div data-pool-lane-picker className="flex flex-col gap-2">
       <div className="no-scrollbar flex gap-2 overflow-x-auto">
         {scope.lanes.map((lane) => {
-          const selected = chosen === lane.id;
+          const selected = chosen?.id === lane.id;
           return (
             <button
               key={lane.id}
               type="button"
               aria-pressed={selected}
               data-pick-pool-lane={lane.id}
-              onClick={() => onPick(selected ? null : pickFor(lane.id, justMine))}
+              onClick={() => onPick(selected ? null : resolvePick(lane, justMine))}
               className={`h-10 shrink-0 rounded-full px-4 text-sm font-semibold ${
                 // Selection is ink (H20f); the chips are the one fill here.
                 selected ? 'bg-ink text-white' : 'border-pool-200 text-ink border'
@@ -71,16 +56,20 @@ export function PoolLanePicker({
           );
         })}
       </div>
-      {/* Under the lanes, at the right: whose it is (review). */}
-      <div className="flex justify-end">
-        <label data-just-mine className="text-pool-500 flex items-center gap-2 text-xs">
+      <div className="flex items-center justify-between gap-3">
+        <span data-landing-hint className="text-pool-500 min-w-0 truncate text-xs">
+          {chosen ? landingHint(chosen, justMine, nameOf) : null}
+        </span>
+        <label data-just-mine className="text-pool-500 flex shrink-0 items-center gap-2 text-xs">
           Just mine
           <Switch
             on={justMine}
             label="Just mine"
+            tone="ink"
+            size="sm"
             onChange={(on) => {
               setJustMine(on);
-              if (chosen) onPick(pickFor(chosen, on));
+              if (chosen) onPick(resolvePick(chosen, on));
             }}
           />
         </label>

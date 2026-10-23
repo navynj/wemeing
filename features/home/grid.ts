@@ -1,7 +1,5 @@
 import { monthKey, representativeLane, type SplashSummary } from '@/features/splash/summary';
-import { END_OF_DAY } from '@/lib/flow-key';
 import type { MyCategory } from '@/lib/queries/profile';
-import { wallClockToInstant } from '@/lib/ripple-kind';
 import { todayIn, type IsoDate } from '@/lib/time';
 
 /**
@@ -26,18 +24,16 @@ export type Card = {
 /**
  * Where a post sits (H22): on the last day of its display range, else the
  * day it was made — one row, one month, no longer every month its range
- * touches. Within the day it orders by its latest block there, so the grid
- * and the stack read the same key.
+ * touches. Within the day it orders by its latest block there, else by
+ * when it last received something (review: never the day's end, which put
+ * a declared-date post above everything written after it), so the grid and
+ * the stack read the same key.
  */
 export function placeCard(splash: SplashSummary, body: string, timeZone: string): Card {
   const day = splash.range?.end ?? todayIn(timeZone, new Date(splash.createdAt));
   const onDay = splash.blocks.filter((block) => block.day === day);
   const instant =
-    onDay.length > 0
-      ? onDay[onDay.length - 1].instant
-      : splash.range
-        ? wallClockToInstant(day, END_OF_DAY, timeZone).getTime()
-        : Date.parse(splash.createdAt);
+    onDay.length > 0 ? onDay[onDay.length - 1].instant : Date.parse(splash.latestCreatedAt);
   return { splash, day, instant, body };
 }
 

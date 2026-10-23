@@ -38,8 +38,9 @@ const PLUS_PX = 44;
 const WINDOW_STEP = 31;
 /** The fewest rows rendered at first, so a month that has barely begun still scrolls. */
 const WINDOW_MIN = 21;
-/** A day row's least height, and the mark's diameter with the ring's bound around the one on top. */
+/** A day row's least height, a gap's height (a run of empty days, compressed), and the mark's diameter with the ring's bound. */
 const ROW_PX = 56;
+const GAP_PX = 28;
 export const MARK_PX = 28;
 const RING_PX = 96;
 /** How long a smooth scroll to the mark is given before its ring plays, so the ring is seen. */
@@ -69,10 +70,12 @@ export type GridHandle = {
  * weekday, the year and month only where the month changes) at one quiet
  * opacity. A post is a white disc carrying its lane's emoji, centred on its
  * column at its day; several on one lane and day stack within the row, and
- * the row grows to hold them. A post dived into the water (review) keeps a
- * translucent mark here; tapping any mark brings its card up. Empty days
- * are rows of empty ropes with no date on the rail (review) — the empty
- * state is the water itself, and only a day with something on it is named.
+ * the row grows to hold them. A post in the board's upper stair, read,
+ * keeps a translucent mark here (review); tapping any mark brings its card
+ * to the top. A run of
+ * empty days is one short gap of empty ropes with no date on the rail
+ * (review): the past compresses rather than stretching by the calendar,
+ * and only a day with something on it is named.
  *
  * One scroll container, both axes: the rail is sticky at the left and the
  * lane headers sticky at the top, so a vertical drag anywhere scrolls days
@@ -98,8 +101,8 @@ export const LaneGrid = forwardRef<
     today: IsoDate;
     /** The mark to ring, once per `seq`. */
     ring: Ring | null;
-    /** Posts in the water: their marks read translucent. */
-    divedIds: ReadonlySet<string>;
+    /** Posts in the upper stair, read: their marks read translucent (review). */
+    waterIds: ReadonlySet<string>;
     initials: string;
     /** `?m=`: the month to scroll the grid to; the newest day of it lands under the headers. */
     scrollToMonth: string | null;
@@ -113,7 +116,7 @@ export const LaneGrid = forwardRef<
     categories,
     today,
     ring,
-    divedIds,
+    waterIds,
     initials,
     scrollToMonth,
     onPick,
@@ -176,6 +179,19 @@ export const LaneGrid = forwardRef<
   );
   const limit = Math.max(grown, needed);
   const days = allDays.slice(0, limit);
+  // A day with something on it is a row; a run of empty days is one gap.
+  const named = (d: IsoDate): boolean =>
+    categories.some((lane) => byCell.has(`${d}|${lane.id}`)) || byCell.has(`${d}|`);
+  const rows: ({ kind: 'day'; day: IsoDate } | { kind: 'gap'; from: IsoDate; to: IsoDate })[] = [];
+  for (const day of days) {
+    if (named(day)) {
+      rows.push({ kind: 'day', day });
+      continue;
+    }
+    const last = rows[rows.length - 1];
+    if (last && last.kind === 'gap') last.to = day;
+    else rows.push({ kind: 'gap', from: day, to: day });
+  }
 
   // The window grows when its end comes into view.
   const sentinel = useRef<HTMLDivElement>(null);
@@ -254,7 +270,7 @@ export const LaneGrid = forwardRef<
     const el = scroller.current;
     if (!el || !scrollToMonth || !monthDay) return;
     if (scrolledMonth.current === scrollToMonth) return;
-    const row = el.querySelector<HTMLElement>(`[data-day-row="${monthDay}"]`);
+    const row = rowHolding(el, monthDay);
     if (!row) return;
     scrolledMonth.current = scrollToMonth;
     scrollWithin(el, { top: offsetIn(row, el).top - headerHeight(el) }, reducedMotion);
@@ -282,7 +298,7 @@ export const LaneGrid = forwardRef<
         className={`relative grid ${even ? 'w-full' : 'w-max min-w-full'}`}
         // Every day row at least this tall and as tall as its fullest cell,
         // so stacked marks grow the row rather than spill into the next.
-        style={{ gridTemplateColumns: template, gridAutoRows: `minmax(${ROW_PX}px, auto)` }}
+        style={{ gridTemplateColumns: template, gridAutoRows: 'auto' }}
       >
         {/* The avatar: large, centred, scrolling away with the days. */}
         <div
@@ -343,28 +359,28 @@ export const LaneGrid = forwardRef<
           </button>
         </div>
 
-        {days.map((day, index) => {
-          // Only a day with something on it is named; the month is named on
-          // the first named day of each month.
-          const named = (d: IsoDate): boolean =>
-            categories.some((lane) => byCell.has(`${d}|${lane.id}`)) || byCell.has(`${d}|`);
-          const labelled = named(day);
-          const monthChanges =
-            labelled &&
-            !days.slice(0, index).some((d) => monthKey(d) === monthKey(day) && named(d));
+        {rows.map((row, index) => {
+          if (row.kind === 'gap') {
+            return <GapRow key={row.from} from={row.from} to={row.to} columns={columns} />;
+          }
+          const { day } = row;
+          // The month is named on its first named day.
+          const monthChanges = !rows
+            .slice(0, index)
+            .some((r) => r.kind === 'day' && monthKey(r.day) === monthKey(day));
           const marks = (lane: string, icon: string | null): ReactNode =>
             (byCell.get(`${day}|${lane}`) ?? []).map((card) => (
               <Mark
                 key={card.splash.id}
                 card={card}
                 icon={icon}
-                dived={divedIds.has(card.splash.id)}
+                dived={waterIds.has(card.splash.id)}
                 ring={ringAt?.id === card.splash.id ? ringAt.seq : null}
                 onPick={onPick}
               />
             ));
           return (
-            <DayRow key={day} day={day} labelled={labelled} monthChanges={monthChanges}>
+            <DayRow key={day} day={day} monthChanges={monthChanges}>
               {categories.map((lane, at) => (
                 <Cell key={lane.id} lane={lane.id} first={at === 0}>
                   {marks(lane.id, lane.icon)}
@@ -382,25 +398,26 @@ export const LaneGrid = forwardRef<
   );
 });
 
-/** A day's row: its label on the rail when the day has something, then a cell per column. */
+/** A day's row: its label on the rail, then a cell per column. */
 function DayRow({
   day,
-  labelled,
   monthChanges,
   children,
 }: {
   day: IsoDate;
-  labelled: boolean;
   monthChanges: boolean;
   children: ReactNode;
 }) {
   return (
     <>
-      {/* The rail reads quieter than the marks: one readable opacity (review). */}
+      {/* The rail reads quieter than the marks: one readable opacity (review).
+          A day row is at least ROW_PX tall and as tall as its fullest cell,
+          so stacked marks grow the row rather than spill into the next. */}
       <div
         data-day-row={day}
-        data-labelled={labelled ? '' : undefined}
+        data-labelled=""
         className="bg-main-900 sticky left-0 z-10 flex flex-col justify-center gap-0.5 py-2 pr-2 pl-6 text-white/70"
+        style={{ minHeight: ROW_PX }}
       >
         {monthChanges ? (
           <span data-month-label className="text-[8px]/none font-medium text-white/50">
@@ -409,18 +426,41 @@ function DayRow({
             {monthAbbrev(day)}
           </span>
         ) : null}
-        {labelled ? (
-          <>
-            <span className="text-sm/none font-medium tabular-nums">
-              {Number(day.slice(8, 10))}
-            </span>
-            <span className="text-[8px]/none font-medium text-white/50">{weekdayOf(day)}</span>
-          </>
-        ) : null}
+        <span className="text-sm/none font-medium tabular-nums">{Number(day.slice(8, 10))}</span>
+        <span className="text-[8px]/none font-medium text-white/50">{weekdayOf(day)}</span>
       </div>
       {children}
     </>
   );
+}
+
+/** A run of empty days, compressed to one short row of empty ropes: the rail says nothing. */
+function GapRow({ from, to, columns }: { from: IsoDate; to: IsoDate; columns: number }) {
+  return (
+    <>
+      <div
+        data-day-row={from}
+        data-day-to={to}
+        data-gap=""
+        className="bg-main-900 sticky left-0 z-10"
+        style={{ height: GAP_PX }}
+      />
+      {Array.from({ length: columns }, (_, at) => (
+        <Cell key={at} lane="" first={at === 0} />
+      ))}
+      <Cell lane="+" />
+    </>
+  );
+}
+
+/** The row that holds a day: its own, or the gap its run is compressed into. */
+function rowHolding(scroller: HTMLElement, day: IsoDate): HTMLElement | null {
+  for (const row of scroller.querySelectorAll<HTMLElement>('[data-day-row]')) {
+    const from = row.getAttribute('data-day-row') ?? '';
+    const to = row.getAttribute('data-day-to') ?? from;
+    if (day <= from && day >= to) return row;
+  }
+  return null;
 }
 
 /**
@@ -456,8 +496,9 @@ function Cell({
 }
 
 /**
- * A post's mark: a white disc with its lane's emoji; translucent while the
- * post is in the water (dived), the ring around it when Home says so. A
+ * A post's mark: a white disc with its lane's emoji, translucent while the
+ * post sits read in the board's upper stair, the ring around it when Home
+ * says so. A
  * post on no lane of mine has no emoji to show, so its disc is an outline —
  * a seat with nothing on it, never a blank white coin.
  */

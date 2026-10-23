@@ -14,6 +14,9 @@ import type { IsoDate } from '@/lib/time';
 
 import { formatRange, type DateRange, type SplashSummary } from './summary';
 
+/** The title's size and weight on a post's page; the top card on Home reads at the same (review). */
+export const DETAIL_TITLE_CLASS = 'text-3xl font-semibold';
+
 export type HeaderEdit = {
   title: string;
   declaredStart: IsoDate | null;
@@ -265,7 +268,7 @@ export function SplashHeader({
               setEditingTitle(false);
             }
           }}
-          className="text-ink w-full text-3xl font-semibold outline-none"
+          className={`text-ink w-full ${DETAIL_TITLE_CLASS} outline-none`}
         />
       ) : (
         <button
@@ -274,7 +277,7 @@ export function SplashHeader({
           onClick={() => setEditingTitle(true)}
           className="text-left"
         >
-          <h1 data-splash-title className="text-ink text-3xl font-semibold">
+          <h1 data-splash-title className={`text-ink ${DETAIL_TITLE_CLASS}`}>
             {splash.title.trim() ? (
               splash.title
             ) : (

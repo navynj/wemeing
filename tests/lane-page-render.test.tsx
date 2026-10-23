@@ -25,6 +25,7 @@ import { byNewest, placeCard } from '@/features/home/grid';
 import { LanePage } from '@/features/lanes/lane-page';
 import { summarizeSplash, type SplashBlock } from '@/features/splash/summary';
 import type { MyCategory } from '@/lib/queries/profile';
+import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
 import { written } from './written-on';
 
 afterEach(cleanup);
@@ -100,7 +101,11 @@ const CARDS = [
 
 describe('a lane’s page (round 3)', () => {
   it('reads Home / the lane, the emoji large over the name, and its posts newest first by month', () => {
-    const { container } = render(<LanePage lane={FOOD} cards={CARDS} />);
+    const { container } = render(
+      <InputSheetProvider>
+        <LanePage lane={FOOD} cards={CARDS} />
+      </InputSheetProvider>,
+    );
     const crumb = container.querySelector('[data-breadcrumb]')!;
     expect(crumb.querySelector('a[href="/"]')!.textContent).toBe('Home');
     expect(crumb.textContent).toContain('Food');
@@ -125,7 +130,11 @@ describe('a lane’s page (round 3)', () => {
   });
 
   it('sets the lane\u2019s card stack at the foot: the top card\u2019s row at full white, the rest quiet, no pill', async () => {
-    const { container } = render(<LanePage lane={FOOD} cards={CARDS} />);
+    const { container } = render(
+      <InputSheetProvider>
+        <LanePage lane={FOOD} cards={CARDS} />
+      </InputSheetProvider>,
+    );
     const stack = container.querySelector('[data-lane-stack] [data-stack]')!;
     expect(
       stack.querySelector('[data-stack-card][data-slot="0"]')!.getAttribute('data-stack-card'),
@@ -146,7 +155,11 @@ describe('a lane’s page (round 3)', () => {
   });
 
   it('opens with the card a post\u2019s page sent it back to on top', () => {
-    const { container } = render(<LanePage lane={FOOD} cards={CARDS} topParam="ramen" />);
+    const { container } = render(
+      <InputSheetProvider>
+        <LanePage lane={FOOD} cards={CARDS} topParam="ramen" />
+      </InputSheetProvider>,
+    );
     expect(
       container.querySelector('[data-stack-card][data-slot="0"]')!.getAttribute('data-stack-card'),
     ).toBe('ramen');
@@ -154,7 +167,11 @@ describe('a lane’s page (round 3)', () => {
 
   it('edits the emoji and the name in place, and saves them', async () => {
     saved.length = 0;
-    const { container, getByText, getByLabelText } = render(<LanePage lane={FOOD} cards={CARDS} />);
+    const { container, getByText, getByLabelText } = render(
+      <InputSheetProvider>
+        <LanePage lane={FOOD} cards={CARDS} />
+      </InputSheetProvider>,
+    );
     fireEvent.click(container.querySelector('[data-lane-name]')!);
     fireEvent.change(getByLabelText('Lane icon'), { target: { value: '🍜🍣' } });
     fireEvent.change(getByLabelText('Lane name'), { target: { value: 'Meals' } });
@@ -166,7 +183,11 @@ describe('a lane’s page (round 3)', () => {
 
   it('cancels an edit without saving', () => {
     saved.length = 0;
-    const { container, getByText, getByLabelText } = render(<LanePage lane={FOOD} cards={CARDS} />);
+    const { container, getByText, getByLabelText } = render(
+      <InputSheetProvider>
+        <LanePage lane={FOOD} cards={CARDS} />
+      </InputSheetProvider>,
+    );
     fireEvent.click(container.querySelector('[data-lane-emoji]')!);
     fireEvent.change(getByLabelText('Lane name'), { target: { value: 'Meals' } });
     fireEvent.click(getByText('Cancel'));

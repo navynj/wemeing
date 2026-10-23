@@ -69,7 +69,7 @@ export function LaneMatch({
               key={lane.key}
               data-match-row={lane.key}
               data-connected={off ? undefined : ''}
-              className={`grid grid-cols-[minmax(0,1fr)_2rem_7.5rem] items-center gap-2 rounded-2xl px-5 py-5 ${
+              className={`grid grid-cols-[minmax(0,1fr)_2rem_8.5rem] items-center gap-2 rounded-2xl px-5 py-5 ${
                 off ? 'bg-pool-100/60' : 'bg-pool-100'
               }`}
             >

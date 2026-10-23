@@ -1,6 +1,8 @@
 'use client';
 
 import { CommitRing } from '@/components/ui/waves';
+import { Monogram } from '@/components/ui/monogram';
+
 import { postIcon, type Card, type CardLane } from './grid';
 
 /** The icon disc's diameter, and the ring's bound around it. */
@@ -77,6 +79,10 @@ export function PostRow({
       >
         {title}
       </span>
+      {(card.pools ?? []).map((pool) => (
+        // Shared to a pool (H23), as on the mark and the card.
+        <Monogram key={pool} name={pool} size="chip" />
+      ))}
       {card.author ? (
         // In a pool's Date view each row says whose it is (H23).
         <span data-row-author className="shrink-0 text-[10px] font-medium text-white/70">

@@ -320,8 +320,10 @@ export function SplashComposer({
 
       {/* The declared lane: where every block of this post starts (H21f).
           From a pool, its lanes as I linked them, and Joint splash (H23). */}
-      <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1">
+      {/* From a pool its two-line lane chips need the row's width; the chip
+          takes its own line under them. */}
+      <div className={pool ? 'flex flex-col items-start gap-3' : 'flex items-start gap-2'}>
+        <div className="w-full min-w-0 flex-1">
           {pool ? (
             <PoolLanePicker
               scope={pool}

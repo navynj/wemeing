@@ -84,8 +84,8 @@ export type GridHandle = {
  * what keeps three rows above the stack on a short phone. With up to
  * `EVEN_COLUMNS_MAX` lanes the columns share the width and the group sits
  * centred; past that each column is fixed and the columns scroll sideways.
- * At the far left of the headers, above the rail, an `=` opens the lanes
- * sheet (review).
+ * A lane's header opens its detail — the titles on it; at the far left of
+ * the headers, above the rail, an `=` opens the lanes sheet (review).
  *
  * The rendered window of days grows as the bottom comes into view, from the
  * top day back to the oldest post's month. The ring plays at the mark Home
@@ -107,6 +107,8 @@ export const LaneGrid = forwardRef<
     /** `?m=`: the month to scroll the grid to; the newest day of it lands under the headers. */
     scrollToMonth: string | null;
     onPick: (id: string) => void;
+    /** A lane's header: its detail, the titles on it (review). */
+    onLaneTap: (laneId: string) => void;
     onEditLanes: () => void;
     onCreateLane: () => void;
   }
@@ -120,6 +122,7 @@ export const LaneGrid = forwardRef<
     initials,
     scrollToMonth,
     onPick,
+    onLaneTap,
     onEditLanes,
     onCreateLane,
   },
@@ -335,7 +338,7 @@ export const LaneGrid = forwardRef<
             key={lane.id}
             type="button"
             data-lane-header={lane.id}
-            onClick={onEditLanes}
+            onClick={() => onLaneTap(lane.id)}
             className="bg-main-900 sticky top-0 z-20 flex flex-col items-center gap-0.5 px-0.5 pb-2 text-white"
           >
             <span aria-hidden className="text-2xl/none">

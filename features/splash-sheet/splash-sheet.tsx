@@ -14,8 +14,7 @@ export const SHEET_MAX_HEIGHT = 'max-h-[calc(100dvh-env(safe-area-inset-top,0px)
 
 /**
  * The post sheet (SPEC 6, H21): the composer as a white bottom sheet on the
- * dimmed ground, from the FAB on a phone. On a wide screen the same
- * composer stands in the right half instead (`ComposerPanel`).
+ * dimmed ground, from the compose disc at every width (review).
  */
 export function SplashSheet({
   context,

@@ -9,7 +9,7 @@ vi.mock('@/features/splash/actions', () => ({
     return Promise.resolve({ ok: true, splash: { id: 's-new', title: input.title } });
   },
 }));
-let pathname = '/';
+const pathname = '/';
 vi.mock('next/navigation', () => ({
   usePathname: () => pathname,
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),
@@ -28,8 +28,6 @@ import {
   type DropHandoff,
 } from '@/features/splash-sheet/splash-sheet';
 import type { SplashSummary } from '@/features/splash/summary';
-import { ComposerPanel } from '@/features/input-sheet/sheet-host';
-import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
 import { composeDrop, splitTitle } from '@/features/splash-sheet/split-title';
 import type { MyCategory } from '@/lib/queries/profile';
 
@@ -268,88 +266,5 @@ describe('the affordances under the text', () => {
     const { getByText, container } = sheet();
     expect(getByText('+ Add Image')).toBeTruthy();
     expect(container.querySelector('[data-media-input]')).not.toBeNull();
-  });
-});
-
-describe('the wide screen’s standing composer (review)', () => {
-  const context = { categories: LANES, timeZone: TZ, today: TODAY };
-  const panel = () =>
-    render(
-      <InputSheetProvider>
-        <ComposerPanel context={context} />
-      </InputSheetProvider>,
-    );
-
-  it('floats on the water on Home, with Drop your splash waiting', () => {
-    pathname = '/';
-    const { container } = panel();
-    const aside = container.querySelector('[data-composer-panel]')!;
-    expect(aside.className).toContain('water-ground');
-    expect(aside.className).toContain('lg:w-1/2');
-    expect(aside.querySelector('[data-splash-composer]')).not.toBeNull();
-    expect(aside.querySelector('[data-sheet-title]')!.getAttribute('placeholder')).toBe(
-      'Drop your splash',
-    );
-  });
-
-  it('sits on the page elsewhere, and is absent on a post’s page: the blocks take the right half', () => {
-    pathname = '/locker';
-    let view = panel();
-    expect(view.container.querySelector('[data-composer-panel]')!.className).toContain(
-      'bg-pool-100',
-    );
-    expect(view.container.querySelector('[data-composer-panel]')!.className).not.toContain(
-      'water-ground',
-    );
-    cleanup();
-
-    pathname = '/splash/s1';
-    view = panel();
-    expect(view.container.querySelector('[data-composer-panel]')).toBeNull();
-    pathname = '/';
-  });
-});
-
-describe('the composer minimises (review)', () => {
-  it('folds to one line so the Trail can be read on its own, and opens back up', () => {
-    pathname = '/';
-    try {
-      window.localStorage.removeItem('during.composer-minimized');
-    } catch {
-      // No storage, no memory.
-    }
-    const { container, getByLabelText } = render(
-      <InputSheetProvider>
-        <ComposerPanel context={{ categories: LANES, timeZone: TZ, today: TODAY }} />
-      </InputSheetProvider>,
-    );
-    expect(container.querySelector('[data-splash-composer]')).not.toBeNull();
-    fireEvent.click(getByLabelText('Minimize the composer'));
-    expect(container.querySelector('[data-splash-composer]')).toBeNull();
-    const line = container.querySelector('[data-composer-minimized]')!;
-    expect(line.textContent).toContain('Drop your splash');
-    expect(window.localStorage.getItem('during.composer-minimized')).toBe('1');
-    fireEvent.click(getByLabelText('Open the composer'));
-    expect(container.querySelector('[data-splash-composer]')).not.toBeNull();
-    window.localStorage.removeItem('during.composer-minimized');
-  });
-});
-
-describe('the Trail under the composer (review)', () => {
-  it('reads under the composer in its own card: a wide screen has no Locker tab', () => {
-    pathname = '/';
-    const { container } = render(
-      <InputSheetProvider>
-        <ComposerPanel
-          context={{ categories: LANES, timeZone: TZ, today: TODAY }}
-          trail={<ol data-trail-fixture />}
-        />
-      </InputSheetProvider>,
-    );
-    const composer = container.querySelector('[data-splash-composer]')!;
-    const card = container.querySelector('[data-panel-trail]')!;
-    expect(card.querySelector('[data-trail-fixture]')).not.toBeNull();
-    expect(card.className).toContain('bg-white');
-    expect(composer.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

@@ -401,9 +401,25 @@ describe('the lane grid', () => {
     expect(wide.style.touchAction).toBe('pan-x pan-y');
   });
 
-  it('opens the lanes sheet from a lane header, and the new-lane sheet from the +', () => {
+  it('opens a lane\u2019s detail from its header: its titles as a list, newest first', () => {
     const { container, getByLabelText, getByRole } = ground();
     fireEvent.click(container.querySelector('[data-lane-header="c-food"]')!);
+    const sheet = getByRole('dialog', { name: 'Food' });
+    expect(sheet.textContent).toContain('2 posts');
+    const posts = [...sheet.querySelectorAll('[data-lane-post]')].map((p) => p.textContent);
+    expect(posts[0]).toContain('Toy Story 5');
+    expect(posts[0]).toContain('Sep 20');
+    expect(posts[1]).toContain('Beef Short Rib Soup');
+    expect(sheet.querySelector('[data-lane-post="late"]')!.getAttribute('href')).toBe(
+      '/splash/late?from=2026-09',
+    );
+    fireEvent.click(getByLabelText('Close'));
+    expect(container.querySelector('[data-lane-detail]')).toBeNull();
+  });
+
+  it('opens the lanes sheet from the = above the rail, and the new-lane sheet from the +', () => {
+    const { container, getByLabelText, getByRole } = ground();
+    fireEvent.click(container.querySelector('[data-grid-header] [data-edit-lanes]')!);
     expect(getByRole('dialog', { name: 'Edit lanes' })).toBeTruthy();
     fireEvent.click(getByLabelText('Close'));
     fireEvent.click(getByLabelText('New lane'));
@@ -536,13 +552,38 @@ describe('the diving board, a staircase', () => {
     await waitFor(() => expect(deleted).toEqual(['late']));
   });
 
-  it('opens the post sheet from the compose button outside the stack; no drop bar', () => {
+  it('opens the post sheet from the compose disc at the nav\u2019s right: white, a blue plus', () => {
     const { container } = ground();
     expect(container.querySelector('[data-drop-bar]')).toBeNull();
     expect(container.querySelector('[data-stack] [data-compose]')).toBeNull();
+    const compose = container.querySelector('[data-ground-nav] [data-compose]')!;
+    expect(compose.className).toContain('bg-white');
+    expect(compose.className).toContain('text-main-900');
     expect(container.querySelector('[data-sheet-open]')).toBeNull();
-    fireEvent.click(container.querySelector('[data-compose]')!);
+    fireEvent.click(compose);
     expect(container.querySelector('[data-sheet-open="splash"]')).not.toBeNull();
+  });
+
+  it('carries Home, Locker and Sessions as tabs at the nav\u2019s left, Sessions opening the sheet', () => {
+    const { container, getByRole } = ground();
+    const nav = container.querySelector('[data-ground-nav]')!;
+    const tabs = [...nav.querySelectorAll('[data-ground-tab]')].map((t) =>
+      t.getAttribute('data-ground-tab'),
+    );
+    expect(tabs).toEqual(['home', 'locker', 'sessions']);
+    expect(nav.querySelector('[data-ground-tab="locker"]')!.getAttribute('href')).toBe('/locker');
+    expect(nav.querySelector('[data-ground-tab="home"]')!.getAttribute('aria-current')).toBe(
+      'page',
+    );
+    expect(nav.querySelector('[data-ground-tab="locker"]')!.className).toContain('opacity-50');
+    expect(
+      nav.compareDocumentPosition(nav.querySelector('[data-compose]')!) &
+        Node.DOCUMENT_POSITION_CONTAINED_BY,
+    ).toBeTruthy();
+    fireEvent.click(nav.querySelector('[data-ground-tab="sessions"]')!);
+    expect(
+      getByRole('dialog', { name: 'Sessions' }).querySelector('[data-session-schedule]'),
+    ).not.toBeNull();
   });
 
   it('keeps its height whatever is on top, so the grid never moves', async () => {

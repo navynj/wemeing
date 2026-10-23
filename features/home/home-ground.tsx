@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, Plus } from 'lucide-react';
+import { CalendarDays, ChevronDown, Home, Plus, ShelvingUnit } from 'lucide-react';
 
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { deleteRipple } from '@/features/ripple-sheet/actions';
 import { deleteSplash, setSplashPinned } from '@/features/splash/actions';
 import { CategorySheet } from '@/features/lanes/category-sheet';
+import { LaneDetailSheet } from '@/features/lanes/lane-detail-sheet';
 import { LanesSheet } from '@/features/lanes/lanes-sheet';
 import { SessionsSheet } from '@/features/sessions/sessions-sheet';
 import type { Session } from '@/features/sessions/shelves';
@@ -18,7 +19,7 @@ import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
 
 import { FlipBoard } from './diving-board-flip';
-import { byNewest, newestIn, placeCard, type Card } from './grid';
+import { byNewest, cardLane, newestIn, placeCard, type Card } from './grid';
 import { LaneGrid, type GridHandle, type Ring } from './lane-grid';
 import { PinnedBar } from './pinned-bar';
 import { StairBoard } from './stair-board';
@@ -44,7 +45,8 @@ const RING_MS = 1800;
  * and unread below (or, on the page-turn board, a pile beneath). The ring
  * plays at the mark of whichever card comes to the top; tapping a mark
  * brings its card there. Between them the pinned bar, when anything is
- * pinned; beneath, the compose `+` at the bottom right.
+ * pinned; beneath, the ground's nav — Home, Locker, Sessions — with the
+ * compose disc at its right.
  *
  * The title opens the ground's menu: the Locker, the sessions sheet and the
  * lanes sheet. The Home dropdown's pool switching is P3's; nothing here
@@ -88,6 +90,7 @@ export function HomeGround({
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [newLane, setNewLane] = useState(false);
   const [editingLanes, setEditingLanes] = useState(false);
+  const [laneDetail, setLaneDetail] = useState<string | null>(null);
   const { openSheet, pendingDrop, clearDropped, dropMessage, pendingDeletes, markDeleted } =
     useInputSheet();
   const router = useRouter();
@@ -182,135 +185,178 @@ export function HomeGround({
 
   return (
     <div data-home-ground className="water-ground flex min-h-0 flex-1 flex-col">
+      {/* A phone stacks the halves; a wide screen sets them side by side, the
+          grid left and the board right, the board's column as tall as the
+          screen (review). */}
       <div
-        className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col"
+        className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col lg:max-w-5xl lg:flex-row lg:gap-8"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
-        <header className="relative flex shrink-0 items-center px-6 pt-4 pb-1">
-          <button
-            type="button"
-            data-home-menu-button
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((open) => !open)}
-            className="flex items-center gap-1 text-2xl font-semibold text-white"
-          >
-            Home
-            <ChevronDown aria-hidden size={18} className="mt-0.5" />
-          </button>
-          {menuOpen ? (
-            <>
-              <button
-                type="button"
-                aria-label="Close menu"
-                onClick={() => setMenuOpen(false)}
-                className="fixed inset-0 z-30"
-              />
-              {/* The menu in ink: the selection channel on the water. */}
-              <ul
-                role="menu"
-                data-home-menu
-                className="bg-ink absolute top-full left-6 z-40 flex w-44 flex-col rounded-xl py-1 text-sm text-white shadow-lg"
-              >
-                <li>
-                  <Link
-                    role="menuitem"
-                    href="/locker"
-                    onClick={() => setMenuOpen(false)}
-                    className="block px-4 py-2.5"
-                  >
-                    Locker
-                  </Link>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    data-manage-sessions
-                    onClick={() => {
-                      setMenuOpen(false);
-                      setSessionsOpen(true);
-                    }}
-                    className="w-full px-4 py-2.5 text-left"
-                  >
-                    Sessions
-                  </button>
-                </li>
-                <li>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    data-edit-lanes
-                    onClick={() => {
-                      setMenuOpen(false);
-                      setEditingLanes(true);
-                    }}
-                    className="w-full px-4 py-2.5 text-left"
-                  >
-                    Lanes
-                  </button>
-                </li>
-              </ul>
-            </>
+        <div className="flex min-h-0 flex-1 flex-col lg:w-1/2 lg:flex-none">
+          <header className="relative flex shrink-0 items-center px-6 pt-4 pb-1">
+            <button
+              type="button"
+              data-home-menu-button
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((open) => !open)}
+              className="flex items-center gap-1 text-2xl font-semibold text-white"
+            >
+              Home
+              <ChevronDown aria-hidden size={18} className="mt-0.5" />
+            </button>
+            {menuOpen ? (
+              <>
+                <button
+                  type="button"
+                  aria-label="Close menu"
+                  onClick={() => setMenuOpen(false)}
+                  className="fixed inset-0 z-30"
+                />
+                {/* The menu in ink: the selection channel on the water. */}
+                <ul
+                  role="menu"
+                  data-home-menu
+                  className="bg-ink absolute top-full left-6 z-40 flex w-44 flex-col rounded-xl py-1 text-sm text-white shadow-lg"
+                >
+                  <li>
+                    <Link
+                      role="menuitem"
+                      href="/locker"
+                      onClick={() => setMenuOpen(false)}
+                      className="block px-4 py-2.5"
+                    >
+                      Locker
+                    </Link>
+                  </li>
+                  <li>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      data-manage-sessions
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setSessionsOpen(true);
+                      }}
+                      className="w-full px-4 py-2.5 text-left"
+                    >
+                      Sessions
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      data-edit-lanes
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setEditingLanes(true);
+                      }}
+                      className="w-full px-4 py-2.5 text-left"
+                    >
+                      Lanes
+                    </button>
+                  </li>
+                </ul>
+              </>
+            ) : null}
+          </header>
+
+          {dropMessage || lanes.message ? (
+            <p role="alert" className="shrink-0 px-6 pb-2 text-sm text-white/80">
+              {dropMessage ?? lanes.message}
+            </p>
           ) : null}
-        </header>
 
-        {dropMessage || lanes.message ? (
-          <p role="alert" className="shrink-0 px-6 pb-2 text-sm text-white/80">
-            {dropMessage ?? lanes.message}
-          </p>
-        ) : null}
-
-        <LaneGrid
-          ref={grid}
-          cards={shown}
-          categories={lanes.value}
-          today={today}
-          ring={ring}
-          waterIds={waterIds}
-          initials={initials}
-          scrollToMonth={scrollToMonth}
-          onPick={goTo}
-          onEditLanes={() => setEditingLanes(true)}
-          onCreateLane={() => setNewLane(true)}
-        />
-
-        <div className="shrink-0 px-6">
-          <PinnedBar
-            pinned={pins.value.filter((p) => !pendingDeletes.includes(p.id))}
+          <LaneGrid
+            ref={grid}
+            cards={shown}
             categories={lanes.value}
-            month={today.slice(0, 7)}
+            today={today}
+            ring={ring}
+            waterIds={waterIds}
+            initials={initials}
+            scrollToMonth={scrollToMonth}
+            onPick={goTo}
+            onLaneTap={setLaneDetail}
+            onEditLanes={() => setEditingLanes(true)}
+            onCreateLane={() => setNewLane(true)}
           />
+
+          <div className="shrink-0 px-6">
+            <PinnedBar
+              pinned={pins.value.filter((p) => !pendingDeletes.includes(p.id))}
+              categories={lanes.value}
+              month={today.slice(0, 7)}
+            />
+          </div>
         </div>
 
-        {board === 'stair' ? (
-          <StairBoard
-            cards={shown}
-            flip={flip}
-            categories={lanes.value}
-            initials={initials}
-            pinnedIds={pinnedIds}
-            onPin={pin}
-            onDelete={remove}
-          />
-        ) : (
-          <FlipBoard cards={shown} flip={flip} categories={lanes.value} initials={initials} />
-        )}
+        <div className="flex shrink-0 flex-col lg:min-h-0 lg:w-1/2 lg:flex-none lg:pt-10">
+          {board === 'stair' ? (
+            <StairBoard
+              cards={shown}
+              flip={flip}
+              categories={lanes.value}
+              initials={initials}
+              pinnedIds={pinnedIds}
+              onPin={pin}
+              onDelete={remove}
+            />
+          ) : (
+            <FlipBoard cards={shown} flip={flip} categories={lanes.value} initials={initials} />
+          )}
 
-        {/* Compose: the action, in blue, at the bottom right outside the stack. */}
-        <div
-          className="flex shrink-0 justify-end px-6 pt-2"
-          style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }}
-        >
-          <button
-            type="button"
-            aria-label="Drop a splash"
-            data-compose
-            onClick={openSheet}
-            className="bg-main-900 flex h-12 w-12 items-center justify-center rounded-full text-white"
+          {/* The bottom nav on the ground (review): Home, Locker and Sessions
+            as tabs at the left — white, the active one full and the others
+            faded as one item (SPEC 7, chrome) — and compose at the right, a
+            white disc with the blue plus: on the water, white carries the
+            action (H21c). A tab appears only when its screen ships. */}
+          <nav
+            data-ground-nav
+            aria-label="Home"
+            className="flex shrink-0 items-center justify-between px-6 pt-2"
+            style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }}
           >
-            <Plus aria-hidden size={24} />
-          </button>
+            <div className="flex items-center gap-7 text-white">
+              <Link
+                href="/"
+                aria-current="page"
+                data-ground-tab="home"
+                className="flex flex-col items-center gap-1 font-semibold"
+              >
+                <Home aria-hidden size={20} strokeWidth={2.25} />
+                <span className="text-xs/none">Home</span>
+              </Link>
+              <Link
+                href="/locker"
+                data-ground-tab="locker"
+                className="flex flex-col items-center gap-1 font-medium opacity-50"
+              >
+                <ShelvingUnit aria-hidden size={20} />
+                <span className="text-xs/none">Locker</span>
+              </Link>
+              <button
+                type="button"
+                data-ground-tab="sessions"
+                aria-haspopup="dialog"
+                onClick={() => setSessionsOpen(true)}
+                className="flex flex-col items-center gap-1 font-medium opacity-50"
+              >
+                <CalendarDays aria-hidden size={20} />
+                <span className="text-xs/none">Sessions</span>
+              </button>
+            </div>
+            <button
+              type="button"
+              aria-label="Drop a splash"
+              data-compose
+              onClick={openSheet}
+              className="text-main-900 flex h-12 w-12 items-center justify-center rounded-full bg-white"
+            >
+              <Plus aria-hidden size={24} />
+            </button>
+          </nav>
         </div>
       </div>
 
@@ -326,6 +372,13 @@ export function HomeGround({
         />
       ) : null}
 
+      {laneDetail ? (
+        <LaneDetailSheet
+          lane={lanes.value.find((lane) => lane.id === laneDetail) ?? lanes.value[0]}
+          cards={shown.filter((card) => cardLane(card.splash) === laneDetail)}
+          onClose={() => setLaneDetail(null)}
+        />
+      ) : null}
       {newLane ? (
         <CategorySheet category={null} apply={lanes.run} onClose={() => setNewLane(false)} />
       ) : null}

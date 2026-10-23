@@ -173,6 +173,7 @@ function ground(
   deleted: string | null = null,
   categories = LANES,
   month: string | null = null,
+  board: 'dive' | 'flip' = 'dive',
 ) {
   return render(
     <InputSheetProvider>
@@ -191,6 +192,7 @@ function ground(
         timeZone={TZ}
         initials="YL"
         scrollToMonth={month}
+        board={board}
       />
     </InputSheetProvider>,
   );
@@ -207,24 +209,33 @@ const rowOf = (mark: Element): HTMLElement => {
 };
 const topCard = (root: Element): HTMLElement =>
   root.querySelector<HTMLElement>('[data-stack-card][data-slot="0"]')!;
-const tabs = (root: Element): (string | null)[] =>
+/** The cards behind the top one, nearest first. */
+const peeks = (root: Element): (string | null)[] =>
   [...root.querySelectorAll('[data-stack-card]')]
-    .filter((el) => el.getAttribute('data-slot') !== '0' && el.getAttribute('data-slot') !== '-1')
+    .filter((el) => Number(el.getAttribute('data-slot')) > 0)
     .sort((a, b) => Number(a.getAttribute('data-slot')) - Number(b.getAttribute('data-slot')))
     .map((el) => el.getAttribute('data-stack-card'));
-const flipped = (root: Element): Promise<void> => waitFor(() => expectSettled(root));
+/** The pile's strips, newest-turned first (the page-turn board). */
+const pile = (root: Element): (string | null)[] =>
+  [...root.querySelectorAll('[data-pile-strip][data-pile-slot]')]
+    .sort(
+      (a, b) => Number(a.getAttribute('data-pile-slot')) - Number(b.getAttribute('data-pile-slot')),
+    )
+    .map((el) => el.getAttribute('data-pile-strip'));
+/** Nothing diving, rising or turning. */
+const settled = (root: Element): Promise<void> =>
+  waitFor(() => {
+    expect(root.querySelector('[data-moving]')).toBeNull();
+    expect(root.querySelector('[data-turning]')).toBeNull();
+  });
+const dived = (root: Element): (string | null)[] =>
+  [...root.querySelectorAll('[data-mark][data-dived]')].map((el) => el.getAttribute('data-mark'));
 /** The ring arrives once the mark has been brought into view. */
 const ringed = (root: Element, id: string): Promise<void> =>
   waitFor(() => expect(root.querySelector(`[data-mark="${id}"][data-ring]`)).not.toBeNull());
 /** The window reaches every day once the grid has measured where its end is. */
 const grown = (root: Element): Promise<void> =>
   waitFor(() => expect(root.querySelector('[data-day-row="2026-08-17"]')).not.toBeNull());
-function expectSettled(root: Element): void {
-  for (const el of root.querySelectorAll('[data-stack-card]')) {
-    expect(el.getAttribute('data-slot')).toBe(el.getAttribute('data-to'));
-  }
-}
-
 describe('the water ground (H22)', () => {
   it('is the blue ground: the grid above, the diving board below, white carrying content', () => {
     const { container } = ground();
@@ -268,7 +279,7 @@ describe('the lane grid', () => {
     );
   });
 
-  it('reads newest day first, with the year and month only where the month changes', async () => {
+  it('reads newest day first, names only the days with something, and the month on the first named day', async () => {
     const { container } = ground();
     await grown(container);
     const rows = [...container.querySelectorAll('[data-day-row]')].map((r) =>
@@ -277,11 +288,17 @@ describe('the lane grid', () => {
     expect(rows[0]).toBe('2026-09-25');
     expect(rows[1]).toBe('2026-09-24');
     expect(rows).toContain('2026-08-17');
-    const labelled = [...container.querySelectorAll('[data-day-row]')]
+    // An empty day is a row of empty ropes with no date (review).
+    expect(container.querySelector('[data-day-row="2026-09-25"]')!.textContent).toBe('');
+    const named = [...container.querySelectorAll('[data-day-row][data-labelled]')].map((r) =>
+      r.getAttribute('data-day-row'),
+    );
+    expect(named).toEqual(['2026-09-20', '2026-09-12', '2026-09-08', '2026-09-05', '2026-08-17']);
+    expect(container.querySelector('[data-day-row="2026-09-20"]')!.textContent).toContain('SUN');
+    const monthLabelled = [...container.querySelectorAll('[data-day-row]')]
       .filter((r) => r.querySelector('[data-month-label]'))
       .map((r) => r.getAttribute('data-day-row'));
-    expect(labelled).toEqual(['2026-09-25', '2026-08-31']);
-    expect(container.querySelector('[data-day-row="2026-09-25"]')!.textContent).toContain('FRI');
+    expect(monthLabelled).toEqual(['2026-09-20', '2026-08-17']);
   });
 
   it('heads each column with its emoji over its name, in lane order, a rope down each', () => {
@@ -293,9 +310,11 @@ describe('the lane grid', () => {
       'c-day',
     ]);
     expect(headers[0].textContent).toBe('🍜Food');
+    // A rope runs beside each lane, between it and the next; none at the rail's side (review).
     const row = container.querySelector('[data-day-row="2026-09-24"]')!;
-    const cells = [row.nextElementSibling, row.nextElementSibling!.nextElementSibling];
-    for (const cell of cells) expect(cell!.querySelector('[data-rope]')).not.toBeNull();
+    const cells = [row.nextElementSibling!, row.nextElementSibling!.nextElementSibling!];
+    expect(cells[0].querySelector('[data-rope]')).toBeNull();
+    expect(cells[1].querySelector('[data-rope]')).not.toBeNull();
   });
 
   it('renders an empty month as rows of empty ropes, with no copy', () => {
@@ -304,7 +323,7 @@ describe('the lane grid', () => {
     expect(container.querySelector('[data-mark]')).toBeNull();
     expect(queryByText(/quiet|fresh page|nothing/i)).toBeNull();
     expect(container.querySelector('[data-diving-board] [data-stack]')).toBeNull();
-    expect(container.querySelector('[data-drop-bar]')).not.toBeNull();
+    expect(container.querySelector('[data-compose]')).not.toBeNull();
   });
 
   it('stacks two posts on one lane and day within the row', () => {
@@ -378,15 +397,19 @@ describe('the diving board', () => {
     }
   });
 
-  it('peeks the next older cards as tabs, each its emoji and title', () => {
+  it('shows up to three cards behind the top one, each its emoji and title line; no strip, no pile', () => {
     const { container } = ground();
-    expect(tabs(container)).toEqual(['mid', 'soup']);
-    const tab = container.querySelector('[data-tab="mid"]')!;
-    expect(tab.textContent).toContain('📍');
-    expect(tab.textContent).toContain('coffee went cold');
+    expect(peeks(container)).toEqual(['mid', 'soup', 'early']);
+    const behind = container.querySelector('[data-stack-card="mid"]')!;
+    expect(behind.textContent).toContain('📍');
+    expect(behind.textContent).toContain('coffee went cold');
+    expect(behind.querySelector('[data-back-card="mid"]')).not.toBeNull();
+    expect(container.querySelector('[data-tab]')).toBeNull();
+    expect(pile(container)).toEqual([]);
+    expect(container.querySelector('[data-surfaced]')).toBeNull();
   });
 
-  it('reads the top card: date with weekday, lane chip, emoji and title, initials, body', () => {
+  it('reads the top card: emoji and title first, date with weekday, lane chip, initials, body', () => {
     const { container } = ground();
     const card = topCard(container);
     expect(card.querySelector('[data-card-date]')!.textContent).toBe('Sep 20 (SUN)');
@@ -399,31 +422,59 @@ describe('the diving board', () => {
     );
   });
 
-  it('brings a tapped tab forward, moving the ring to its mark', async () => {
+  it('dives the top card to its mark when the next mark is tapped: translucent mark, ring at the landing, surfaced strip', async () => {
     const { container } = ground();
-    fireEvent.click(container.querySelector('[data-tab="soup"]')!);
-    await flipped(container);
-    expect(topCard(container).getAttribute('data-stack-card')).toBe('soup');
-    await ringed(container, 'soup');
+    fireEvent.click(container.querySelector('[data-mark="mid"]')!);
+    await settled(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('mid');
+    expect(container.querySelector('[data-stack-card="late"]')).toBeNull();
+    expect(dived(container)).toEqual(['late']);
+    await ringed(container, 'late');
     expect(container.querySelectorAll('[data-ring]')).toHaveLength(1);
-    expect(tabs(container)).toEqual(['early', 'aug']);
+    const strip = container.querySelector('[data-surfaced="late"]')!;
+    expect(strip.textContent).toContain('Toy Story 5');
+    expect(strip.textContent).toContain('🍜');
+    expect(container.querySelectorAll('[data-surfaced]')).toHaveLength(1);
   });
 
-  it('brings a tapped mark\u2019s card to the top, and scrolls the grid to the mark', async () => {
+  it('raises the last dived card from the surfaced strip, and the strip names the previous one or goes', async () => {
+    const { container } = ground();
+    fireEvent.click(container.querySelector('[data-back-card="soup"]')!);
+    await settled(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('soup');
+    expect(dived(container).sort()).toEqual(['late', 'mid']);
+    expect(container.querySelector('[data-surfaced]')!.getAttribute('data-surfaced')).toBe('mid');
+    fireEvent.click(container.querySelector('[data-surfaced="mid"]')!);
+    await settled(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('mid');
+    expect(container.querySelector('[data-surfaced]')!.getAttribute('data-surfaced')).toBe('late');
+    fireEvent.click(container.querySelector('[data-surfaced="late"]')!);
+    await settled(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('late');
+    expect(container.querySelector('[data-surfaced]')).toBeNull();
+    expect(dived(container)).toEqual([]);
+  });
+
+  it('raises a dived card, and every card that dived after it, from its translucent mark', async () => {
     const { container } = ground();
     await grown(container);
     fireEvent.click(container.querySelector('[data-mark="aug"]')!);
-    await flipped(container);
+    await settled(container);
     expect(topCard(container).getAttribute('data-stack-card')).toBe('aug');
-    await ringed(container, 'aug');
-    // Round again: the newest follows the oldest.
-    expect(tabs(container)).toEqual(['late', 'mid']);
+    expect(dived(container)).toHaveLength(4);
+    fireEvent.click(container.querySelector('[data-mark="mid"][data-dived]')!);
+    await settled(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('mid');
+    expect(dived(container)).toEqual(['late']);
+    expect(peeks(container)).toEqual(['soup', 'early', 'aug']);
   });
 
-  it('opens the post sheet from the drop bar', () => {
+  it('opens the post sheet from the compose button outside the stack; no drop bar', () => {
     const { container } = ground();
+    expect(container.querySelector('[data-drop-bar]')).toBeNull();
+    expect(container.querySelector('[data-stack] [data-compose]')).toBeNull();
     expect(container.querySelector('[data-sheet-open]')).toBeNull();
-    fireEvent.click(container.querySelector('[data-drop-bar]')!);
+    fireEvent.click(container.querySelector('[data-compose]')!);
     expect(container.querySelector('[data-sheet-open="splash"]')).not.toBeNull();
   });
 
@@ -431,9 +482,20 @@ describe('the diving board', () => {
     const { container } = ground();
     const stack = container.querySelector<HTMLElement>('[data-stack]')!;
     const height = stack.style.height;
-    fireEvent.click(container.querySelector('[data-tab="mid"]')!);
-    await flipped(container);
+    fireEvent.click(container.querySelector('[data-mark="soup"]')!);
+    await settled(container);
     expect(stack.style.height).toBe(height);
+  });
+
+  it('turns pages onto a pile instead when the page-turn board is chosen', async () => {
+    const { container } = ground(POSTS, null, null, LANES, null, 'flip');
+    expect(container.querySelector('[data-board="flip"]')).not.toBeNull();
+    fireEvent.click(container.querySelector('[data-mark="mid"]')!);
+    await settled(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('mid');
+    expect(pile(container)).toEqual(['late']);
+    expect(dived(container)).toEqual([]);
+    await ringed(container, 'mid');
   });
 });
 
@@ -444,8 +506,9 @@ describe('the post just dropped', () => {
     expect(cellOf(container.querySelector('[data-mark="fresh"]')!).getAttribute('data-cell')).toBe(
       'c-place',
     );
-    await flipped(container);
+    await settled(container);
     expect(topCard(container).getAttribute('data-stack-card')).toBe('fresh');
+    expect(dived(container)).toEqual([]);
     await ringed(container, 'fresh');
     expect(container.querySelectorAll('[data-commit-ripple]')).toHaveLength(1);
   });

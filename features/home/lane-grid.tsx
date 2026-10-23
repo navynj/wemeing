@@ -1,7 +1,17 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Plus } from 'lucide-react';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import { Equal, Plus } from 'lucide-react';
 
 import { CommitRing } from '@/components/ui/waves';
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
@@ -28,21 +38,41 @@ const PLUS_PX = 44;
 const WINDOW_STEP = 31;
 /** The fewest rows rendered at first, so a month that has barely begun still scrolls. */
 const WINDOW_MIN = 21;
-/** The mark's diameter, and the ring's bound around the one on top of the stack. */
-const MARK_PX = 28;
+/** A day row's least height, and the mark's diameter with the ring's bound around the one on top. */
+const ROW_PX = 56;
+export const MARK_PX = 28;
 const RING_PX = 96;
 /** How long a smooth scroll to the mark is given before its ring plays, so the ring is seen. */
-const SCROLL_MS = 350;
+export const SCROLL_MS = 350;
+
+/** A ring to play: at this mark, once per `seq`. */
+export type Ring = { id: string; seq: number };
+
+/** Where a mark is on screen: the centre of its disc, in client coordinates. */
+export type MarkSpot = { x: number; y: number; size: number };
+
+/** What Home can ask the grid to do. */
+export type GridHandle = {
+  /**
+   * Scrolls so the first mark is in view (smooth unless motion is reduced)
+   * and reports where each mark will be once that scroll has landed — the
+   * target a diving card flies to, and the seat a rising one leaves from.
+   */
+  revealMarks: (ids: string[]) => Map<string, MarkSpot>;
+};
 
 /**
  * The lane grid (H22; `_docs/mockups/home-grid-stack.png`): a map of recent
  * records. One column per lane in the author's order, each headed by its
- * emoji over its name with a thin rope running down it; one row per day,
+ * emoji over its name with a thin rope running down each side of it; one row per day,
  * newest at the top, named on a fixed rail at the left (the day number and
- * weekday, the year and month only where the month changes). A post is a
- * white disc carrying its lane's emoji, centred on its column at its day;
- * several on one lane and day stack within the row. Empty days are rows of
- * empty ropes — the empty state is the water itself.
+ * weekday, the year and month only where the month changes) at one quiet
+ * opacity. A post is a white disc carrying its lane's emoji, centred on its
+ * column at its day; several on one lane and day stack within the row, and
+ * the row grows to hold them. A post dived into the water (review) keeps a
+ * translucent mark here; tapping any mark brings its card up. Empty days
+ * are rows of empty ropes with no date on the rail (review) — the empty
+ * state is the water itself, and only a day with something on it is named.
  *
  * One scroll container, both axes: the rail is sticky at the left and the
  * lane headers sticky at the top, so a vertical drag anywhere scrolls days
@@ -51,41 +81,52 @@ const SCROLL_MS = 350;
  * what keeps three rows above the stack on a short phone. With up to
  * `EVEN_COLUMNS_MAX` lanes the columns share the width and the group sits
  * centred; past that each column is fixed and the columns scroll sideways.
+ * At the far left of the headers, above the rail, an `=` opens the lanes
+ * sheet (review).
  *
  * The rendered window of days grows as the bottom comes into view, from the
- * top day back to the oldest post's month. The post on top of the stack has
- * the one-time ripple at its mark, replayed each time a new card lands, and
- * the grid scrolls so that mark is in view.
+ * top day back to the oldest post's month. The ring plays at the mark Home
+ * names — a landing, a drop, the first post on open — after the grid has
+ * scrolled it into view.
  */
-export function LaneGrid({
-  cards,
-  categories,
-  today,
-  topId,
-  initials,
-  scrollToMonth,
-  onPick,
-  onEditLanes,
-  onCreateLane,
-}: {
-  /** Newest first. */
-  cards: Card[];
-  categories: MyCategory[];
-  today: IsoDate;
-  /** The post on top of the stack: its mark carries the ring. */
-  topId: string | null;
-  initials: string;
-  /** `?m=`: the month to scroll the grid to; the newest day of it lands under the headers. */
-  scrollToMonth: string | null;
-  onPick: (id: string) => void;
-  onEditLanes: () => void;
-  onCreateLane: () => void;
-}) {
+export const LaneGrid = forwardRef<
+  GridHandle,
+  {
+    /** Newest first. */
+    cards: Card[];
+    categories: MyCategory[];
+    today: IsoDate;
+    /** The mark to ring, once per `seq`. */
+    ring: Ring | null;
+    /** Posts in the water: their marks read translucent. */
+    divedIds: ReadonlySet<string>;
+    initials: string;
+    /** `?m=`: the month to scroll the grid to; the newest day of it lands under the headers. */
+    scrollToMonth: string | null;
+    onPick: (id: string) => void;
+    onEditLanes: () => void;
+    onCreateLane: () => void;
+  }
+>(function LaneGrid(
+  {
+    cards,
+    categories,
+    today,
+    ring,
+    divedIds,
+    initials,
+    scrollToMonth,
+    onPick,
+    onEditLanes,
+    onCreateLane,
+  },
+  ref,
+) {
   const scroller = useRef<HTMLDivElement>(null);
   const reducedMotion = usePrefersReducedMotion();
   const [viewportWidth, setViewportWidth] = useState<number | null>(null);
-  // The mark the ring plays at: the top card's, once it has been brought into view.
-  const [ringAt, setRingAt] = useState<string | null>(null);
+  // The ring as it plays: set once its mark has been brought into view.
+  const [ringAt, setRingAt] = useState<Ring | null>(null);
 
   const { top, floor } = gridBounds(cards, today);
   const allDays = useMemo(() => daysDown(top, floor), [top, floor]);
@@ -123,14 +164,14 @@ export function LaneGrid({
     return () => observer.disconnect();
   }, []);
 
-  // The month asked for and the mark on top are always within the window,
+  // The month asked for and the mark to ring are always within the window,
   // which reaches down to them: the window is the larger of the two.
-  const topCard = cards.find((card) => card.splash.id === topId) ?? null;
+  const ringCard = cards.find((card) => card.splash.id === ring?.id) ?? null;
   const monthDay = scrollToMonth
     ? (allDays.find((day) => monthKey(day) === scrollToMonth) ?? null)
     : null;
   const needed = Math.max(
-    topCard ? allDays.indexOf(topCard.day) + 1 : 0,
+    ringCard ? allDays.indexOf(ringCard.day) + 1 : 0,
     monthDay ? allDays.indexOf(monthDay) + 1 : 0,
   );
   const limit = Math.max(grown, needed);
@@ -160,6 +201,53 @@ export function LaneGrid({
     return () => observer.disconnect();
   }, [limit, allDays.length]);
 
+  /** The scroll that brings a mark into view, and where the mark sits once it has. */
+  const reveal = useCallback(
+    (ids: string[]): { spots: Map<string, MarkSpot>; scrolled: boolean } => {
+      const el = scroller.current;
+      const spots = new Map<string, MarkSpot>();
+      if (!el) return { spots, scrolled: false };
+      const header = headerHeight(el);
+      let scrollTop = el.scrollTop;
+      let scrollLeft = el.scrollLeft;
+      let scrolled = false;
+      const first = ids[0]
+        ? el.querySelector<HTMLElement>(`[data-mark="${CSS.escape(ids[0])}"]`)
+        : null;
+      if (first) {
+        const { top: markTop, left: markLeft } = offsetIn(first, el);
+        if (markTop < scrollTop + header) scrollTop = markTop - header - 8;
+        else if (markTop + first.offsetHeight > scrollTop + el.clientHeight) {
+          scrollTop = markTop + first.offsetHeight - el.clientHeight + 8;
+        }
+        if (markLeft < scrollLeft + RAIL_PX) scrollLeft = markLeft - RAIL_PX - 8;
+        else if (markLeft + first.offsetWidth > scrollLeft + el.clientWidth) {
+          scrollLeft = markLeft + first.offsetWidth - el.clientWidth + 8;
+        }
+        scrollTop = Math.max(0, Math.min(scrollTop, el.scrollHeight - el.clientHeight));
+        scrollLeft = Math.max(0, Math.min(scrollLeft, el.scrollWidth - el.clientWidth));
+        if (scrollTop !== el.scrollTop || scrollLeft !== el.scrollLeft) {
+          scrollWithin(el, { top: scrollTop, left: scrollLeft }, reducedMotion);
+          scrolled = !reducedMotion;
+        }
+      }
+      const rect = el.getBoundingClientRect();
+      for (const id of ids) {
+        const mark = el.querySelector<HTMLElement>(`[data-mark="${CSS.escape(id)}"]`);
+        if (!mark) continue;
+        const at = offsetIn(mark, el);
+        spots.set(id, {
+          x: rect.left + at.left - scrollLeft + mark.offsetWidth / 2,
+          y: rect.top + at.top - scrollTop + mark.offsetHeight / 2,
+          size: mark.offsetWidth || MARK_PX,
+        });
+      }
+      return { spots, scrolled };
+    },
+    [reducedMotion],
+  );
+  useImperativeHandle(ref, () => ({ revealMarks: (ids) => reveal(ids).spots }), [reveal]);
+
   // `?m=`: the month's newest day lands just under the headers.
   const scrolledMonth = useRef<string | null>(null);
   useLayoutEffect(() => {
@@ -172,32 +260,14 @@ export function LaneGrid({
     scrollWithin(el, { top: offsetIn(row, el).top - headerHeight(el) }, reducedMotion);
   }, [scrollToMonth, monthDay, reducedMotion]);
 
-  // The ring never plays off screen: the mark on top is scrolled into view
-  // first, and the ring starts once the scroll has had time to land.
+  // The ring never plays off screen: its mark is scrolled into view first,
+  // and the ring starts once the scroll has had time to land.
   useLayoutEffect(() => {
-    const el = scroller.current;
-    if (!el || !topId) return;
-    const mark = el.querySelector<HTMLElement>(`[data-mark="${CSS.escape(topId)}"]`);
-    if (!mark) return;
-    let scrolled = false;
-    const { top: markTop, left: markLeft } = offsetIn(mark, el);
-    const header = headerHeight(el);
-    const target: { top?: number; left?: number } = {};
-    if (markTop < el.scrollTop + header) target.top = markTop - header - 8;
-    else if (markTop + mark.offsetHeight > el.scrollTop + el.clientHeight) {
-      target.top = markTop + mark.offsetHeight - el.clientHeight + 8;
-    }
-    if (markLeft < el.scrollLeft + RAIL_PX) target.left = markLeft - RAIL_PX - 8;
-    else if (markLeft + mark.offsetWidth > el.scrollLeft + el.clientWidth) {
-      target.left = markLeft + mark.offsetWidth - el.clientWidth + 8;
-    }
-    if (target.top !== undefined || target.left !== undefined) {
-      scrollWithin(el, target, reducedMotion);
-      scrolled = !reducedMotion;
-    }
-    const timer = window.setTimeout(() => setRingAt(topId), scrolled ? SCROLL_MS : 0);
+    if (!ring) return;
+    const { scrolled } = reveal([ring.id]);
+    const timer = window.setTimeout(() => setRingAt(ring), scrolled ? SCROLL_MS : 0);
     return () => window.clearTimeout(timer);
-  }, [topId, reducedMotion]);
+  }, [ring, reveal]);
 
   return (
     <div
@@ -210,7 +280,9 @@ export function LaneGrid({
       <div
         data-grid
         className={`relative grid ${even ? 'w-full' : 'w-max min-w-full'}`}
-        style={{ gridTemplateColumns: template }}
+        // Every day row at least this tall and as tall as its fullest cell,
+        // so stacked marks grow the row rather than spill into the next.
+        style={{ gridTemplateColumns: template, gridAutoRows: `minmax(${ROW_PX}px, auto)` }}
       >
         {/* The avatar: large, centred, scrolling away with the days. */}
         <div
@@ -229,9 +301,19 @@ export function LaneGrid({
         {/* The lane headers: sticky at the top, on the water so rows pass beneath. */}
         <div
           data-grid-header
-          className="bg-main-900 sticky top-0 left-0 z-30"
+          className="bg-main-900 sticky top-0 left-0 z-30 flex items-start justify-start pt-1 pl-5"
           style={{ gridColumn: 1 }}
-        />
+        >
+          <button
+            type="button"
+            aria-label="Edit lanes"
+            data-edit-lanes
+            onClick={onEditLanes}
+            className="flex h-7 w-7 items-center justify-center text-white"
+          >
+            <Equal aria-hidden size={18} />
+          </button>
+        </div>
         {categories.map((lane) => (
           <button
             key={lane.id}
@@ -262,35 +344,33 @@ export function LaneGrid({
         </div>
 
         {days.map((day, index) => {
-          const monthChanges = index === 0 || monthKey(days[index - 1]) !== monthKey(day);
+          // Only a day with something on it is named; the month is named on
+          // the first named day of each month.
+          const named = (d: IsoDate): boolean =>
+            categories.some((lane) => byCell.has(`${d}|${lane.id}`)) || byCell.has(`${d}|`);
+          const labelled = named(day);
+          const monthChanges =
+            labelled &&
+            !days.slice(0, index).some((d) => monthKey(d) === monthKey(day) && named(d));
+          const marks = (lane: string, icon: string | null): ReactNode =>
+            (byCell.get(`${day}|${lane}`) ?? []).map((card) => (
+              <Mark
+                key={card.splash.id}
+                card={card}
+                icon={icon}
+                dived={divedIds.has(card.splash.id)}
+                ring={ringAt?.id === card.splash.id ? ringAt.seq : null}
+                onPick={onPick}
+              />
+            ));
           return (
-            <DayRow key={day} day={day} monthChanges={monthChanges}>
-              {categories.map((lane) => (
-                <Cell key={lane.id} lane={lane.id}>
-                  {(byCell.get(`${day}|${lane.id}`) ?? []).map((card) => (
-                    <Mark
-                      key={card.splash.id}
-                      card={card}
-                      icon={lane.icon}
-                      ring={card.splash.id === ringAt}
-                      onPick={onPick}
-                    />
-                  ))}
+            <DayRow key={day} day={day} labelled={labelled} monthChanges={monthChanges}>
+              {categories.map((lane, at) => (
+                <Cell key={lane.id} lane={lane.id} first={at === 0}>
+                  {marks(lane.id, lane.icon)}
                 </Cell>
               ))}
-              {orphans ? (
-                <Cell lane="">
-                  {(byCell.get(`${day}|`) ?? []).map((card) => (
-                    <Mark
-                      key={card.splash.id}
-                      card={card}
-                      icon={null}
-                      ring={card.splash.id === ringAt}
-                      onPick={onPick}
-                    />
-                  ))}
-                </Cell>
-              ) : null}
+              {orphans ? <Cell lane="">{marks('', null)}</Cell> : null}
               <Cell lane="+" />
             </DayRow>
           );
@@ -300,73 +380,108 @@ export function LaneGrid({
       </div>
     </div>
   );
-}
+});
 
-/** A day's row: its label on the rail, then a cell per column. */
+/** A day's row: its label on the rail when the day has something, then a cell per column. */
 function DayRow({
   day,
+  labelled,
   monthChanges,
   children,
 }: {
   day: IsoDate;
+  labelled: boolean;
   monthChanges: boolean;
   children: ReactNode;
 }) {
   return (
     <>
+      {/* The rail reads quieter than the marks: one readable opacity (review). */}
       <div
         data-day-row={day}
-        className="bg-main-900 sticky left-0 z-10 flex min-h-12 flex-col justify-center py-1.5 pl-6 text-white"
+        data-labelled={labelled ? '' : undefined}
+        className="bg-main-900 sticky left-0 z-10 flex flex-col justify-center gap-0.5 py-2 pr-2 pl-6 text-white/70"
       >
         {monthChanges ? (
-          <span data-month-label className="text-[8px]/none font-medium text-white/60">
+          <span data-month-label className="text-[8px]/none font-medium text-white/50">
             {day.slice(0, 4)}
             <br />
             {monthAbbrev(day)}
           </span>
         ) : null}
-        <span className="text-sm/none font-medium tabular-nums">{Number(day.slice(8, 10))}</span>
-        <span className="text-[8px]/none font-medium text-white/60">{weekdayOf(day)}</span>
+        {labelled ? (
+          <>
+            <span className="text-sm/none font-medium tabular-nums">
+              {Number(day.slice(8, 10))}
+            </span>
+            <span className="text-[8px]/none font-medium text-white/50">{weekdayOf(day)}</span>
+          </>
+        ) : null}
       </div>
       {children}
     </>
   );
 }
 
-/** A cell: the rope through it, and the day's marks on that lane stacked. */
-function Cell({ lane, children }: { lane: string; children?: ReactNode }) {
+/**
+ * A cell: the rope along its left edge — a lane line runs beside the lane,
+ * never through its marks (review), and the first lane has none at the
+ * rail's side — and the day's marks on that lane stacked 4px apart, centred
+ * in the row. The `+` column's rope closes the last lane.
+ */
+function Cell({
+  lane,
+  first = false,
+  children,
+}: {
+  lane: string;
+  first?: boolean;
+  children?: ReactNode;
+}) {
   return (
     <div
       data-cell={lane}
-      className="relative flex min-h-12 flex-col items-center justify-center gap-1 py-1.5"
+      className="relative flex h-full flex-col items-center justify-center gap-1 py-2"
     >
-      <span
-        aria-hidden
-        data-rope
-        className="pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white/15"
-      />
+      {first ? null : (
+        <span
+          aria-hidden
+          data-rope
+          className="pointer-events-none absolute inset-y-0 left-0 w-px bg-white/15"
+        />
+      )}
       {children}
     </div>
   );
 }
 
-/** A post's mark: a white disc with its lane's emoji; the ring around the one on top. */
+/**
+ * A post's mark: a white disc with its lane's emoji; translucent while the
+ * post is in the water (dived), the ring around it when Home says so. A
+ * post on no lane of mine has no emoji to show, so its disc is an outline —
+ * a seat with nothing on it, never a blank white coin.
+ */
 function Mark({
   card,
   icon,
+  dived,
   ring,
   onPick,
 }: {
   card: Card;
   icon: string | null;
-  ring: boolean;
+  dived: boolean;
+  /** The ring's sequence number while it plays here, else null. */
+  ring: number | null;
   onPick: (id: string) => void;
 }) {
   const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
+  const surface = !icon ? 'border border-white/60' : dived ? 'bg-white/35' : 'bg-white';
   return (
     <span className="relative flex items-center justify-center">
-      {ring ? (
+      {ring !== null ? (
         <span
+          key={ring}
           aria-hidden
           data-commit-ripple
           // White on the water (H21c), and never shrunk to the mark's width.
@@ -380,13 +495,18 @@ function Mark({
       <button
         type="button"
         data-mark={card.splash.id}
-        data-ring={ring ? '' : undefined}
+        data-dived={dived ? '' : undefined}
+        data-ring={ring !== null ? '' : undefined}
         aria-label={title}
         onClick={() => onPick(card.splash.id)}
-        className="relative flex items-center justify-center rounded-full bg-white text-sm/none"
+        className={`relative flex shrink-0 items-center justify-center rounded-full text-sm/none ${surface}`}
         style={{ width: MARK_PX, height: MARK_PX }}
       >
-        {icon ? <span aria-hidden>{icon}</span> : null}
+        {icon ? (
+          <span aria-hidden className={`leading-none ${dived ? 'opacity-60' : ''}`}>
+            {icon}
+          </span>
+        ) : null}
       </button>
     </span>
   );

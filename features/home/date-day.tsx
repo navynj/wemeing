@@ -15,7 +15,9 @@ export const DAY_LIST_TEMPLATE = `${DAY_RAIL_PX}px minmax(0, 1fr)`;
  * own above the day rather than a taller rail, so no day's rows sit apart
  * differently; the rail is the day number over its weekday, aligned with
  * the day's first row; one fixed space follows each day. Laid out in a
- * grid of `DAY_LIST_TEMPLATE`.
+ * grid of `DAY_LIST_TEMPLATE`. A day list never scrolls sideways, so the
+ * rail is neither sticky nor filled: a fill would cut the ring that plays
+ * around a row's icon, which reaches across the rail (review).
  */
 export function DateDay({
   day,
@@ -39,7 +41,7 @@ export function DateDay({
       <div
         data-day-row={day}
         data-labelled=""
-        className="bg-main-900 sticky left-0 z-10 flex min-w-0 flex-col gap-0.5 overflow-hidden pt-3 pr-1 pl-6 text-white/70"
+        className="flex min-w-0 flex-col gap-0.5 pt-3 pr-1 pl-6 text-white/70"
       >
         <span className="text-sm/none font-medium tabular-nums">{Number(day.slice(8, 10))}</span>
         <span className="text-[10px]/none font-medium text-white/50">{weekdayOf(day)}</span>

@@ -773,6 +773,24 @@ describe('?m= as a scroll target', () => {
   });
 });
 
+it('leaves the ring whole in the Date view: the day rail is not filled over it', () => {
+  window.localStorage.setItem('weming.home-view', 'date');
+  const { container } = ground(POSTS);
+  const rail = container.querySelector<HTMLElement>('[data-day-row]')!;
+  expect(rail.closest('[data-cell]') ?? rail).toBeTruthy();
+  expect(rail.className).not.toMatch(/bg-|sticky|overflow-hidden/);
+  window.localStorage.removeItem('weming.home-view');
+});
+
+it('leaves the ring whole in the Date view: the day rail is not filled over it', () => {
+  window.localStorage.setItem('weming.home-view', 'date');
+  const { container } = ground(POSTS);
+  const rail = container.querySelector<HTMLElement>('[data-day-row]')!;
+  expect(container.querySelector('[data-cell="date"]')).not.toBeNull();
+  expect(rail.className).not.toMatch(/bg-|sticky|overflow-hidden/);
+  window.localStorage.removeItem('weming.home-view');
+});
+
 describe('pinned posts as cards (round 3)', () => {
   const pinnedPosts = (): SplashSummary[] =>
     POSTS.map((p) =>

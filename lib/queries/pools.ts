@@ -130,38 +130,10 @@ export async function getMyPools(supabase: DuringClient, me: string): Promise<My
   const ids = mine.map((row) => row.pool_id);
   if (ids.length === 0) return [];
 
-  const [members, placements, joints] = await Promise.all([
+  const [members, latest] = await Promise.all([
     membersOf(supabase, ids),
-    supabase
-      .from('splash_placements')
-      .select('pool_id, splash_id')
-      .in('pool_id', ids)
-      .eq('shared', true),
-    supabase.from('splashes').select('id, pool_id').in('pool_id', ids).is('owner_id', null),
+    getPoolActivity(supabase, me, ids),
   ]);
-  if (placements.error) throw placements.error;
-  if (joints.error) throw joints.error;
-
-  // What happened there: the newest ripple someone else wrote on anything
-  // placed or joint in the pool.
-  const poolOf = new Map<string, string>();
-  for (const p of placements.data) poolOf.set(p.splash_id, p.pool_id);
-  for (const j of joints.data) if (j.pool_id) poolOf.set(j.id, j.pool_id);
-  const latest = new Map<string, string>();
-  if (poolOf.size > 0) {
-    const { data: ripples, error: rippleError } = await supabase
-      .from('ripples')
-      .select('splash_id, created_at')
-      .in('splash_id', [...poolOf.keys()])
-      .neq('author_id', me);
-    if (rippleError) throw rippleError;
-    for (const r of ripples) {
-      const pool = r.splash_id ? poolOf.get(r.splash_id) : undefined;
-      if (!pool) continue;
-      const seen = latest.get(pool);
-      if (!seen || r.created_at > seen) latest.set(pool, r.created_at);
-    }
-  }
 
   return mine.map((row) => ({
     id: row.pool.id,
@@ -172,6 +144,47 @@ export async function getMyPools(supabase: DuringClient, me: string): Promise<My
     ),
     latestActivity: latest.get(row.pool_id) ?? null,
   }));
+}
+
+/**
+ * What happened in each pool: the newest ripple someone else wrote on
+ * anything placed or joint there, by pool (for the "new since my last
+ * visit" dots).
+ */
+export async function getPoolActivity(
+  supabase: DuringClient,
+  me: string,
+  ids: string[],
+): Promise<Map<string, string>> {
+  const latest = new Map<string, string>();
+  if (ids.length === 0) return latest;
+  const [placements, joints] = await Promise.all([
+    supabase
+      .from('splash_placements')
+      .select('pool_id, splash_id')
+      .in('pool_id', ids)
+      .eq('shared', true),
+    supabase.from('splashes').select('id, pool_id').in('pool_id', ids).is('owner_id', null),
+  ]);
+  if (placements.error) throw placements.error;
+  if (joints.error) throw joints.error;
+  const poolOf = new Map<string, string>();
+  for (const p of placements.data) poolOf.set(p.splash_id, p.pool_id);
+  for (const j of joints.data) if (j.pool_id) poolOf.set(j.id, j.pool_id);
+  if (poolOf.size === 0) return latest;
+  const { data: ripples, error } = await supabase
+    .from('ripples')
+    .select('splash_id, created_at')
+    .in('splash_id', [...poolOf.keys()])
+    .neq('author_id', me);
+  if (error) throw error;
+  for (const r of ripples) {
+    const pool = r.splash_id ? poolOf.get(r.splash_id) : undefined;
+    if (!pool) continue;
+    const seen = latest.get(pool);
+    if (!seen || r.created_at > seen) latest.set(pool, r.created_at);
+  }
+  return latest;
 }
 
 /** One pool as its home reads it. Null when I am not a current member (RLS shows nothing). */

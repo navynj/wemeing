@@ -20,6 +20,7 @@ import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
 import { Avatar } from '@/features/people/avatar';
 
+import { UnseenDot, useHasUnseenPool } from './activity';
 import { poolScopeOf } from './compose-scope';
 import { deleteJointSplash } from './actions';
 import { InvitePanel } from './invite-panel';
@@ -78,6 +79,7 @@ export function PoolGround({
   const router = useRouter();
   const poolId = view.pool.id;
   const [kind, setKind] = usePoolView();
+  const otherUnseen = useHasUnseenPool(poolId);
   const [sheet, setSheet] = useState<Sheet>(null);
   const {
     openSheet,
@@ -205,7 +207,11 @@ export function PoolGround({
               <span data-pool-title className="truncate text-3xl/tight font-semibold">
                 {view.pool.name}
               </span>
-              <ChevronDown aria-hidden size={22} strokeWidth={2.5} className="shrink-0" />
+              <span className="relative flex shrink-0">
+                <ChevronDown aria-hidden size={22} strokeWidth={2.5} />
+                {/* Another of my pools has something new (review). */}
+                {otherUnseen ? <UnseenDot label="New in another Pool" /> : null}
+              </span>
             </button>
             <span className="flex shrink-0 items-center">
               {/* The members' faces are the way to the member list (review). */}

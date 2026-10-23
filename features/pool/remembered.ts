@@ -14,6 +14,7 @@ const LAST_POOL = 'weming.last-pool';
 const VISITS = 'weming.pool-visits';
 const VIEW = 'weming.pool-view';
 const EVENT = 'weming:pool-view';
+const VISIT_EVENT = 'weming:pool-visit';
 
 function read(key: string): string | null {
   try {
@@ -48,6 +49,35 @@ function visits(): Record<string, string> {
 export function rememberVisit(poolId: string, at: Date = new Date()): void {
   write(LAST_POOL, poolId);
   write(VISITS, JSON.stringify({ ...visits(), [poolId]: at.toISOString() }));
+  // The dots clear the moment a pool is opened.
+  window.dispatchEvent(new Event(VISIT_EVENT));
+}
+
+function subscribeVisits(onChange: () => void): () => void {
+  window.addEventListener('storage', onChange);
+  window.addEventListener(VISIT_EVENT, onChange);
+  return () => {
+    window.removeEventListener('storage', onChange);
+    window.removeEventListener(VISIT_EVENT, onChange);
+  };
+}
+
+/**
+ * The pools with something new since my last visit on this device (H23),
+ * from each pool's latest activity; `except` leaves out the pool I am in.
+ * Nothing on the server render: a dot is a device's memory.
+ */
+export function useUnseenPools(
+  activity: Record<string, string | null>,
+  except: string | null = null,
+): string[] {
+  const raw = useSyncExternalStore(
+    subscribeVisits,
+    () => read(VISITS) ?? '',
+    () => null,
+  );
+  if (raw === null) return [];
+  return Object.keys(activity).filter((id) => id !== except && isNewSince(id, activity[id]));
 }
 
 /** Something new since my last visit on this device; never-visited counts as new when anything is there. */

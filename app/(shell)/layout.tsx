@@ -3,9 +3,10 @@ import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
 import { TimezoneSync } from '@/features/auth/timezone-sync';
 import { initialsOf } from '@/features/home/grid';
 import { PeopleProvider } from '@/features/people/people-provider';
+import { PoolActivityProvider } from '@/features/pool/activity';
 import { getPeople } from '@/lib/queries/people';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
-import { getMyLinks, getMyPoolNames } from '@/lib/queries/pools';
+import { getMyLinks, getMyPoolNames, getPoolActivity } from '@/lib/queries/pools';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
 
@@ -36,15 +37,28 @@ export default async function ShellLayout({ children }: LayoutProps<'/'>) {
     : null;
   // Every face the shell draws, signed once here (0018).
   const people = profile ? await getPeople(supabase) : {};
+  // What is new in each pool, for the Pool tab's dot (review).
+  const latest = context
+    ? await getPoolActivity(
+        supabase,
+        profile!.id,
+        context.pools.map((p) => p.id),
+      )
+    : new Map<string, string>();
+  const activity: Record<string, string | null> = Object.fromEntries(
+    (context?.pools ?? []).map((p) => [p.id, latest.get(p.id) ?? null]),
+  );
   return (
     <PeopleProvider me={profile?.id ?? null} people={people}>
-      <InputSheetProvider>
-        <div className="flex min-h-dvh flex-col">
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
-        </div>
-        {context ? <SheetHost context={context} /> : null}
-        {profile ? <TimezoneSync profileZone={profile.timezone} /> : null}
-      </InputSheetProvider>
+      <PoolActivityProvider activity={activity}>
+        <InputSheetProvider>
+          <div className="flex min-h-dvh flex-col">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
+          </div>
+          {context ? <SheetHost context={context} /> : null}
+          {profile ? <TimezoneSync profileZone={profile.timezone} /> : null}
+        </InputSheetProvider>
+      </PoolActivityProvider>
     </PeopleProvider>
   );
 }

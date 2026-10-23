@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { Home, Plus, WavesLadder } from 'lucide-react';
 
+import { UnseenDot, useHasUnseenPool } from '@/features/pool/activity';
+
 /**
  * The ground's foot (H23): Home and Pool at the left, compose at the right
  * as a white disc with the blue plus — on the water, white carries the
@@ -35,6 +37,7 @@ export function GroundFoot({
   onPool?: () => void;
   poolLabel?: string;
 }) {
+  const unseen = useHasUnseenPool();
   const item = 'flex flex-col items-center gap-1 font-semibold text-white';
   const faded = 'opacity-40';
   const home = (
@@ -43,12 +46,18 @@ export function GroundFoot({
       <span className="text-xs/none">Home</span>
     </>
   );
-  const pool = (
-    <>
-      {/* The pool's own glyph: a ladder into the water. */}
-      <WavesLadder aria-hidden size={22} strokeWidth={2.25} />
-      <span className="text-xs/none">Pool</span>
-    </>
+  // The dot sits outside the fade (review): a notification is never faded
+  // with the tab it marks. Icon and label still fade together.
+  const pool = (dim: boolean) => (
+    <span className="relative flex flex-col items-center">
+      <span className={`flex flex-col items-center gap-1 ${dim ? faded : ''}`}>
+        {/* The pool's own glyph: a ladder into the water. */}
+        <WavesLadder aria-hidden size={22} strokeWidth={2.25} />
+        <span className="text-xs/none">Pool</span>
+      </span>
+      {/* Something new in one of my pools since I last looked (review). */}
+      {unseen ? <UnseenDot /> : null}
+    </span>
   );
   const wide = slot === 'wide';
   return (
@@ -89,16 +98,16 @@ export function GroundFoot({
               onClick={onPool}
               className={item}
             >
-              {pool}
+              {pool(false)}
             </button>
           ) : (
             <span data-pool-tab aria-current="page" className={item}>
-              {pool}
+              {pool(false)}
             </span>
           )
         ) : (
-          <Link href="/pool" data-pool-tab className={`${item} ${faded}`}>
-            {pool}
+          <Link href="/pool" data-pool-tab className={item}>
+            {pool(true)}
           </Link>
         )}
       </nav>

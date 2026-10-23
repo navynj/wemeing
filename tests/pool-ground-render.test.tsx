@@ -213,42 +213,56 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('a joint splash on the grid (H23)', () => {
-  it('renders once as a band, with one branch per ripple', () => {
+  it('renders once as a band, never as a mark in a cell', () => {
     setView('lane');
     const { container } = ground(A);
     expect(container.querySelectorAll('[data-joint-band="s-joint"]')).toHaveLength(1);
-    expect(container.querySelectorAll('[data-branch]')).toHaveLength(2);
-    // Never also a mark in a cell.
     expect(container.querySelectorAll('[data-cell] [data-mark="s-joint"]')).toHaveLength(0);
-  });
-
-  it('draws each ripple as a plain dot, never with an icon or a title', () => {
-    setView('lane');
-    const { container } = ground(A);
-    for (const branch of container.querySelectorAll('[data-branch]')) {
-      expect(branch.textContent).toBe('');
-      expect(branch.querySelector('[data-branch-dot]')).not.toBeNull();
-    }
     // The icon and the title are the splash's, on its band.
     expect(container.querySelector('[data-joint-band="s-joint"]')!.textContent).toContain('🏛️');
   });
 
-  it('branches in its own lane in the Lane view, stacked by author', () => {
-    setView('lane');
-    const { container } = ground(A);
-    const cells = [...container.querySelectorAll('[data-branch-cell]')];
-    const holding = cells.filter((cell) => cell.querySelector('[data-branch]'));
-    expect(holding).toHaveLength(1);
-    expect(holding[0].querySelectorAll('[data-branch]')).toHaveLength(2);
+  it('counts its ripples and shows who wrote them at its right end, with no branches', () => {
+    for (const view of ['lane', 'swimmers'] as const) {
+      setView(view);
+      const { container } = ground(A);
+      const band = container.querySelector('[data-joint-band="s-joint"]')!;
+      expect(band.querySelector('[data-joint-count]')!.textContent).toBe('2 ripples');
+      // Mina and I, each once.
+      expect(band.querySelectorAll('[data-joint-faces] > :not([data-joint-more])')).toHaveLength(2);
+      expect(band.querySelector('[data-joint-more]')).toBeNull();
+      expect(container.querySelector('[data-branch]')).toBeNull();
+      cleanup();
+    }
   });
 
-  it('branches in each author’s column in Swimmers', () => {
-    setView('swimmers');
-    const { container } = ground(A);
-    const holding = [...container.querySelectorAll('[data-branch-cell]')].filter((cell) =>
-      cell.querySelector('[data-branch]'),
-    );
-    expect(holding).toHaveLength(2);
+  it('shows four faces, then +n', () => {
+    setView('lane');
+    const writers = ['u-1', 'u-2', 'u-3', 'u-4', 'u-5', 'u-6'];
+    const crowded: PoolView = {
+      ...A,
+      members: [
+        ...A.members,
+        ...writers.map((userId, at) => ({
+          userId,
+          name: `P${at}`,
+          initials: `P${at}`,
+          joinedAt: `2026-10-1${at}`,
+          former: false,
+          timeZone: TZ,
+        })),
+      ],
+      ripples: [
+        ...A.ripples,
+        ...writers.map((author_id, at) =>
+          ripple({ id: `r-x${at}`, splash_id: 's-joint', author_id, occurred_on: '2026-10-20' }),
+        ),
+      ],
+    };
+    const band = ground(crowded).container.querySelector('[data-joint-band="s-joint"]')!;
+    expect(band.querySelector('[data-joint-count]')!.textContent).toBe('8 ripples');
+    expect(band.querySelectorAll('[data-joint-faces] > :not([data-joint-more])')).toHaveLength(4);
+    expect(band.querySelector('[data-joint-more]')!.textContent).toBe('+4');
   });
 
   it('is a row with its ripples as sub-rows in the Date view', () => {

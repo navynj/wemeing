@@ -518,9 +518,6 @@ export const LaneGrid = forwardRef<
                     card={card}
                     day={day}
                     label={!plain && at === 0 ? { monthChanges } : null}
-                    columns={categories}
-                    orphans={orphans}
-                    plus={plusColumn}
                     icon={card.splash.icon ?? laneOfCard(card, categories)?.icon ?? null}
                     dived={waterIds.has(card.splash.id)}
                     ring={ringAt?.id === card.splash.id ? ringAt.seq : null}

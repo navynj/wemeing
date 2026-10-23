@@ -2,39 +2,30 @@
 
 import { CommitRing } from '@/components/ui/waves';
 import type { IsoDate } from '@/lib/time';
-import { Initials } from '@/features/people/avatar';
+import { Avatar, Initials } from '@/features/people/avatar';
 
-import { monthAbbrev, weekdayOf, type Card, type CardLane, type GridColumn } from './grid';
+import { monthAbbrev, weekdayOf, type Card, type CardLane } from './grid';
 
-/** The band's height, a branch mark's diameter, and the rhythm branches stack at. */
+/** The band's height, a member's face on it, and how many faces before "+n". */
 const BAND_PX = 44;
-const BRANCH_PX = 24;
-/** A ripple's dot on its branch: a ripple is never an icon or a title — those are a splash's (review). */
-const DOT_PX = 8;
-const BRANCH_GAP_PX = 6;
-const BRANCH_PAD_PX = 8;
+const FACE_PX = 26;
+const MAX_FACES = 4;
 const RING_PX = 96;
 
 /**
  * A joint splash on the grid (H23; `_docs/mockups/pool-swimmers.png`): a
  * horizontal band across every column at its day — its icon, its title, a
- * translucent fill at the card's radius — and beneath it, each ripple a
- * small plain dot that branches off the band by an elbow (an icon and a
- * title are a splash's alone, never a ripple's): in Swimmers in its
- * author's column, in the Lane view in the band's own lane, stacked by
- * author. Branch lines are white at 10%, fainter than the 15–20% ropes, so
- * they read as belonging to the band rather than as structure.
+ * translucent fill at the card's radius — and at its right end how many
+ * ripples it holds and who wrote them, four faces then "+n" (review: no
+ * branches; a ripple is never drawn on the grid, only counted).
  *
  * The band is the joint splash's mark (`data-mark`): the ring plays on it,
- * and a tap on it or on any branch brings its card to the top.
+ * and a tap brings its card to the top.
  */
 export function JointBand({
   card,
   day,
   label,
-  columns,
-  orphans,
-  plus,
   icon,
   dived,
   ring,
@@ -44,9 +35,6 @@ export function JointBand({
   day: IsoDate;
   /** The day's name on the rail, when no plain row above has named it. */
   label: { monthChanges: boolean } | null;
-  columns: GridColumn[];
-  orphans: boolean;
-  plus: boolean;
   icon: string | null;
   dived: boolean;
   ring: number | null;
@@ -54,7 +42,11 @@ export function JointBand({
 }) {
   const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
   const branches = card.branches ?? [];
-  const cells = [...columns.map((c) => c.id), ...(orphans ? [''] : [])];
+  // Each writer once, in the order they first wrote.
+  const writers = [
+    ...new Map(branches.map((b) => [b.authorId ?? b.initials, b] as const)).values(),
+  ];
+  const more = writers.length - MAX_FACES;
   return (
     <>
       <Rail day={day} label={label} />
@@ -97,24 +89,35 @@ export function JointBand({
             </span>
           </span>
           <span className="min-w-0 flex-1 truncate text-sm font-medium">{title}</span>
+          <span
+            data-joint-count
+            className="shrink-0 text-xs font-medium text-white/70 tabular-nums"
+          >
+            {branches.length === 1 ? '1 ripple' : `${branches.length} ripples`}
+          </span>
+          {writers.length > 0 ? (
+            <span data-joint-faces className="flex shrink-0 items-center">
+              {writers.slice(0, MAX_FACES).map((writer, at) => (
+                <Avatar
+                  key={writer.authorId ?? writer.initials}
+                  id={writer.authorId}
+                  initials={writer.initials}
+                  // Solid, so a face never shows the one beneath it (review).
+                  className={`text-main-900/60 ring-main-900 flex items-center justify-center rounded-full bg-[#8283EE] text-[10px] font-medium ring-2 ${
+                    at > 0 ? '-ml-1' : ''
+                  }`}
+                  style={{ width: FACE_PX, height: FACE_PX }}
+                />
+              ))}
+              {more > 0 ? (
+                <span data-joint-more className="ml-1 text-[10px] font-medium text-white/70">
+                  +{more}
+                </span>
+              ) : null}
+            </span>
+          ) : null}
         </button>
       </div>
-
-      {branches.length > 0 ? (
-        <>
-          <div aria-hidden className="bg-main-900 sticky left-0 z-10" />
-          {cells.map((column, at) => (
-            <BranchCell
-              key={column || 'orphans'}
-              first={at === 0}
-              branches={branches.filter((b) => b.column === column)}
-              dived={dived}
-              onPick={() => onPick(card.splash.id)}
-            />
-          ))}
-          {plus ? <div /> : null}
-        </>
-      ) : null}
     </>
   );
 }
@@ -137,93 +140,6 @@ function Rail({ day, label }: { day: IsoDate; label: { monthChanges: boolean } |
       ) : null}
       <span className="text-sm/none font-medium tabular-nums">{Number(day.slice(8, 10))}</span>
       <span className="text-[10px]/none font-medium text-white/50">{weekdayOf(day)}</span>
-    </div>
-  );
-}
-
-/**
- * A column's branches under a band: one vertical 10% line down the cell's
- * left, and at each mark a horizontal to it — the last turning with an 8px
- * radius, the elbow. The rope is kept at the left edge as everywhere.
- */
-function BranchCell({
-  first,
-  branches,
-  dived,
-  onPick,
-}: {
-  first: boolean;
-  branches: { id: string; initials: string }[];
-  dived: boolean;
-  onPick: () => void;
-}) {
-  const center = (i: number): number =>
-    BRANCH_PAD_PX + i * (BRANCH_PX + BRANCH_GAP_PX) + BRANCH_PX / 2;
-  const last = branches.length - 1;
-  return (
-    <div
-      data-branch-cell
-      className="relative flex flex-col items-center"
-      style={{ gap: BRANCH_GAP_PX, paddingTop: BRANCH_PAD_PX, paddingBottom: BRANCH_PAD_PX }}
-    >
-      {first ? null : (
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-y-0 left-0 w-px bg-white/15"
-        />
-      )}
-      {branches.length > 0 ? (
-        <>
-          {last > 0 ? (
-            <span
-              aria-hidden
-              className="pointer-events-none absolute left-2 w-px bg-white/10"
-              style={{ top: 0, height: center(last) - 8 }}
-            />
-          ) : null}
-          {branches.map((branch, i) =>
-            i === last ? (
-              <span
-                key={`elbow-${branch.id}`}
-                aria-hidden
-                data-branch-elbow
-                className="pointer-events-none absolute left-2 rounded-bl-[8px] border-b border-l border-white/10"
-                style={{
-                  top: last > 0 ? center(last) - 8 : 0,
-                  height: last > 0 ? 8 : center(last),
-                  width: `calc(50% - ${DOT_PX / 2 + 8}px)`,
-                }}
-              />
-            ) : (
-              <span
-                key={`tee-${branch.id}`}
-                aria-hidden
-                className="pointer-events-none absolute left-2 h-px bg-white/10"
-                style={{ top: center(i), width: `calc(50% - ${DOT_PX / 2 + 8}px)` }}
-              />
-            ),
-          )}
-          {branches.map((branch) => (
-            <button
-              key={branch.id}
-              type="button"
-              data-branch={branch.id}
-              aria-label={`A ripple by ${branch.initials}`}
-              onClick={onPick}
-              // A wide tap target around a small dot.
-              className="relative flex items-center justify-center"
-              style={{ width: BRANCH_PX, height: BRANCH_PX }}
-            >
-              <span
-                aria-hidden
-                data-branch-dot
-                className={`rounded-full ${dived ? 'bg-white/30' : 'bg-white/90'}`}
-                style={{ width: DOT_PX, height: DOT_PX }}
-              />
-            </button>
-          ))}
-        </>
-      ) : null}
     </div>
   );
 }

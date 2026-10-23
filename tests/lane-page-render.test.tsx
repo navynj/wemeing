@@ -14,6 +14,14 @@ vi.mock('@/features/splash/actions', () => ({
 vi.mock('@/features/ripple-sheet/actions', () => ({
   deleteRipple: () => Promise.resolve({ ok: true }),
 }));
+const poolSaved: unknown[] = [];
+vi.mock('@/features/pool/actions', () => ({
+  savePoolLane: (lane: unknown) => {
+    poolSaved.push(lane);
+    return Promise.resolve({ ok: true });
+  },
+  deleteJointSplash: () => Promise.resolve({ ok: true }),
+}));
 vi.mock('@/features/lanes/actions', () => ({
   saveLane: (lane: unknown) => {
     saved.push(lane);
@@ -193,5 +201,51 @@ describe('a lane’s page (round 3)', () => {
     fireEvent.click(getByText('Cancel'));
     expect(container.querySelector('[data-lane-name]')!.textContent).toBe('Food');
     expect(saved).toEqual([]);
+  });
+});
+
+describe('a pool lane’s page (review)', () => {
+  const POOL = {
+    poolId: 'p-ours',
+    poolName: 'Sarang',
+    lanes: [{ id: 'l-word', name: '말씀', icon: '📖', myCategoryId: null, direction: null }],
+  };
+  const page = () =>
+    render(
+      <InputSheetProvider>
+        <LanePage
+          lane={{ id: 'l-word', name: '말씀', icon: '📖', description: 'Sunday notes' }}
+          cards={CARDS}
+          pool={POOL}
+        />
+      </InputSheetProvider>,
+    );
+
+  it('starts its breadcrumb at the pool and has no Manage lanes link', () => {
+    const { container } = page();
+    const crumb = container.querySelector('[data-breadcrumb] a')!;
+    expect(crumb.textContent).toBe('Sarang');
+    expect(crumb.getAttribute('href')).toBe('/pool/p-ours');
+    expect(container.querySelector('[data-manage-lanes-link]')).toBeNull();
+  });
+
+  it('renames the pool lane in place, keeping its description', async () => {
+    poolSaved.length = 0;
+    const { container, getByText, getByLabelText } = page();
+    fireEvent.click(container.querySelector('[data-lane-name]')!);
+    fireEvent.change(getByLabelText('Lane name'), { target: { value: '말씀 묵상' } });
+    fireEvent.click(getByText('Save'));
+    expect(container.querySelector('[data-lane-name]')!.textContent).toBe('말씀 묵상');
+    await waitFor(() =>
+      expect(poolSaved).toEqual([
+        {
+          id: 'l-word',
+          poolId: 'p-ours',
+          name: '말씀 묵상',
+          icon: '📖',
+          description: 'Sunday notes',
+        },
+      ]),
+    );
   });
 });

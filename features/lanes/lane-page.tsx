@@ -12,6 +12,8 @@ import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { PostRow } from '@/features/home/post-row';
 import { StairBoard } from '@/features/home/stair-board';
 import { useFlip } from '@/features/home/use-flip';
+import type { PoolScope } from '@/features/pool/compose-scope';
+import { deleteJointSplash, savePoolLane } from '@/features/pool/actions';
 import { deleteRipple } from '@/features/ripple-sheet/actions';
 import { deleteSplash, setSplashPinned } from '@/features/splash/actions';
 import { monthKey } from '@/features/splash/summary';
@@ -35,6 +37,11 @@ import { EmojiInput } from './emoji-input';
  * one-grapheme field, the name as text — with Save and Cancel, shown at
  * once (CLAUDE.md, the principle). Deleting and reordering lanes stay in
  * lane management, linked at the foot of the list.
+ *
+ * A pool's lane opens the same page from its header in the pool (review):
+ * the breadcrumb starts at the pool, the posts are the pool's on that lane
+ * with their authors, the rename is the pool lane's (any member's), and the
+ * foot is the pool's.
  */
 export function LanePage({
   lane,
@@ -42,11 +49,14 @@ export function LanePage({
   categories = [lane],
   initials = '',
   topParam = null,
+  pool,
 }: {
-  lane: MyCategory;
+  lane: Pick<MyCategory, 'id' | 'name' | 'icon'> & { description?: string | null };
   /** This lane's posts, newest first. */
   cards: Card[];
-  categories?: MyCategory[];
+  categories?: Pick<MyCategory, 'id' | 'name' | 'icon'>[];
+  /** A pool's lane: the pool it is in, as the composer takes it. */
+  pool?: PoolScope;
   initials?: string;
   /** `?top=`: the post to open with on top, where a post's page sends this page back to. */
   topParam?: string | null;
@@ -72,7 +82,7 @@ export function LanePage({
     topParam && ids.includes(topParam) ? topParam : (ids[0] ?? null),
   );
   const flip = useFlip(ids, initialTop, -1);
-  const here = `/lane/${lane.id}`;
+  const here = pool ? `/pool/${pool.poolId}/lane/${lane.id}` : `/lane/${lane.id}`;
 
   function start(): void {
     setName(saved.value.name);
@@ -85,7 +95,16 @@ export function LanePage({
     setEditing(false);
     saved.run(
       () => next,
-      () => saveLane({ id: lane.id, name: next.name, icon: next.icon }),
+      () =>
+        pool
+          ? savePoolLane({
+              id: lane.id,
+              poolId: pool.poolId,
+              name: next.name,
+              icon: next.icon,
+              description: lane.description ?? null,
+            })
+          : saveLane({ id: lane.id, name: next.name, icon: next.icon }),
     );
   }
 
@@ -119,8 +138,8 @@ export function LanePage({
           data-breadcrumb
           className="flex items-center gap-1 px-6 text-sm"
         >
-          <Link href="/" className="font-medium text-white">
-            Home
+          <Link href={pool ? `/pool/${pool.poolId}` : '/'} className="font-medium text-white">
+            {pool ? pool.poolName : 'Home'}
           </Link>
           <ChevronRight aria-hidden size={14} className="text-white/50" />
           <span className="text-white/70">{saved.value.name}</span>
@@ -134,7 +153,7 @@ export function LanePage({
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 aria-label="Lane name"
-                maxLength={24}
+                maxLength={pool ? 40 : 24}
                 className="text-ink w-full max-w-60 rounded-full bg-white px-4 py-2 text-center text-base outline-none"
               />
               <span className="flex gap-4 text-sm">
@@ -209,13 +228,15 @@ export function LanePage({
           </div>
         )}
 
-        <Link
-          href="/?manage=lanes"
-          data-manage-lanes-link
-          className="mt-10 block text-center text-sm text-white/70 underline-offset-4 hover:underline"
-        >
-          Manage lanes
-        </Link>
+        {pool ? null : (
+          <Link
+            href="/?manage=lanes"
+            data-manage-lanes-link
+            className="mt-10 block text-center text-sm text-white/70 underline-offset-4 hover:underline"
+          >
+            Manage lanes
+          </Link>
+        )}
       </div>
 
       {/* Home's stack over this lane's posts, at the foot of the page. */}
@@ -242,9 +263,12 @@ export function LanePage({
             removed.run(
               (current) => [...current, card.splash.id],
               async () => {
-                const result = card.splash.orphan
-                  ? await deleteRipple(card.splash.id)
-                  : await deleteSplash(card.splash.id);
+                const result =
+                  pool && card.branches
+                    ? await deleteJointSplash(pool.poolId, card.splash.id)
+                    : card.splash.orphan
+                      ? await deleteRipple(card.splash.id)
+                      : await deleteSplash(card.splash.id);
                 if (result.ok) router.refresh();
                 return result.ok
                   ? { ok: true }
@@ -252,17 +276,22 @@ export function LanePage({
               },
             )
           }
-          hrefFor={(id) => `/splash/${id}?from=${encodeURIComponent(`${here}?top=${id}`)}`}
+          hrefFor={(id) =>
+            pool
+              ? (shown.find((card) => card.splash.id === id)?.href ?? here)
+              : `/splash/${id}?from=${encodeURIComponent(`${here}?top=${id}`)}`
+          }
         />
       </div>
 
       {/* Wide: Home, Pool and compose, the vertical rail at the far right. */}
       <GroundFoot
         slot="wide"
-        here="home"
+        here={pool ? 'pool' : 'home'}
         homeLabel="Home"
         onHome={() => router.push('/')}
-        onCompose={() => openSheet()}
+        onPool={pool ? () => router.push(`/pool/${pool.poolId}`) : undefined}
+        onCompose={() => openSheet(pool ?? null)}
       />
     </div>
   );

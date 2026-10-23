@@ -20,6 +20,7 @@ import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
 import { Avatar } from '@/features/people/avatar';
 
+import { poolScopeOf } from './compose-scope';
 import { deleteJointSplash } from './actions';
 import { InvitePanel } from './invite-panel';
 import { MembersSheet } from './members-sheet';
@@ -170,18 +171,7 @@ export function PoolGround({
   // Re-tapping Pool while in a pool walks the views; the toggle follows (review).
   const cycleView = (): void => setKind(nextView(kind));
   // Compose from here defaults to this pool, its lanes as I linked them (H23).
-  const composeHere = (): void =>
-    openSheet({
-      poolId,
-      poolName: view.pool.name,
-      lanes: view.lanes.map((lane) => ({
-        id: lane.id,
-        name: lane.name,
-        icon: lane.icon,
-        myCategoryId: view.myLinks.find((l) => l.poolLaneId === lane.id)?.myCategoryId ?? null,
-        direction: view.myLinks.find((l) => l.poolLaneId === lane.id)?.direction ?? null,
-      })),
-    });
+  const composeHere = (): void => openSheet(poolScopeOf(view));
   const waterIds = useMemo(() => new Set(ids.filter((id) => id !== heading)), [ids, heading]);
   const current = view.members.filter((m) => !m.former);
   const laneNames = view.lanes.map((l) => ({ id: l.id, name: l.name, icon: l.icon }));

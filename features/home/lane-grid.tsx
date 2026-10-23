@@ -538,8 +538,8 @@ export const LaneGrid = forwardRef<
 /**
  * A column's header: a lane's emoji over its name, opening its page on
  * Home; in a pool's Swimmers view a member's initials on a disc over their
- * name (H23). A pool's lane opens nothing here: lane management is the glyph
- * at the header's left, as on Home.
+ * name (H23). A pool's lane opens its page in the pool, as a lane's does on
+ * Home (review); a member's column opens nothing.
  */
 function ColumnHeader({ column }: { column: GridColumn }) {
   const href = column.href === undefined ? `/lane/${column.id}` : column.href;

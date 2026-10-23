@@ -435,3 +435,11 @@ Retired with it, each with its reason: the **lane rows** and their ropes (the gr
 **A link's arrow points where records go; one sender per lane of mine (review, 2026-10-23; amends 0017).** In lane matching the pool lane is at the left and my lane at the right, so *out* (mine into the pool) is drawn ←, *in* (the pool's into mine) →, and *both* ↔. The 0017 entry drew them the other way round. The stored directions are unchanged. A lane of mine may send (↔ or ←) to at most one pool lane in a pool, because a post sits in one pool lane per pool. Bringing in (→) from several pool lanes is fine. Of the rows connecting the same lane, the first keeps sending and the rest are held to →, with "Already shared to <pool lane>" under them. When the sender stops, the next row is unlocked but still shows →: it shares only when tapped, never on its own. The app enforces this in create, join and Pool settings; a database constraint is proposed as 0019.
 
 **A joint splash with no lane of mine sits in its pool's column on Home (review, 2026-10-23).** A joint splash I made with no ripple of mine yet is on Home too: written as a title alone, nothing used to bring it there, and its instant placeholder fell into the unlabelled column with a blank mark. Like a joint splash whose latest ripple of mine has no lane (0016), it sits in its pool's column, headed by the pool's monogram. Its mark shows the pool lane's emoji when the splash has none of its own. The placeholder after a drop uses the same column and emoji from the first frame, adding the pool's column if Home has none yet.
+
+**A pool lane has a page, as a lane does on Home (review, 2026-10-23).** In a pool's Lane view a lane's header opens `/pool/[id]/lane/[laneId]`, Home's lane page in a pool mode:
+- the breadcrumb starts at the pool;
+- the posts are the pool's on that lane, placed and joint, each with its author;
+- the emoji and name are renamed in place, by any member, as pool lanes already are;
+- the stack and compose are the pool's;
+- there is no Manage lanes link, since a pool's lanes are managed from its glyph.
+A member's column in Swimmers opens nothing.

@@ -445,6 +445,21 @@ describe('re-tapping Pool (review)', () => {
   });
 });
 
+describe('a pool lane’s header (review)', () => {
+  it('opens its lane page, as a lane’s header does on Home', () => {
+    setView('lane');
+    const { container } = ground(A);
+    const header = container.querySelector('[data-lane-header="l-food"]')!;
+    expect(header.getAttribute('href')).toBe('/pool/p-a/lane/l-food');
+  });
+
+  it('opens nothing for a member’s column in Swimmers', () => {
+    setView('swimmers');
+    const { container } = ground(A);
+    expect(container.querySelector(`[data-lane-header="${MINA}"]`)!.tagName).not.toBe('A');
+  });
+});
+
 describe('faces (0018)', () => {
   it('writes authors out by name in the Date view, never as initials', () => {
     setView('date');

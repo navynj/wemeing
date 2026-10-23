@@ -23,7 +23,13 @@ export function poolColumns(view: PoolView, kind: PoolViewKind): GridColumn[] {
       .filter((m) => !m.former)
       .map((m) => ({ id: m.userId, name: m.name, icon: null, avatar: m.initials, href: null }));
   }
-  return view.lanes.map((lane) => ({ id: lane.id, name: lane.name, icon: lane.icon, href: null }));
+  // A pool lane's header opens its page, as a lane's does on Home (review).
+  return view.lanes.map((lane) => ({
+    id: lane.id,
+    name: lane.name,
+    icon: lane.icon,
+    href: `/pool/${view.pool.id}/lane/${lane.id}`,
+  }));
 }
 
 /**

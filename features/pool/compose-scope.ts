@@ -18,3 +18,25 @@ export type PoolScope = {
     direction: LinkDirection | null;
   }[];
 };
+
+/** A pool as the composer takes it: its lanes, each with my link and its direction. */
+export function poolScopeOf(view: {
+  pool: { id: string; name: string };
+  lanes: { id: string; name: string; icon: string | null }[];
+  myLinks: { poolLaneId: string; myCategoryId: string; direction: LinkDirection }[];
+}): PoolScope {
+  return {
+    poolId: view.pool.id,
+    poolName: view.pool.name,
+    lanes: view.lanes.map((lane) => {
+      const link = view.myLinks.find((l) => l.poolLaneId === lane.id);
+      return {
+        id: lane.id,
+        name: lane.name,
+        icon: lane.icon,
+        myCategoryId: link?.myCategoryId ?? null,
+        direction: link?.direction ?? null,
+      };
+    }),
+  };
+}

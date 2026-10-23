@@ -53,13 +53,24 @@ echo "→ dumping ${label}"
   echo "-- schema"
 } > "$dump"
 # Tool chatter goes to a file, not the log: it may echo connection details.
+# On failure only its last lines are shown, with anything shaped like a
+# connection string, a pooler user or a database host redacted.
+redacted() {
+  tail -n 8 "$1" | sed -E \
+    -e 's#postgres(ql)?://[^[:space:]"]+#<db-url>#g' \
+    -e 's#postgres\.[A-Za-z0-9]+#<db-user>#g' \
+    -e 's#[A-Za-z0-9.-]+\.(pooler\.)?supabase\.(com|co)#<db-host>#g' \
+    -e 's#(password[=:][[:space:]]*)[^[:space:]]+#\1<redacted>#gI' >&2
+}
 supabase db dump "${source_flags[@]}" >> "$dump" 2> "${out}/.dump-schema.err" || {
-  echo "✖ schema dump failed (details kept out of the log)" >&2
+  echo "✖ schema dump failed:" >&2
+  redacted "${out}/.dump-schema.err"
   exit 1
 }
 echo "-- data" >> "$dump"
 supabase db dump "${source_flags[@]}" --data-only >> "$dump" 2> "${out}/.dump-data.err" || {
-  echo "✖ data dump failed (details kept out of the log)" >&2
+  echo "✖ data dump failed:" >&2
+  redacted "${out}/.dump-data.err"
   exit 1
 }
 rm -f "${out}/.dump-schema.err" "${out}/.dump-data.err"

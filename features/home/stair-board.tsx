@@ -246,6 +246,10 @@ function Step({
     return at;
   });
   const background = useTransform(d, (v) => seat(v).background);
+  // A card moving to or from the top carries both faces and crossfades them
+  // on its distance from the top, so nothing switches when it lands.
+  const fullOpacity = useTransform(d, (v) => 1 - clamp01(Math.abs(v)));
+  const edgeOpacity = useTransform(d, (v) => clamp01(Math.abs(v)));
   const height = useTransform(d, (v) => seat(v).height);
   const inkOpacity = useTransform(d, (v) => seat(v).ink);
   // Nearer the top, nearer the eye; a card rising from below over one sliding up.
@@ -253,10 +257,12 @@ function Step({
 
   const onTop = to === 0;
   const stair = to === 0 ? 'top' : to < 0 ? 'up' : 'down';
-  // In flight, the card leaving the top keeps its full face and the card
-  // arriving there has it from the first frame (review: a title that
-  // arrives late reads as a bug); every other card keeps the face it had.
-  const shown = moving ? (from === 0 || to === 0 ? 'top' : from < 0 ? 'up' : 'down') : stair;
+  // Which stair's edge a card shows when it is not on top: by where it is
+  // going, or, moving between two stairs, by where it was.
+  const touchesTop = moving && (from === 0 || to === 0);
+  const side = touchesTop ? (from < 0 || to < 0 ? 'up' : 'down') : from < 0 ? 'up' : 'down';
+  const edgeSide = moving ? side : stair === 'up' ? 'up' : 'down';
+  const frosted = stair === 'up' || (moving && from < 0);
   const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
 
   return (
@@ -274,15 +280,18 @@ function Step({
     >
       {/* The face, clipped to the card's corners so the frost stays inside. */}
       <motion.div
-        className={`absolute inset-0 overflow-hidden rounded-[24px] ${stair === 'up' ? 'frosted' : ''}`}
+        className={`absolute inset-0 overflow-hidden rounded-[24px] ${frosted ? 'frosted' : ''}`}
         style={{
           background,
           ['--face' as string]: background,
           ['--ink-opacity' as string]: inkOpacity,
         }}
       >
-        {shown === 'top' ? (
-          <>
+        {onTop || touchesTop ? (
+          <motion.div
+            className="absolute inset-0"
+            style={{ opacity: touchesTop ? fullOpacity : 1 }}
+          >
             <CardFace
               card={card}
               lane={lane}
@@ -290,33 +299,44 @@ function Step({
               edge="full"
               onClickCapture={guard}
             />
-            {onTop ? (
+            {onTop && !moving ? (
               <CardMenu card={card} pinned={pinned} onPin={onPin} onDelete={onDelete} />
             ) : null}
-          </>
-        ) : (
-          <>
+          </motion.div>
+        ) : null}
+        {!onTop || touchesTop ? (
+          <motion.div
+            className="absolute inset-0"
+            style={{ opacity: touchesTop ? edgeOpacity : 1 }}
+          >
             {/* A step: its visible edge is a seat, one tap to the top. */}
-            <button
-              type="button"
-              data-step-card={card.splash.id}
-              aria-label={`Bring ${title} to the top`}
-              onClick={() => bringForward(card.splash.id)}
-              className={`absolute inset-x-0 z-10 cursor-pointer ${stair === 'up' ? 'top-0' : 'bottom-0'}`}
-              style={{ height: stair === 'up' ? UP_STEP_PX : STEP_PX }}
-            />
+            {!moving ? (
+              <button
+                type="button"
+                data-step-card={card.splash.id}
+                aria-label={`Bring ${title} to the top`}
+                onClick={() => bringForward(card.splash.id)}
+                className={`absolute inset-x-0 z-10 cursor-pointer ${stair === 'up' ? 'top-0' : 'bottom-0'}`}
+                style={{ height: stair === 'up' ? UP_STEP_PX : STEP_PX }}
+              />
+            ) : null}
             <CardFace
               card={card}
               lane={lane}
               initials={initials}
-              edge={shown === 'up' ? 'top' : 'bottom'}
-              ink={shown === 'up' ? 'white' : 'blue'}
+              edge={edgeSide === 'up' ? 'top' : 'bottom'}
+              ink={edgeSide === 'up' ? 'white' : 'blue'}
             />
-          </>
-        )}
+          </motion.div>
+        ) : null}
       </motion.div>
-      {/* The ladder glyph hung over the read card's edge: a hint, not a control (review). */}
-      {shown === 'up' ? <LadderGlyph /> : null}
+      {/* The ladder glyph hung over the read card's edge: a hint, not a control
+          (review), fading in with the edge it hangs on. */}
+      {edgeSide === 'up' && (stair === 'up' || moving) ? (
+        <motion.div style={{ opacity: touchesTop ? edgeOpacity : 1 }}>
+          <LadderGlyph />
+        </motion.div>
+      ) : null}
     </motion.div>
   );
 }
@@ -324,10 +344,10 @@ function Step({
 /**
  * A small pool ladder hooked over the upper stair card's top edge near its
  * right end (review, to the reference): both rails bend the same way at
- * the bottom, over the card's edge, as a ladder hangs over a pool wall, and
- * climb straight from there up into the water, three rungs between them,
- * white where they grip the card and fading to nothing as they rise — a
- * ladder going under. Outlined, round caps, the same size
+ * the bottom, over the card's edge, as a ladder hangs over a pool wall — each
+ * curling a little past a quarter turn — and climb from there up into the water in perspective, drawing together as they go, three rungs between them,
+ * white where they grip the card, turning the water's blue and then
+ * to nothing as they rise — a ladder going under. Outlined, round caps, the same size
  * at every width, undoing the card's own scale; the card beneath is the tap.
  */
 function LadderGlyph() {
@@ -336,27 +356,32 @@ function LadderGlyph() {
     <svg
       aria-hidden
       data-ladder-glyph
-      width={24}
-      height={44}
-      viewBox="0 0 24 44"
+      width={28}
+      height={26}
+      viewBox="0 0 28 26"
       fill="none"
       stroke={`url(#${fade})`}
       strokeWidth={2.5}
       strokeLinecap="round"
       strokeLinejoin="round"
       className="pointer-events-none absolute right-7 origin-bottom-right"
-      style={{ top: -30, transform: `scale(${1 / STEP_SCALE})` }}
+      style={{ top: -20, transform: `scale(${1 / STEP_SCALE})` }}
     >
       <defs>
         <linearGradient id={fade} x1="0" y1="1" x2="0" y2="0">
+          {/* White at the hooks, turning the water's blue as it rises — the
+              blue kept light enough to read on the water, so the three rungs
+              all show — and gone at the top. */}
           <stop offset="0" stopColor="#ffffff" stopOpacity="1" />
-          <stop offset="0.55" stopColor="#ffffff" stopOpacity="0.8" />
-          <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+          <stop offset="0.4" stopColor="#ffffff" stopOpacity="0.9" />
+          <stop offset="0.8" stopColor="#6b6ddc" stopOpacity="0.9" />
+          <stop offset="1" stopColor="#0507c9" stopOpacity="0" />
         </linearGradient>
       </defs>
       {/* Both rails bend the same way at the bottom, over the card's edge,
-          as a ladder hangs over a pool wall; above it they climb straight. */}
-      <path d="M8 2v28a6 6 0 0 1-6 6M19 2v28a6 6 0 0 1-6 6M8 9h11M8 17h11M8 25h11" />
+          as a ladder hangs over a pool wall; above it they climb toward the
+          water in perspective, drawing together as they go. */}
+      <path d="M9.5 2L8 20a4 4 0 0 0 6.8 2.8M15.5 2L19 20a4 4 0 0 0 6.8 2.8M9.1 9h6.8M8.7 14.5h7.9M8.2 20h9.6" />
     </svg>
   );
 }

@@ -1,12 +1,19 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/lane/c-food',
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),
 }));
 const saved: unknown[] = [];
+vi.mock('@/features/splash/actions', () => ({
+  setSplashPinned: () => Promise.resolve({ ok: true }),
+  deleteSplash: () => Promise.resolve({ ok: true }),
+}));
+vi.mock('@/features/ripple-sheet/actions', () => ({
+  deleteRipple: () => Promise.resolve({ ok: true }),
+}));
 vi.mock('@/features/lanes/actions', () => ({
   saveLane: (lane: unknown) => {
     saved.push(lane);
@@ -20,6 +27,22 @@ import { summarizeSplash, type SplashBlock } from '@/features/splash/summary';
 import type { MyCategory } from '@/lib/queries/profile';
 
 afterEach(cleanup);
+beforeEach(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    configurable: true,
+    value: (query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      onchange: null,
+      dispatchEvent: () => false,
+    }),
+  });
+});
 
 const TZ = 'America/Vancouver';
 const NOW = new Date('2026-10-22T20:00:00.000Z');
@@ -85,10 +108,35 @@ describe('a lane’s page (round 3)', () => {
       p.getAttribute('data-lane-post'),
     );
     expect(posts).toEqual(['noodles', 'ramen', 'soup']);
-    expect(container.querySelector('[data-lane-post="soup"]')!.getAttribute('href')).toBe(
-      `/splash/soup?from=${encodeURIComponent('/lane/c-food')}`,
-    );
     expect(container.querySelector('a[href="/?manage=lanes"]')!.textContent).toBe('Manage lanes');
+  });
+
+  it('sets the lane\u2019s card stack at the foot: the top card\u2019s row at full white, the rest quiet, no pill', async () => {
+    const { container } = render(<LanePage lane={FOOD} cards={CARDS} />);
+    const stack = container.querySelector('[data-lane-stack] [data-stack]')!;
+    expect(
+      stack.querySelector('[data-stack-card][data-slot="0"]')!.getAttribute('data-stack-card'),
+    ).toBe('noodles');
+    const top = container.querySelector('[data-pill="noodles"]')!;
+    expect(top.hasAttribute('data-dived')).toBe(false);
+    expect(top.className).toContain('border-white/15');
+    expect(top.className).not.toMatch(/rounded-full|bg-white /);
+    expect(container.querySelector('[data-pill="ramen"]')!.className).toContain('opacity-60');
+    // The top card opens the post, coming back here with it on top.
+    expect(stack.querySelector('[data-card-link]')!.getAttribute('href')).toBe(
+      `/splash/noodles?from=${encodeURIComponent('/lane/c-food?top=noodles')}`,
+    );
+    fireEvent.click(container.querySelector('[data-pill="soup"]')!);
+    await waitFor(() =>
+      expect(container.querySelector('[data-pill="soup"]')!.hasAttribute('data-dived')).toBe(false),
+    );
+  });
+
+  it('opens with the card a post\u2019s page sent it back to on top', () => {
+    const { container } = render(<LanePage lane={FOOD} cards={CARDS} topParam="ramen" />);
+    expect(
+      container.querySelector('[data-stack-card][data-slot="0"]')!.getAttribute('data-stack-card'),
+    ).toBe('ramen');
   });
 
   it('edits the emoji and the name in place, and saves them', async () => {

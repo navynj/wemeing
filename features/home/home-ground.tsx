@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus } from 'lucide-react';
+import { Home, Plus } from 'lucide-react';
 
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { CategorySheet } from '@/features/lanes/category-sheet';
@@ -297,12 +297,24 @@ export function HomeGround({
             <FlipBoard cards={shown} flip={flip} categories={lanes.value} initials={initials} />
           )}
 
-          {/* Compose: a white disc with the blue plus, at the bottom right
-              outside the stack — on the water, white carries the action. */}
+          {/* The foot: Home at the left — each tap switches the view, Lane
+              to Date and back (review) — and compose at the right, a white
+              disc with the blue plus: on the water, white carries the action. */}
           <div
-            className="flex shrink-0 justify-end px-6 pt-2 lg:px-0"
+            data-home-foot
+            className="flex shrink-0 items-center justify-between px-6 pt-2 lg:px-0"
             style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }}
           >
+            <button
+              type="button"
+              data-home-tab
+              aria-label={`Home, showing the ${view} view; tap to switch`}
+              onClick={() => setView(view === 'lane' ? 'date' : 'lane')}
+              className="flex flex-col items-center gap-1 font-semibold text-white"
+            >
+              <Home aria-hidden size={22} strokeWidth={2.25} />
+              <span className="text-xs/none">Home</span>
+            </button>
             <button
               type="button"
               aria-label="Drop a splash"

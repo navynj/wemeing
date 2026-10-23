@@ -14,7 +14,6 @@ import {
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
 
-import { OutlineChip } from '@/components/ui/chips/category-chip';
 import { useAxisLock } from '@/components/ui/use-axis-lock';
 import { CommitRing } from '@/components/ui/waves';
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
@@ -32,8 +31,8 @@ import {
   monthAbbrev,
   weekdayOf,
   type Card,
-  postIcon,
 } from './grid';
+import { PostRow } from './post-row';
 
 /** The date rail's width and the `+` column's, both fixed; the lanes share the rest. */
 const RAIL_PX = 56;
@@ -137,8 +136,17 @@ export const LaneGrid = forwardRef<
   ref,
 ) {
   const scroller = useRef<HTMLDivElement>(null);
-  // One axis per gesture: a drag never drifts diagonally (round 3).
+  // The inner, sideways scroller, and the header bar that follows it.
+  const across = useRef<HTMLDivElement>(null);
+  const head = useRef<HTMLDivElement>(null);
+  const followAcross = useCallback((): void => {
+    const x = across.current;
+    if (head.current && x) head.current.style.transform = `translateX(${-x.scrollLeft}px)`;
+  }, []);
+  // Belt and braces over the native latching: each scroller holds the other
+  // axis still for the rest of a gesture (round 3).
   useAxisLock(scroller);
+  useAxisLock(across);
   const dateView = view === 'date';
   const reducedMotion = usePrefersReducedMotion();
   const [viewportWidth, setViewportWidth] = useState<number | null>(null);
@@ -254,38 +262,44 @@ export const LaneGrid = forwardRef<
   const reveal = useCallback(
     (ids: string[]): { spots: Map<string, MarkSpot>; scrolled: boolean } => {
       const el = scroller.current;
+      const x = across.current;
       const spots = new Map<string, MarkSpot>();
-      if (!el) return { spots, scrolled: false };
+      if (!el || !x) return { spots, scrolled: false };
       const header = headerHeight(el);
       let scrollTop = el.scrollTop;
-      let scrollLeft = el.scrollLeft;
+      let scrollLeft = x.scrollLeft;
       let scrolled = false;
       const first = ids[0] ? el.querySelector<HTMLElement>(markSelector(ids[0])) : null;
       if (first) {
-        const { top: markTop, left: markLeft } = offsetIn(first, el);
+        const markTop = offsetIn(first, el).top;
+        const markLeft = offsetIn(first, x).left;
         if (markTop < scrollTop + header) scrollTop = markTop - header - 8;
         else if (markTop + first.offsetHeight > scrollTop + el.clientHeight) {
           scrollTop = markTop + first.offsetHeight - el.clientHeight + 8;
         }
         if (markLeft < scrollLeft + RAIL_PX) scrollLeft = markLeft - RAIL_PX - 8;
-        else if (markLeft + first.offsetWidth > scrollLeft + el.clientWidth) {
-          scrollLeft = markLeft + first.offsetWidth - el.clientWidth + 8;
+        else if (markLeft + first.offsetWidth > scrollLeft + x.clientWidth) {
+          scrollLeft = markLeft + first.offsetWidth - x.clientWidth + 8;
         }
         scrollTop = Math.max(0, Math.min(scrollTop, el.scrollHeight - el.clientHeight));
-        scrollLeft = Math.max(0, Math.min(scrollLeft, el.scrollWidth - el.clientWidth));
-        if (scrollTop !== el.scrollTop || scrollLeft !== el.scrollLeft) {
-          scrollWithin(el, { top: scrollTop, left: scrollLeft }, reducedMotion);
+        scrollLeft = Math.max(0, Math.min(scrollLeft, x.scrollWidth - x.clientWidth));
+        if (scrollTop !== el.scrollTop) {
+          scrollWithin(el, { top: scrollTop }, reducedMotion);
+          scrolled = !reducedMotion;
+        }
+        if (scrollLeft !== x.scrollLeft) {
+          scrollWithin(x, { left: scrollLeft }, reducedMotion);
           scrolled = !reducedMotion;
         }
       }
-      const rect = el.getBoundingClientRect();
+      const outer = el.getBoundingClientRect();
+      const inner = x.getBoundingClientRect();
       for (const id of ids) {
         const mark = el.querySelector<HTMLElement>(markSelector(id));
         if (!mark) continue;
-        const at = offsetIn(mark, el);
         spots.set(id, {
-          x: rect.left + at.left - scrollLeft + mark.offsetWidth / 2,
-          y: rect.top + at.top - scrollTop + mark.offsetHeight / 2,
+          x: inner.left + offsetIn(mark, x).left - scrollLeft + mark.offsetWidth / 2,
+          y: outer.top + offsetIn(mark, el).top - scrollTop + mark.offsetHeight / 2,
           size: mark.offsetWidth || MARK_PX,
         });
       }
@@ -316,141 +330,155 @@ export const LaneGrid = forwardRef<
     return () => window.clearTimeout(timer);
   }, [ring, reveal]);
 
+  // The headers' columns: the grid's own, without the rail, which stays put.
+  const headTemplate = template.slice(`${RAIL_PX}px `.length);
+
   return (
+    // Two scrollers, one axis each (review): the outer moves only up and
+    // down — the avatar, the sticky header bar, the days — and the inner
+    // moves only sideways — the columns, the rail sticky at its left. A
+    // drag latches to one of them natively, momentum included, so it never
+    // drifts diagonally; the header bar follows the inner's sideways scroll.
     <div
       ref={scroller}
       data-lane-grid
       data-columns={even ? 'even' : 'fixed'}
-      className="no-scrollbar relative min-h-0 flex-1 overflow-auto overscroll-contain"
-      style={{ touchAction: 'pan-x pan-y' }}
+      className="no-scrollbar relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
     >
-      <div
-        data-grid
-        className={`relative grid ${even ? 'w-full' : 'w-max min-w-full'}`}
-        // Every day row at least this tall and as tall as its fullest cell,
-        // so stacked marks grow the row rather than spill into the next.
-        style={{ gridTemplateColumns: template, gridAutoRows: 'auto' }}
-      >
-        {/* The avatar: large, centred, scrolling away with the days. */}
-        <div
-          data-avatar-row
-          className="sticky left-0 col-span-full flex justify-center pt-5 pb-6"
-          style={{ width: viewportWidth ?? '100%' }}
+      {/* The avatar: large, centred, scrolling away with the days. */}
+      <div data-avatar-row className="flex justify-center pt-5 pb-6">
+        <span
+          data-avatar
+          className="flex h-20 w-20 items-center justify-center rounded-full bg-white/25 text-2xl font-medium text-white/70"
         >
-          <span
-            data-avatar
-            className="flex h-20 w-20 items-center justify-center rounded-full bg-white/25 text-2xl font-medium text-white/70"
-          >
-            {initials}
-          </span>
-        </div>
+          {initials}
+        </span>
+      </div>
 
-        {/* The lane headers: sticky at the top, on the water so rows pass
-            beneath. A header opens its lane's page (round 3). The Date view
-            has no columns, so no headers. */}
-        {dateView ? null : (
-          <>
+      {/* The lane headers: one bar sticky at the top, on the water so rows
+          pass beneath, moved sideways with the columns. A header opens its
+          lane's page (round 3). The Date view has no columns, so no bar. */}
+      {dateView ? null : (
+        <div data-grid-header className="bg-main-900 sticky top-0 z-30 flex">
+          <div aria-hidden className="shrink-0" style={{ width: RAIL_PX }} />
+          <div className="min-w-0 flex-1 overflow-hidden">
             <div
-              data-grid-header
-              className="bg-main-900 sticky top-0 left-0 z-30"
-              style={{ gridColumn: 1 }}
-            />
-            {categories.map((lane) => (
-              <Link
-                key={lane.id}
-                href={`/lane/${lane.id}`}
-                data-lane-header={lane.id}
-                className="bg-main-900 sticky top-0 z-20 flex flex-col items-center gap-0.5 px-0.5 pb-2 text-white"
-              >
-                <span aria-hidden className="text-2xl/none">
-                  {lane.icon}
-                </span>
-                <span className="max-w-full truncate text-[11px]/tight font-semibold">
-                  {lane.name}
-                </span>
-              </Link>
-            ))}
-            {orphans ? (
-              <div data-lane-header="" className="bg-main-900 sticky top-0 z-20 pb-2" />
-            ) : null}
-            <div className="bg-main-900 sticky top-0 z-20 flex items-start justify-center pb-2">
-              <button
-                type="button"
-                aria-label="New lane"
-                data-new-lane
-                onClick={onCreateLane}
-                className="flex h-7 w-7 items-center justify-center rounded-full border border-white/40 text-white/60"
-              >
-                <Plus aria-hidden size={14} />
-              </button>
+              ref={head}
+              data-grid-head
+              className={`grid ${even ? 'w-full' : 'w-max'}`}
+              style={{ gridTemplateColumns: headTemplate }}
+            >
+              {categories.map((lane) => (
+                <Link
+                  key={lane.id}
+                  href={`/lane/${lane.id}`}
+                  data-lane-header={lane.id}
+                  className="flex flex-col items-center gap-0.5 px-0.5 pb-2 text-white"
+                >
+                  <span aria-hidden className="text-2xl/none">
+                    {lane.icon}
+                  </span>
+                  <span className="max-w-full truncate text-[11px]/tight font-semibold">
+                    {lane.name}
+                  </span>
+                </Link>
+              ))}
+              {orphans ? <div data-lane-header="" className="pb-2" /> : null}
+              <div className="flex items-start justify-center pb-2">
+                <button
+                  type="button"
+                  aria-label="New lane"
+                  data-new-lane
+                  onClick={onCreateLane}
+                  className="flex h-7 w-7 items-center justify-center rounded-full border border-white/40 text-white/60"
+                >
+                  <Plus aria-hidden size={14} />
+                </button>
+              </div>
             </div>
-          </>
-        )}
+          </div>
+        </div>
+      )}
 
-        {rows.map((row, index) => {
-          if (row.kind === 'gap') {
-            return (
-              <GapRow
-                key={row.from}
-                from={row.from}
-                to={row.to}
-                columns={dateView ? 0 : columns}
-                plus={!dateView}
-              />
-            );
-          }
-          const { day } = row;
-          // The month is named on its first named day.
-          const monthChanges = !rows
-            .slice(0, index)
-            .some((r) => r.kind === 'day' && monthKey(r.day) === monthKey(day));
-          const marks = (lane: string, icon: string | null): ReactNode =>
-            (byCell.get(`${day}|${lane}`) ?? []).map((card) => (
-              <Mark
-                key={card.splash.id}
-                card={card}
-                icon={card.splash.icon ?? icon}
-                dived={waterIds.has(card.splash.id)}
-                ring={ringAt?.id === card.splash.id ? ringAt.seq : null}
-                titled={titled}
-                onPick={onPick}
-              />
-            ));
-          if (dateView) {
+      <div
+        ref={across}
+        data-x-scroller
+        onScroll={followAcross}
+        className={`no-scrollbar ${dateView ? '' : 'overflow-x-auto overflow-y-hidden overscroll-x-contain'}`}
+      >
+        <div
+          data-grid
+          className={`relative grid ${even ? 'w-full' : 'w-max min-w-full'}`}
+          // Every day row at least this tall and as tall as its fullest cell,
+          // so stacked marks grow the row rather than spill into the next.
+          style={{ gridTemplateColumns: template, gridAutoRows: 'auto' }}
+        >
+          {rows.map((row, index) => {
+            if (row.kind === 'gap') {
+              return (
+                <GapRow
+                  key={row.from}
+                  from={row.from}
+                  to={row.to}
+                  columns={dateView ? 0 : columns}
+                  plus={!dateView}
+                />
+              );
+            }
+            const { day } = row;
+            // The month is named on its first named day.
+            const monthChanges = !rows
+              .slice(0, index)
+              .some((r) => r.kind === 'day' && monthKey(r.day) === monthKey(day));
+            const marks = (lane: string, icon: string | null): ReactNode =>
+              (byCell.get(`${day}|${lane}`) ?? []).map((card) => (
+                <Mark
+                  key={card.splash.id}
+                  card={card}
+                  icon={card.splash.icon ?? icon}
+                  dived={waterIds.has(card.splash.id)}
+                  ring={ringAt?.id === card.splash.id ? ringAt.seq : null}
+                  titled={titled}
+                  onPick={onPick}
+                />
+              ));
+            if (dateView) {
+              return (
+                <DayRow key={day} day={day} monthChanges={monthChanges}>
+                  <div data-cell="date" className="flex min-w-0 flex-col py-1 pr-4">
+                    {(byDay.get(day) ?? []).map((card) => {
+                      const laneId = cardLane(card.splash);
+                      return (
+                        <PostRow
+                          key={card.splash.id}
+                          card={card}
+                          lane={laneId ? (byLaneId.get(laneId) ?? null) : null}
+                          current={!waterIds.has(card.splash.id)}
+                          ring={ringAt?.id === card.splash.id ? ringAt.seq : null}
+                          lead="lane"
+                          onPick={onPick}
+                        />
+                      );
+                    })}
+                  </div>
+                </DayRow>
+              );
+            }
             return (
               <DayRow key={day} day={day} monthChanges={monthChanges}>
-                <div data-cell="date" className="flex min-w-0 flex-col gap-1.5 py-2 pr-4">
-                  {(byDay.get(day) ?? []).map((card) => {
-                    const laneId = cardLane(card.splash);
-                    return (
-                      <Pill
-                        key={card.splash.id}
-                        card={card}
-                        lane={laneId ? (byLaneId.get(laneId) ?? null) : null}
-                        dived={waterIds.has(card.splash.id)}
-                        ring={ringAt?.id === card.splash.id ? ringAt.seq : null}
-                        onPick={onPick}
-                      />
-                    );
-                  })}
-                </div>
+                {categories.map((lane, at) => (
+                  <Cell key={lane.id} lane={lane.id} first={at === 0}>
+                    {marks(lane.id, lane.icon)}
+                  </Cell>
+                ))}
+                {orphans ? <Cell lane="">{marks('', null)}</Cell> : null}
+                <Cell lane="+" />
               </DayRow>
             );
-          }
-          return (
-            <DayRow key={day} day={day} monthChanges={monthChanges}>
-              {categories.map((lane, at) => (
-                <Cell key={lane.id} lane={lane.id} first={at === 0}>
-                  {marks(lane.id, lane.icon)}
-                </Cell>
-              ))}
-              {orphans ? <Cell lane="">{marks('', null)}</Cell> : null}
-              <Cell lane="+" />
-            </DayRow>
-          );
-        })}
+          })}
 
-        <div ref={sentinel} data-grid-end className="col-span-full h-px" />
+          <div ref={sentinel} data-grid-end className="col-span-full h-px" />
+        </div>
       </div>
     </div>
   );
@@ -639,71 +667,6 @@ function Mark({
         {title}
       </button>
     </span>
-  );
-}
-
-/**
- * A post in the Date view (round 3): one pill per line, full width — the
- * icon on a disc, the title, the lane as a chip — translucent like a mark
- * when it is not on top, the ring around its icon when Home says so.
- */
-function Pill({
-  card,
-  lane,
-  dived,
-  ring,
-  onPick,
-}: {
-  card: Card;
-  lane: MyCategory | null;
-  dived: boolean;
-  ring: number | null;
-  onPick: (id: string) => void;
-}) {
-  const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
-  return (
-    <button
-      type="button"
-      data-pill={card.splash.id}
-      data-dived={dived ? '' : undefined}
-      data-ring={ring !== null ? '' : undefined}
-      onClick={() => onPick(card.splash.id)}
-      className={`flex w-full min-w-0 items-center gap-2.5 rounded-full py-1.5 pr-2 pl-1.5 text-left ${
-        dived ? 'bg-white/15 text-white' : 'text-ink bg-white'
-      }`}
-    >
-      <span className="relative flex shrink-0 items-center justify-center">
-        {ring !== null ? (
-          <span
-            key={ring}
-            aria-hidden
-            data-commit-ripple
-            className="pointer-events-none absolute inset-0 flex items-center justify-center text-white"
-          >
-            <span className="flex shrink-0">
-              <CommitRing size={RING_PX} contentSize={MARK_PX} gap={6} once />
-            </span>
-          </span>
-        ) : null}
-        <span
-          aria-hidden
-          className={`relative flex items-center justify-center rounded-full text-sm/none ${
-            dived ? 'bg-white/20' : 'bg-pool-100'
-          }`}
-          style={{ width: MARK_PX, height: MARK_PX }}
-        >
-          {postIcon(card.splash, lane) ?? ''}
-        </span>
-      </span>
-      <span
-        className={`min-w-0 flex-1 truncate text-sm font-semibold ${
-          card.splash.title.trim() ? '' : 'opacity-50'
-        }`}
-      >
-        {title}
-      </span>
-      {lane ? <OutlineChip icon={lane.icon} name={lane.name} className="opacity-90" /> : null}
-    </button>
   );
 }
 

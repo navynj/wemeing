@@ -12,7 +12,19 @@ import {
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
 
 /** The spring the pages turn on: Apple's card feel, as the brief sets it. */
-export const FLIP_SPRING = { type: 'spring', stiffness: 300, damping: 30 } as const;
+/**
+ * The spring the stack moves on: stiff enough that a flip lands in about a
+ * quarter second, damped to a whisper of overshoot, and called settled as
+ * soon as the eye can no longer tell — the long invisible tail of a softer
+ * spring was what made the next tap wait (review).
+ */
+export const FLIP_SPRING = {
+  type: 'spring',
+  stiffness: 520,
+  damping: 42,
+  restDelta: 0.004,
+  restSpeed: 0.4,
+} as const;
 /** How far the finger travels, in px, for one whole turn. */
 export const FLIP_TRAVEL = 200;
 /** Past this, a release completes the turn; before it, a fast enough fling does too. */

@@ -159,6 +159,7 @@ export function StairBoard({
   pinnedIds,
   onPin,
   onDelete,
+  hrefFor,
 }: {
   /** Newest first, in the order `flip.ids` follows. */
   cards: Card[];
@@ -168,6 +169,8 @@ export function StairBoard({
   pinnedIds: ReadonlySet<string>;
   onPin: (card: Card, pinned: boolean) => void;
   onDelete: (card: Card) => void;
+  /** Where the top card opens; Home's way back by default, a lane page's on a lane page. */
+  hrefFor?: (id: string) => string;
 }) {
   const { ids, n, next, bringForward } = flip;
   const byId = new Map(cards.map((card) => [card.splash.id, card]));
@@ -330,6 +333,7 @@ export function StairBoard({
                 pinned={pinnedIds.has(card.splash.id)}
                 onPin={(pinned) => onPin(card, pinned)}
                 onDelete={() => onDelete(card)}
+                href={hrefFor?.(card.splash.id)}
               />
             ) : null;
           })}
@@ -356,6 +360,7 @@ function Step({
   pinned,
   onPin,
   onDelete,
+  href,
 }: {
   card: Card;
   index: number;
@@ -372,6 +377,7 @@ function Step({
   pinned: boolean;
   onPin: (pinned: boolean) => void;
   onDelete: () => void;
+  href?: string;
 }) {
   const reducedMotion = usePrefersReducedMotion();
   const frostGlass = useBackdropFrost();
@@ -470,6 +476,7 @@ function Step({
               lane={lane}
               initials={initials}
               edge="full"
+              href={href}
               onClickCapture={guard}
             />
             {onTop && !moving ? (
@@ -484,7 +491,9 @@ function Step({
           >
             {/* A step: its visible edge is a seat, one tap to the top. Sideways
                 the whole face is, the cards in front covering the rest. */}
-            {!moving ? (
+            {/* Live while cards move, too: a tap during a landing moves on
+                rather than waiting it out (review). */}
+            {stairSide !== 'top' ? (
               <button
                 type="button"
                 data-step-card={card.splash.id}

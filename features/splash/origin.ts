@@ -15,7 +15,7 @@ export function originOf(
   lanes: Pick<MyCategory, 'id' | 'name' | 'icon'>[],
 ): Origin {
   if (from && MONTH.test(from)) return { label: monthName(from), href: monthHref(from) };
-  const lanePage = from ? /^\/lane\/([^/?#]+)$/.exec(from) : null;
+  const lanePage = from ? /^\/lane\/([^/?#]+)(\?.*)?$/.exec(from) : null;
   if (from && lanePage) {
     const lane = lanes.find((l) => l.id === lanePage[1]);
     if (lane) return { label: [lane.icon, lane.name].filter(Boolean).join(' '), href: from };

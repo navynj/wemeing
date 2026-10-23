@@ -392,10 +392,23 @@ describe('the lane grid', () => {
     expect(wide.querySelector<HTMLElement>('[data-grid]')!.style.gridTemplateColumns).toContain(
       'repeat(7, 56px)',
     );
-    // The rail and the headers stay put: sticky inside the one scroller.
-    expect(wide.querySelector('[data-day-row]')!.className).toContain('sticky left-0');
-    expect(wide.querySelector('[data-lane-header]')!.className).toContain('sticky top-0');
-    expect(wide.style.touchAction).toBe('pan-x pan-y');
+    // One axis per scroller: the outer moves only up and down with the header
+    // bar sticky at its top; the inner moves only sideways, the rail sticky
+    // at its left.
+    expect(wide.className).toContain('overflow-x-hidden');
+    expect(wide.className).toContain('overflow-y-auto');
+    const across = wide.querySelector<HTMLElement>('[data-x-scroller]')!;
+    expect(across.className).toContain('overflow-x-auto');
+    expect(across.className).toContain('overflow-y-hidden');
+    expect(across.querySelector('[data-day-row]')!.className).toContain('sticky left-0');
+    expect(wide.querySelector('[data-grid-header]')!.className).toContain('sticky top-0');
+    expect(across.querySelector('[data-lane-header]')).toBeNull();
+    // The header bar follows the columns sideways.
+    across.scrollLeft = 40;
+    fireEvent.scroll(across);
+    expect(wide.querySelector<HTMLElement>('[data-grid-head]')!.style.transform).toBe(
+      'translateX(-40px)',
+    );
   });
 
   it('writes the short title under each mark, at six lanes and at eight', () => {
@@ -817,10 +830,10 @@ describe('pinned posts as cards (round 3)', () => {
 
 describe('the header and the Date view (round 3)', () => {
   it('has the lane glyph and the Lane | Date toggle, no Home title and no =', () => {
-    const { container, queryByText } = ground();
+    const { container } = ground();
     const header = container.querySelector('[data-home-header]')!;
     expect(header.querySelector('[data-manage-lanes] [data-lane-icon]')).not.toBeNull();
-    expect(queryByText('Home')).toBeNull();
+    expect(header.textContent).not.toContain('Home');
     const lanes = header.querySelector('[data-view-option="lane"]')!;
     expect(lanes.getAttribute('aria-selected')).toBe('true');
     expect(lanes.className).toContain('bg-white');
@@ -898,6 +911,25 @@ describe('a post\u2019s own icon (0008)', () => {
     window.localStorage.setItem('weming.home-view', 'date');
     const { container: list } = ground(withIcon);
     expect(list.querySelector('[data-pill="late"]')!.textContent).toContain('🎬');
+  });
+});
+
+describe('the Home button at the foot', () => {
+  it('switches the view on each tap, and the header toggle follows', () => {
+    const { container } = ground();
+    const home = container.querySelector('[data-home-foot] [data-home-tab]')!;
+    expect(home.textContent).toBe('Home');
+    expect(container.querySelector('[data-mark]')).not.toBeNull();
+    fireEvent.click(home);
+    expect(container.querySelector('[data-pill]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-view-option="date"]')!.getAttribute('aria-selected'),
+    ).toBe('true');
+    fireEvent.click(home);
+    expect(container.querySelector('[data-mark]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-view-option="lane"]')!.getAttribute('aria-selected'),
+    ).toBe('true');
   });
 });
 

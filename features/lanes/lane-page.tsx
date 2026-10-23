@@ -1,11 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useMemo, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 
-import { cardDate, type Card } from '@/features/home/grid';
+import { type Card } from '@/features/home/grid';
+import { PostRow } from '@/features/home/post-row';
 import { monthName } from '@/features/home/scope';
+import { StairBoard } from '@/features/home/stair-board';
+import { useFlip } from '@/features/home/use-flip';
+import { deleteRipple } from '@/features/ripple-sheet/actions';
+import { deleteSplash, setSplashPinned } from '@/features/splash/actions';
 import { monthKey } from '@/features/splash/summary';
 import type { MyCategory } from '@/lib/queries/profile';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
@@ -14,22 +20,55 @@ import { saveLane } from './actions';
 import { EmojiInput } from './emoji-input';
 
 /**
- * A lane's page (round 3): a breadcrumb, Home / the lane; where Home has
- * the avatar, the lane's emoji large with its name under it; then every
- * post on the lane as a pill — the date at the left, the title — newest
- * first, grouped by month under a small label. A pill opens the post's
- * page, which comes back here.
+ * A lane's page (round 3, review): a breadcrumb, Home / the lane; the lane's
+ * emoji large with its name under it; then every post on the lane as a row
+ * — the date, the icon, the title — newest first, grouped by month under a
+ * small label, separated only by faint white lines. Beneath, Home's card
+ * stack over this lane's posts: the row of the card on top is the one at
+ * full white, a row brings its post to the top, and the top card opens the
+ * post's page, which comes back here with the same card on top.
  *
  * Tapping the emoji or the name edits them in place — the emoji as the
  * one-grapheme field, the name as text — with Save and Cancel, shown at
  * once (CLAUDE.md, the principle). Deleting and reordering lanes stay in
- * lane management, linked at the foot.
+ * lane management, linked at the foot of the list.
  */
-export function LanePage({ lane, cards }: { lane: MyCategory; cards: Card[] }) {
+export function LanePage({
+  lane,
+  cards,
+  categories = [lane],
+  initials = '',
+  topParam = null,
+}: {
+  lane: MyCategory;
+  /** This lane's posts, newest first. */
+  cards: Card[];
+  categories?: MyCategory[];
+  initials?: string;
+  /** `?top=`: the post to open with on top, where a post's page sends this page back to. */
+  topParam?: string | null;
+}) {
+  const router = useRouter();
   const saved = useOptimisticAction({ name: lane.name, icon: lane.icon ?? '' });
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(lane.name);
   const [icon, setIcon] = useState(lane.icon ?? '');
+
+  // The stack, over this lane's posts; deletes and pins show at once.
+  const removed = useOptimisticAction<string[]>([]);
+  const pins = useOptimisticAction<string[]>(
+    cards.filter((card) => card.splash.pinnedAt).map((card) => card.splash.id),
+  );
+  const shown = useMemo(
+    () => cards.filter((card) => !removed.value.includes(card.splash.id)),
+    [cards, removed.value],
+  );
+  const ids = useMemo(() => shown.map((card) => card.splash.id), [shown]);
+  const [initialTop] = useState(() =>
+    topParam && ids.includes(topParam) ? topParam : (ids[0] ?? null),
+  );
+  const flip = useFlip(ids, initialTop, -1);
+  const here = `/lane/${lane.id}`;
 
   function start(): void {
     setName(saved.value.name);
@@ -47,131 +86,156 @@ export function LanePage({ lane, cards }: { lane: MyCategory; cards: Card[] }) {
   }
 
   const months: { month: string; cards: Card[] }[] = [];
-  for (const card of cards) {
+  for (const card of shown) {
     const month = monthKey(card.day);
     const last = months[months.length - 1];
     if (last && last.month === month) last.cards.push(card);
     else months.push({ month, cards: [card] });
   }
-  const here = `/lane/${lane.id}`;
+  const shownLane = { ...lane, name: saved.value.name, icon: saved.value.icon };
 
   return (
     <div
       data-lane-page={lane.id}
-      className="mx-auto flex w-full max-w-xl flex-1 flex-col px-6 pb-10"
-      style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
+      className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col"
+      style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
     >
-      <nav aria-label="Breadcrumb" data-breadcrumb className="flex items-center gap-1 text-sm">
-        <Link href="/" className="font-medium text-white">
-          Home
-        </Link>
-        <ChevronRight aria-hidden size={14} className="text-white/50" />
-        <span className="text-white/70">{saved.value.name}</span>
-      </nav>
+      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-6 pt-4 pb-6">
+        <nav aria-label="Breadcrumb" data-breadcrumb className="flex items-center gap-1 text-sm">
+          <Link href="/" className="font-medium text-white">
+            Home
+          </Link>
+          <ChevronRight aria-hidden size={14} className="text-white/50" />
+          <span className="text-white/70">{saved.value.name}</span>
+        </nav>
 
-      <header className="flex flex-col items-center gap-2 pt-6 pb-8">
-        {editing ? (
-          <div data-lane-edit className="flex w-full flex-col items-center gap-3">
-            <EmojiInput value={icon} onChange={setIcon} label="Lane icon" />
-            <input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              aria-label="Lane name"
-              maxLength={24}
-              className="text-ink w-full max-w-60 rounded-full bg-white px-4 py-2 text-center text-base outline-none"
-            />
-            <span className="flex gap-4 text-sm">
+        <header className="flex flex-col items-center gap-2 pt-6 pb-8">
+          {editing ? (
+            <div data-lane-edit className="flex w-full flex-col items-center gap-3">
+              <EmojiInput value={icon} onChange={setIcon} label="Lane icon" />
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                aria-label="Lane name"
+                maxLength={24}
+                className="text-ink w-full max-w-60 rounded-full bg-white px-4 py-2 text-center text-base outline-none"
+              />
+              <span className="flex gap-4 text-sm">
+                <button
+                  type="button"
+                  onClick={save}
+                  disabled={!name.trim() || !icon.trim()}
+                  className="text-main-900 rounded-full bg-white px-4 py-1.5 font-semibold disabled:opacity-50"
+                >
+                  Save
+                </button>
+                <button type="button" onClick={() => setEditing(false)} className="text-white/70">
+                  Cancel
+                </button>
+              </span>
+            </div>
+          ) : (
+            <>
               <button
                 type="button"
-                onClick={save}
-                disabled={!name.trim() || !icon.trim()}
-                className="text-main-900 rounded-full bg-white px-4 py-1.5 font-semibold disabled:opacity-50"
+                aria-label="Edit the lane icon"
+                data-lane-emoji
+                onClick={start}
+                className="flex h-20 w-20 items-center justify-center rounded-full bg-white/15 text-5xl/none"
               >
-                Save
+                {saved.value.icon}
               </button>
-              <button type="button" onClick={() => setEditing(false)} className="text-white/70">
-                Cancel
+              <button
+                type="button"
+                aria-label="Edit the lane name"
+                data-lane-name
+                onClick={start}
+                className="text-xl font-semibold text-white"
+              >
+                {saved.value.name}
               </button>
-            </span>
-          </div>
+            </>
+          )}
+          {saved.message ? (
+            <p role="alert" className="text-sm text-white/80">
+              {saved.message}
+            </p>
+          ) : null}
+        </header>
+
+        {months.length === 0 ? (
+          <p className="py-10 text-center text-sm text-white/60">Nothing on this lane yet.</p>
         ) : (
-          <>
-            <button
-              type="button"
-              aria-label="Edit the lane icon"
-              data-lane-emoji
-              onClick={start}
-              className="flex h-20 w-20 items-center justify-center rounded-full bg-white/15 text-5xl/none"
-            >
-              {saved.value.icon}
-            </button>
-            <button
-              type="button"
-              aria-label="Edit the lane name"
-              data-lane-name
-              onClick={start}
-              className="text-xl font-semibold text-white"
-            >
-              {saved.value.name}
-            </button>
-          </>
-        )}
-        {saved.message ? (
-          <p role="alert" className="text-sm text-white/80">
-            {saved.message}
-          </p>
-        ) : null}
-      </header>
-
-      {months.length === 0 ? (
-        <p className="py-10 text-center text-sm text-white/60">Nothing on this lane yet.</p>
-      ) : (
-        <div data-lane-posts className="flex flex-col gap-6">
-          {months.map(({ month, cards: inMonth }) => (
-            <section key={month} className="flex flex-col gap-2">
-              <h2 data-lane-month className="text-[11px] font-medium text-white/60">
-                {monthName(month)} {month.slice(0, 4)}
-              </h2>
-              <ol className="flex flex-col gap-1.5">
-                {inMonth.map((card) => {
-                  const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
-                  return (
-                    <li key={card.splash.id}>
-                      <Link
-                        href={`/splash/${card.splash.id}?from=${encodeURIComponent(here)}`}
-                        data-lane-post={card.splash.id}
-                        className="text-ink flex items-center gap-3 rounded-full bg-white py-2 pr-4 pl-4"
-                      >
-                        <span className="text-pool-500 w-24 shrink-0 text-xs tabular-nums">
-                          {cardDate(card.day)}
-                        </span>
-                        <span aria-hidden className="shrink-0 text-base/none">
-                          {card.splash.icon ?? saved.value.icon}
-                        </span>
-                        <span
-                          className={`min-w-0 truncate text-sm font-semibold ${
-                            card.splash.title.trim() ? '' : 'opacity-50'
-                          }`}
-                        >
-                          {title}
-                        </span>
-                      </Link>
+          <div data-lane-posts className="flex flex-col gap-6">
+            {months.map(({ month, cards: inMonth }) => (
+              <section key={month} className="flex flex-col">
+                <h2 data-lane-month className="pb-1 text-[11px] font-medium text-white/60">
+                  {monthName(month)} {month.slice(0, 4)}
+                </h2>
+                <ol className="flex flex-col">
+                  {inMonth.map((card) => (
+                    <li key={card.splash.id} data-lane-post={card.splash.id}>
+                      <PostRow
+                        card={card}
+                        lane={shownLane}
+                        current={card.splash.id === flip.heading}
+                        ring={null}
+                        lead="date"
+                        onPick={flip.bringForward}
+                      />
                     </li>
-                  );
-                })}
-              </ol>
-            </section>
-          ))}
-        </div>
-      )}
+                  ))}
+                </ol>
+              </section>
+            ))}
+          </div>
+        )}
 
-      <Link
-        href="/?manage=lanes"
-        data-manage-lanes-link
-        className="mt-10 self-center text-sm text-white/70 underline-offset-4 hover:underline"
+        <Link
+          href="/?manage=lanes"
+          data-manage-lanes-link
+          className="mt-10 block text-center text-sm text-white/70 underline-offset-4 hover:underline"
+        >
+          Manage lanes
+        </Link>
+      </div>
+
+      {/* Home's stack over this lane's posts, at the foot of the page. */}
+      <div
+        data-lane-stack
+        className="shrink-0 pt-2"
+        style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}
       >
-        Manage lanes
-      </Link>
+        <StairBoard
+          cards={shown}
+          flip={flip}
+          categories={categories}
+          initials={initials}
+          pinnedIds={new Set(pins.value)}
+          onPin={(card, on) =>
+            pins.run(
+              (current) =>
+                on ? [...current, card.splash.id] : current.filter((id) => id !== card.splash.id),
+              () => setSplashPinned(card.splash.id, on),
+            )
+          }
+          onDelete={(card) =>
+            removed.run(
+              (current) => [...current, card.splash.id],
+              async () => {
+                const result = card.splash.orphan
+                  ? await deleteRipple(card.splash.id)
+                  : await deleteSplash(card.splash.id);
+                if (result.ok) router.refresh();
+                return result.ok
+                  ? { ok: true }
+                  : { ok: false, message: 'That could not be deleted.' };
+              },
+            )
+          }
+          hrefFor={(id) => `/splash/${id}?from=${encodeURIComponent(`${here}?top=${id}`)}`}
+        />
+      </div>
     </div>
   );
 }

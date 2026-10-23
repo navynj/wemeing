@@ -45,6 +45,7 @@ export function CardFace({
   initials,
   edge,
   ink = 'blue',
+  href,
   onClickCapture,
 }: {
   card: Card;
@@ -54,6 +55,8 @@ export function CardFace({
   edge: 'full' | 'top' | 'bottom' | 'left' | 'right';
   /** The title's colour: blue on a pale face, white on a card in the water. */
   ink?: 'blue' | 'white';
+  /** Where the full card opens: the post's page, coming back to Home by default. */
+  href?: string;
   onClickCapture?: (event: React.MouseEvent) => void;
 }) {
   const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
@@ -113,7 +116,7 @@ export function CardFace({
   }
   return (
     <Link
-      href={splashFromHome(card.splash.id)}
+      href={href ?? splashFromHome(card.splash.id)}
       data-card-link={card.splash.id}
       onClickCapture={onClickCapture}
       draggable={false}

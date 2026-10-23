@@ -15,6 +15,13 @@ describe('the back chip on a post’s page', () => {
     });
   });
 
+  it('names the lane page with the card it should come back to on top', () => {
+    expect(originOf('/lane/c-media?top=s1', '2026-10-23', LANES)).toEqual({
+      label: '🎬 Media',
+      href: '/lane/c-media?top=s1',
+    });
+  });
+
   it('names Home when Home sent it, with the way back to the same card', () => {
     expect(originOf('/?top=s1', '2026-10-23', LANES)).toEqual({ label: 'Home', href: '/?top=s1' });
   });

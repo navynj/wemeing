@@ -145,6 +145,23 @@ describe('the first line is the title (SPEC 6)', () => {
     expect(handoffs[0].splash).toMatchObject({ title: 'Whistler', count: 0, ghostTitle: null });
   });
 
+  it('keeps a title-only post’s date as its own declaration, with no ripple to carry it', async () => {
+    const view = sheet();
+    fireEvent.change(view.getByLabelText('Title'), { target: { value: 'Whistler' } });
+    fireEvent.change(view.getByLabelText('Date'), { target: { value: '2026-09-20' } });
+    fireEvent.click(view.drop());
+    await waitFor(() => expect(drops).toHaveLength(1));
+    expect(drops[0]).toMatchObject({ declaredStart: '2026-09-20', declaredEnd: null, body: '' });
+  });
+
+  it('leaves the declaration empty when the date rides on the first ripple', async () => {
+    const view = sheet();
+    fireEvent.change(view.getByLabelText('Content'), { target: { value: 'a' } });
+    fireEvent.click(view.drop());
+    await waitFor(() => expect(drops).toHaveLength(1));
+    expect(drops[0]).toMatchObject({ declaredStart: null, occurredOn: TODAY });
+  });
+
   it('commits a line in the content alone as an untitled post whose line is its block', async () => {
     const view = sheet();
     expect(view.drop().disabled).toBe(true);

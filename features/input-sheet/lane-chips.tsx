@@ -26,7 +26,7 @@ export function LaneChips({
   onSelect,
   surface = 'pool',
 }: {
-  categories: MyCategory[];
+  categories: Pick<MyCategory, 'id' | 'name' | 'icon'>[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   /** The row's own ground: the old sheet's grey band, or a white page. */

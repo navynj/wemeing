@@ -4,11 +4,19 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { COLUMN_MAX_WIDTH } from '@/components/ui/column';
+import { AnnotationControl } from '@/features/input-sheet/annotation-control';
+import {
+  annotationVerdict,
+  spanIsEmpty,
+  spanKeys,
+  type Annotation,
+} from '@/features/input-sheet/draft';
 import { LaneChips } from '@/features/input-sheet/lane-chips';
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { EmojiInput } from '@/features/lanes/emoji-input';
 import { linkedPools } from '@/features/pool/audience';
 import { AudienceChip } from '@/features/pool/audience-sheet';
+import { wallClockToInstant } from '@/lib/ripple-kind';
 
 import { loadSplashEdit, saveSplashEdit, type SplashEditState } from './edit-actions';
 import { SHEET_MAX_HEIGHT, type SheetContext } from './splash-sheet';
@@ -112,7 +120,19 @@ type Edit = {
   declaredLaneId: string | null;
   share: { poolId: string; on: boolean }[];
   poolId: string | null;
+  block: {
+    rippleId: string;
+    occurredOn: string | null;
+    occurredTime: string | null;
+    startInstant: string | null;
+    endInstant: string | null;
+  } | null;
 };
+
+/** The same annotation, compared on what it says. */
+function sameAnnotation(a: Annotation | null, b: Annotation | null): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
 
 function EditForm({
   initial,
@@ -125,11 +145,13 @@ function EditForm({
   onCancel: () => void;
   onSave: (edit: Edit) => void;
 }) {
-  const { categories, links, pools } = context;
+  const { categories, links, pools, today, timeZone } = context;
   const [title, setTitle] = useState(initial.title);
   const [icon, setIcon] = useState(initial.icon ?? '');
-  const [start, setStart] = useState(initial.declaredStart ?? '');
-  const [end, setEnd] = useState(initial.declaredEnd ?? '');
+  // The composer's own date control (review), prefilled from where the date
+  // lives: a declaration's days, or the first ripple's annotation.
+  const [annotation, setAnnotation] = useState<Annotation | null>(initial.annotation);
+  const declared = initial.date.source === 'declared';
   const [laneId, setLaneId] = useState<string | null>(initial.declaredLaneId);
   const [shared, setShared] = useState<string[]>(initial.shared);
   const mine = initial.kind === 'mine';
@@ -140,11 +162,43 @@ function EditForm({
   const changed =
     title.trim() !== initial.title ||
     (icon || null) !== initial.icon ||
-    (!joint && (start || null) !== initial.declaredStart) ||
-    (!joint && (end || null) !== initial.declaredEnd) ||
+    (!joint && !sameAnnotation(annotation, initial.annotation)) ||
     (mine && laneId !== initial.declaredLaneId) ||
     (mine && [...shared].sort().join() !== [...initial.shared].sort().join());
-  const rangeOk = !end || (start !== '' && end >= start);
+  const rangeOk = !annotation || annotationVerdict(annotation) === 'ok';
+
+  /** Where the edited date goes: the declaration, or the first ripple's annotation. */
+  function dates(): Pick<Edit, 'declaredStart' | 'declaredEnd' | 'block'> {
+    const a = annotation;
+    if (joint || sameAnnotation(a, initial.annotation)) {
+      return {
+        declaredStart: initial.declaredStart,
+        declaredEnd: initial.declaredEnd,
+        block: null,
+      };
+    }
+    if (declared || initial.date.source !== 'block') {
+      const end = a?.endDate && a.endDate !== a.date ? a.endDate : null;
+      return { declaredStart: a?.date ?? null, declaredEnd: end, block: null };
+    }
+    const startInstant =
+      a && a.time ? wallClockToInstant(a.date, a.time, timeZone).toISOString() : null;
+    const span = a && !spanIsEmpty(a) ? spanKeys(a) : null;
+    const endInstant = span?.end
+      ? wallClockToInstant(span.end.slice(0, 10), span.end.slice(11), timeZone).toISOString()
+      : null;
+    return {
+      declaredStart: initial.declaredStart,
+      declaredEnd: initial.declaredEnd,
+      block: {
+        rippleId: initial.date.rippleId,
+        occurredOn: a?.date ?? null,
+        occurredTime: a?.time ?? null,
+        startInstant,
+        endInstant,
+      },
+    };
+  }
 
   return (
     <div data-edit-form={initial.kind} className="flex flex-col gap-5">
@@ -166,36 +220,15 @@ function EditForm({
           A joint splash belongs to {poolName}: its title and icon are everyone&apos;s to edit.
         </p>
       ) : (
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <label className="text-pool-500 flex items-center gap-2">
-            From
-            <input
-              type="date"
-              value={start}
-              onChange={(event) => setStart(event.target.value)}
-              aria-label="Start date"
-              className="text-ink bg-pool-100 rounded-lg px-2 py-1"
-            />
-          </label>
-          <label className="text-pool-500 flex items-center gap-2">
-            to
-            <input
-              type="date"
-              value={end}
-              onChange={(event) => setEnd(event.target.value)}
-              aria-label="End date"
-              className="text-ink bg-pool-100 rounded-lg px-2 py-1"
-            />
-          </label>
-          {start || end ? (
-            <button
-              type="button"
-              onClick={() => (setStart(''), setEnd(''))}
-              className="text-pool-500 text-xs"
-            >
-              Clear dates
-            </button>
-          ) : null}
+        <div data-edit-date>
+          <AnnotationControl
+            annotation={annotation}
+            today={today}
+            onChange={setAnnotation}
+            // A splash's own days have no clock; a ripple's annotation may.
+            clock={!declared}
+            label="+ Add Date"
+          />
         </div>
       )}
 
@@ -249,8 +282,7 @@ function EditForm({
               kind: initial.kind,
               title: title.trim(),
               icon: icon || null,
-              declaredStart: joint ? initial.declaredStart : start || null,
-              declaredEnd: joint ? initial.declaredEnd : end || null,
+              ...dates(),
               declaredLaneId: mine ? laneId : null,
               // Only the switches that moved.
               share: mine

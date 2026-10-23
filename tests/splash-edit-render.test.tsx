@@ -7,19 +7,22 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {} }),
 }));
 const saved: Record<string, unknown>[] = [];
+const JOINT = {
+  ok: true,
+  kind: 'joint',
+  title: 'Arnak league',
+  icon: '🏛️',
+  declaredStart: null,
+  declaredEnd: null,
+  declaredLaneId: null,
+  shared: [],
+  poolId: 'p-ours',
+  date: { source: 'declared' },
+  annotation: null,
+};
+const loaded = vi.hoisted(() => ({ state: null as unknown }));
 vi.mock('@/features/splash-sheet/edit-actions', () => ({
-  loadSplashEdit: () =>
-    Promise.resolve({
-      ok: true,
-      kind: 'joint',
-      title: 'Arnak league',
-      icon: '🏛️',
-      declaredStart: null,
-      declaredEnd: null,
-      declaredLaneId: null,
-      shared: [],
-      poolId: 'p-ours',
-    }),
+  loadSplashEdit: () => Promise.resolve(loaded.state ?? JOINT),
   saveSplashEdit: (input: Record<string, unknown>) => {
     saved.push(input);
     return Promise.resolve({ ok: true });
@@ -32,7 +35,11 @@ import { InputSheetProvider, useInputSheet } from '@/features/input-sheet/sheet-
 import { SplashEditSheet } from '@/features/splash-sheet/splash-edit-sheet';
 import type { SplashSummary } from '@/features/splash/summary';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  loaded.state = null;
+  saved.length = 0;
+});
 
 const SUMMARY = {
   id: 's-joint',
@@ -103,7 +110,7 @@ describe('editing a joint splash (review)', () => {
       expect(view.container.querySelector('[data-edit-form="joint"]')).not.toBeNull(),
     );
     // No dates, no lane, no audience on a joint splash.
-    expect(view.queryByLabelText('Start date')).toBeNull();
+    expect(view.container.querySelector('[data-edit-date]')).toBeNull();
     expect(view.container.querySelector('[data-audience-chip]')).toBeNull();
     const save = view.container.querySelector('[data-edit-save]') as HTMLButtonElement;
     expect(save.disabled).toBe(true);
@@ -119,5 +126,84 @@ describe('editing a joint splash (review)', () => {
       icon: '🏛️',
     });
     expect(view.container.querySelector('[data-pending]')!.textContent).toContain('Arnak finals');
+  });
+});
+
+const CONTEXT = {
+  categories: [],
+  timeZone: 'America/Vancouver',
+  today: '2026-10-23',
+  links: [],
+  pools: [{ id: 'p-ours', name: 'Our Pool' }],
+  initials: 'YL',
+};
+
+async function open(state: Record<string, unknown>) {
+  loaded.state = { ...JOINT, ...state };
+  const view = render(
+    <InputSheetProvider>
+      <SplashEditSheet splashId="s-1" context={CONTEXT} onClose={() => {}} />
+    </InputSheetProvider>,
+  );
+  await waitFor(() => expect(view.container.querySelector('[data-edit-form]')).not.toBeNull());
+  return view;
+}
+
+const save = async (view: ReturnType<typeof render>) => {
+  await act(async () => {
+    fireEvent.click(view.container.querySelector('[data-edit-save]')!);
+  });
+};
+
+describe('a splash’s date in the edit sheet (review)', () => {
+  it('opens with the date and time the composer put on its first ripple, not a range', async () => {
+    const view = await open({
+      kind: 'mine',
+      title: 'Coffee',
+      date: { source: 'block', rippleId: 'r-first' },
+      annotation: { date: '2026-10-20', time: '14:30', endDate: null, endTime: null },
+    });
+    expect((view.getByLabelText('Date') as HTMLInputElement).value).toBe('2026-10-20');
+    expect((view.getByLabelText('Time') as HTMLInputElement).value).toBe('14:30');
+    expect(view.queryByLabelText('End date')).toBeNull();
+    expect(view.container.textContent).not.toMatch(/From/);
+    expect((view.container.querySelector('[data-edit-save]') as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+
+    fireEvent.change(view.getByLabelText('Date'), { target: { value: '2026-10-21' } });
+    await save(view);
+    expect(saved[0]).toMatchObject({
+      declaredStart: null,
+      declaredEnd: null,
+      block: {
+        rippleId: 'r-first',
+        occurredOn: '2026-10-21',
+        occurredTime: '14:30',
+        // 14:30 in Vancouver.
+        startInstant: '2026-10-21T21:30:00.000Z',
+        endInstant: null,
+      },
+    });
+  });
+
+  it('opens a declared range as its days, with no clock, and saves the declaration', async () => {
+    const view = await open({
+      kind: 'mine',
+      title: 'Whistler',
+      declaredStart: '2026-10-10',
+      declaredEnd: '2026-10-12',
+      annotation: { date: '2026-10-10', time: null, endDate: '2026-10-12', endTime: null },
+    });
+    expect((view.getByLabelText('Date') as HTMLInputElement).value).toBe('2026-10-10');
+    expect((view.getByLabelText('End date') as HTMLInputElement).value).toBe('2026-10-12');
+    expect(view.queryByText('+ add time')).toBeNull();
+    fireEvent.change(view.getByLabelText('End date'), { target: { value: '2026-10-13' } });
+    await save(view);
+    expect(saved[0]).toMatchObject({
+      declaredStart: '2026-10-10',
+      declaredEnd: '2026-10-13',
+      block: null,
+    });
   });
 });

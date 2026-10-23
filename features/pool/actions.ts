@@ -422,16 +422,19 @@ export async function dropOwnPoolSplash(input: z.infer<typeof OwnDrop>): Promise
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, message: 'Sign in again to drop this.' };
 
+  const hasBlock = Boolean(drop.body) || drop.media.length > 0;
   const { error } = await supabase.rpc('create_own_pool_splash', {
     p_id: drop.id,
     p_pool: drop.poolId,
     p_pool_lane: drop.poolLaneId,
     p_title: drop.title,
     ...(drop.icon ? { p_icon: drop.icon } : {}),
+    // With no ripple to carry it, the date is the splash's own (review).
+    ...(!hasBlock && drop.occurredOn ? { p_declared_start: drop.occurredOn } : {}),
   });
   if (error) return { ok: false, message: said(error) };
 
-  if (drop.body || drop.media.length > 0) {
+  if (hasBlock) {
     const { error: blockError } = await supabase.from('ripples').insert({
       author_id: user.id,
       category_id: null,

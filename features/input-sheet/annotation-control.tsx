@@ -23,10 +23,15 @@ export function AnnotationControl({
   annotation,
   today,
   onChange,
+  clock = true,
+  label = '+ Add Time',
 }: {
   annotation: Annotation | null;
   today: IsoDate;
   onChange: (next: Annotation | null) => void;
+  /** False for a splash's own dates, which are days with no clock (H21f). */
+  clock?: boolean;
+  label?: string;
 }) {
   // The clock field is shown once asked for, even while still empty.
   const [clockOpen, setClockOpen] = useState(annotation?.time !== null);
@@ -38,7 +43,7 @@ export function AnnotationControl({
           setClockOpen(false);
           onChange({ date: today, time: null, endDate: null, endTime: null });
         }}
-        label="+ Add Time"
+        label={label}
       />
     );
   }
@@ -61,7 +66,7 @@ export function AnnotationControl({
           onChange={(event) => event.target.value && set({ date: event.target.value })}
           className={field}
         />
-        {clockOpen || annotation.time !== null ? (
+        {!clock ? null : clockOpen || annotation.time !== null ? (
           <input
             type="time"
             lang="en"

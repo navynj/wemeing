@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
+import { draftFrom, type Annotation } from '@/features/input-sheet/draft';
 import { setPlacement } from '@/features/pool/actions';
 import { updateSplashHeader } from '@/features/splash/actions';
 import { createClient } from '@/lib/supabase/server';
@@ -22,6 +23,13 @@ export type SplashEditState =
       shared: string[];
       /** The pool a Just-mine or joint splash lives in. */
       poolId: string | null;
+      /**
+       * Where the splash's date lives (review): its own declared days, or —
+       * as the composer writes it — the annotation on my first ripple.
+       */
+      date: { source: 'declared' } | { source: 'block'; rippleId: string };
+      /** That date as the composer's control shows it; null when unset. */
+      annotation: Annotation | null;
     }
   | { ok: false; message: string };
 
@@ -45,6 +53,34 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
   if (!joint && splash.owner_id !== user.id) {
     return { ok: false, message: 'Only its author edits this splash.' };
   }
+  const [{ data: profile }, { data: first }] = await Promise.all([
+    supabase.from('profiles').select('timezone').eq('id', user.id).single(),
+    supabase
+      .from('ripples')
+      .select(
+        'id, category_id, note, media, occurred_on, occurred_time, ended_at, started_at, splash_id',
+      )
+      .eq('splash_id', id)
+      .eq('author_id', user.id)
+      .is('parent_ripple_id', null)
+      .order('created_at')
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  // A declaration wins where there is one; otherwise the date is the first
+  // ripple's, where the composer put it; with no ripple, a declaration to be.
+  const onBlock = !splash.declared_start && first;
+  const annotation: Annotation | null = splash.declared_start
+    ? {
+        date: splash.declared_start,
+        time: null,
+        endDate: splash.declared_end,
+        endTime: null,
+      }
+    : first
+      ? draftFrom(first, profile?.timezone ?? 'UTC').annotation
+      : null;
+
   let shared: string[] = [];
   if (!joint && !splash.own_pool_id) {
     const { data } = await supabase
@@ -64,8 +100,13 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
     declaredLaneId: splash.declared_lane_id,
     shared,
     poolId: splash.pool_id ?? splash.own_pool_id,
+    date: onBlock ? { source: 'block', rippleId: first.id } : { source: 'declared' },
+    annotation,
   };
 }
+
+const CLOCK = /^\d{2}:\d{2}$/;
+const ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 const Edit = z.object({
   id: z.uuid(),
@@ -84,6 +125,16 @@ const Edit = z.object({
   /** Mine only: switches to flip, pool by pool. */
   share: z.array(z.object({ poolId: z.uuid(), on: z.boolean() })).max(24),
   poolId: z.uuid().nullable(),
+  /** The first ripple's annotation, when that is where the date lives; else untouched. */
+  block: z
+    .object({
+      rippleId: z.uuid(),
+      occurredOn: z.string().regex(ISO).nullable(),
+      occurredTime: z.string().regex(CLOCK).nullable(),
+      startInstant: z.iso.datetime().nullable(),
+      endInstant: z.iso.datetime().nullable(),
+    })
+    .nullable(),
 });
 
 /**
@@ -124,6 +175,34 @@ export async function saveSplashEdit(
     declaredLaneId: edit.kind === 'own' ? null : edit.declaredLaneId,
   });
   if (!header.ok) return header;
+  const supabase = await createClient();
+  if (edit.block) {
+    const b = edit.block;
+    if (b.occurredTime !== null && b.occurredOn === null) {
+      return { ok: false, message: 'A time needs a date.' };
+    }
+    if (
+      b.endInstant !== null &&
+      (b.occurredOn === null ||
+        (b.startInstant !== null && Date.parse(b.endInstant) <= Date.parse(b.startInstant)))
+    ) {
+      return { ok: false, message: 'That end is before the start.' };
+    }
+    // The same write a block's own editor makes (updateRipple), the date only.
+    const { error } = await supabase
+      .from('ripples')
+      .update({
+        occurred_on: b.occurredOn,
+        occurred_time: b.occurredTime,
+        ended_at: b.endInstant ?? b.startInstant,
+      })
+      .eq('id', b.rippleId)
+      .eq('splash_id', edit.id);
+    if (error) return { ok: false, message: error.message };
+  }
+  revalidatePath('/');
+  revalidatePath(`/splash/${edit.id}`);
+  if (edit.poolId) revalidatePath(`/pool/${edit.poolId}/splash/${edit.id}`);
   if (edit.kind === 'mine') {
     for (const { poolId, on } of edit.share) {
       const done = await setPlacement(edit.id, poolId, on);

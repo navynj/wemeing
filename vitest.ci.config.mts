@@ -40,6 +40,7 @@ const NEEDS_LOCAL_STACK = [
   'tests/pool-delete.test.ts',
   'tests/joint-ripple-lane.test.ts',
   'tests/avatars-db.test.ts',
+  'tests/splash-edit-db.test.ts',
 ];
 
 export default defineConfig({

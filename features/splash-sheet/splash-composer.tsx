@@ -157,13 +157,18 @@ export function SplashComposer({
       : null;
     const id = crypto.randomUUID();
     const now = new Date();
+    // With no ripple to carry it, the date is the post's own declaration
+    // (review): days only, as a declaration has no clock.
+    const hasBlock = body.length > 0 || mediaPaths.length > 0;
+    const declaredStart = !hasBlock && a ? a.date : null;
+    const declaredEnd = !hasBlock && a?.endDate && a.endDate !== a.date ? a.endDate : null;
     const input = {
       id,
       title,
       body,
       media: mediaPaths,
-      declaredStart: null,
-      declaredEnd: null,
+      declaredStart,
+      declaredEnd,
       declaredLaneId: laneId,
       icon: icon || null,
       occurredOn: a?.date ?? null,
@@ -175,14 +180,13 @@ export function SplashComposer({
 
     // The post as the ground should show it, summarised the way the page
     // summarises a real one.
-    const hasBlock = body.length > 0 || mediaPaths.length > 0;
     const splash = summarizeSplash(
       {
         id,
         owner_id: '',
         title,
-        declared_start: null,
-        declared_end: null,
+        declared_start: declaredStart,
+        declared_end: declaredEnd,
         declared_lane_id: laneId,
         icon: icon || null,
         session_id: null,

@@ -871,6 +871,18 @@ describe('the header and the Date view (round 3)', () => {
     expect(row!.getAttribute('data-day-row')).toBe('2026-09-20');
   });
 
+  it('spaces every day alike: no gap rows, the month on a line of its own', async () => {
+    window.localStorage.setItem('weming.home-view', 'date');
+    const { container } = ground();
+    await grown(container);
+    expect(container.querySelector('[data-day-row][data-gap]')).toBeNull();
+    const cells = [...container.querySelectorAll<HTMLElement>('[data-cell="date"]')];
+    expect(new Set(cells.map((c) => c.className)).size).toBe(1);
+    const months = [...container.querySelectorAll('[data-month-label]')];
+    expect(months.map((m) => m.textContent)).toEqual(['2026 SEP', '2026 AUG']);
+    for (const month of months) expect(month.hasAttribute('data-day-row')).toBe(false);
+  });
+
   it('rings the top card\u2019s pill, and a tapped pill comes to the top', async () => {
     window.localStorage.setItem('weming.home-view', 'date');
     const { container } = ground();

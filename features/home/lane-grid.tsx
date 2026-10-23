@@ -414,7 +414,11 @@ export const LaneGrid = forwardRef<
           style={{ gridTemplateColumns: template, gridAutoRows: 'auto' }}
         >
           {rows.map((row, index) => {
+            // The Date view draws no gaps: every day it lists sits the same
+            // distance from the next, however many empty days lie between
+            // (review).
             if (row.kind === 'gap') {
+              if (dateView) return null;
               return (
                 <GapRow
                   key={row.from}
@@ -444,24 +448,22 @@ export const LaneGrid = forwardRef<
               ));
             if (dateView) {
               return (
-                <DayRow key={day} day={day} monthChanges={monthChanges}>
-                  <div data-cell="date" className="flex min-w-0 flex-col py-1 pr-4">
-                    {(byDay.get(day) ?? []).map((card) => {
-                      const laneId = cardLane(card.splash);
-                      return (
-                        <PostRow
-                          key={card.splash.id}
-                          card={card}
-                          lane={laneId ? (byLaneId.get(laneId) ?? null) : null}
-                          current={!waterIds.has(card.splash.id)}
-                          ring={ringAt?.id === card.splash.id ? ringAt.seq : null}
-                          lead="lane"
-                          onPick={onPick}
-                        />
-                      );
-                    })}
-                  </div>
-                </DayRow>
+                <DateDay key={day} day={day} monthChanges={monthChanges}>
+                  {(byDay.get(day) ?? []).map((card) => {
+                    const laneId = cardLane(card.splash);
+                    return (
+                      <PostRow
+                        key={card.splash.id}
+                        card={card}
+                        lane={laneId ? (byLaneId.get(laneId) ?? null) : null}
+                        current={!waterIds.has(card.splash.id)}
+                        ring={ringAt?.id === card.splash.id ? ringAt.seq : null}
+                        lead="lane"
+                        onPick={onPick}
+                      />
+                    );
+                  })}
+                </DateDay>
               );
             }
             return (
@@ -520,6 +522,46 @@ function DayRow({
   );
 }
 
+/**
+ * A day in the Date view (review): every day spaced alike. The month, when
+ * it changes, is a line of its own above the day rather than a taller rail,
+ * so no day's rows sit apart differently; the day number and weekday align
+ * with its first row; one fixed space follows each day.
+ */
+function DateDay({
+  day,
+  monthChanges,
+  children,
+}: {
+  day: IsoDate;
+  monthChanges: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <>
+      {monthChanges ? (
+        <div
+          data-month-label
+          className="col-span-full pt-1 pb-1 pl-6 text-[8px]/none font-medium text-white/50"
+        >
+          {day.slice(0, 4)} {monthAbbrev(day)}
+        </div>
+      ) : null}
+      <div
+        data-day-row={day}
+        data-labelled=""
+        className="bg-main-900 sticky left-0 z-10 flex flex-col gap-0.5 pt-3 pr-2 pl-6 text-white/70"
+      >
+        <span className="text-sm/none font-medium tabular-nums">{Number(day.slice(8, 10))}</span>
+        <span className="text-[8px]/none font-medium text-white/50">{weekdayOf(day)}</span>
+      </div>
+      <div data-cell="date" className="flex min-w-0 flex-col pr-4 pb-5">
+        {children}
+      </div>
+    </>
+  );
+}
+
 /** A run of empty days, compressed to one short row of empty ropes: the rail says nothing. */
 function GapRow({
   from,
@@ -550,12 +592,16 @@ function GapRow({
   );
 }
 
-/** The row that holds a day: its own, or the gap its run is compressed into. */
+/**
+ * The row that holds a day: its own, or the gap its run is compressed into;
+ * in the Date view, which draws no gaps, the next older day it lists.
+ */
 function rowHolding(scroller: HTMLElement, day: IsoDate): HTMLElement | null {
   for (const row of scroller.querySelectorAll<HTMLElement>('[data-day-row]')) {
     const from = row.getAttribute('data-day-row') ?? '';
     const to = row.getAttribute('data-day-to') ?? from;
     if (day <= from && day >= to) return row;
+    if (from < day) return row;
   }
   return null;
 }

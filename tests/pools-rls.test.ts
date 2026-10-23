@@ -227,6 +227,43 @@ describe('placement', () => {
   });
 });
 
+describe('a post’s audience (H23)', () => {
+  it('lets members read a ripple added later to a shared post', async () => {
+    const { data: later } = await asUser(ana)
+      .from('ripples')
+      .insert({
+        author_id: ana,
+        category_id: ANA_TRIPS,
+        note: 'one more day',
+        splash_id: ANA_OLD_POST,
+      })
+      .select('id')
+      .single();
+    const { data } = await asUser(ben).from('ripples').select('note').eq('id', later!.id);
+    expect(data).toEqual([{ note: 'one more day' }]);
+  });
+
+  it('hides every ripple of a post switched off, and shows them again switched on', async () => {
+    const visible = async (): Promise<number> =>
+      (await asUser(ben).from('ripples').select('id').eq('splash_id', ANA_OLD_POST)).data!.length;
+    expect(await visible()).toBeGreaterThan(1);
+
+    await asUser(ana)
+      .from('splash_placements')
+      .update({ shared: false })
+      .eq('splash_id', ANA_OLD_POST)
+      .eq('pool_id', pool);
+    expect(await visible()).toBe(0);
+
+    await asUser(ana)
+      .from('splash_placements')
+      .update({ shared: true })
+      .eq('splash_id', ANA_OLD_POST)
+      .eq('pool_id', pool);
+    expect(await visible()).toBeGreaterThan(1);
+  });
+});
+
 describe('writing', () => {
   it('refuses a block written into another member’s post', async () => {
     const { error } = await asUser(ben)

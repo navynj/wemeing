@@ -7,6 +7,8 @@ import { ChevronRight } from 'lucide-react';
 
 import { type Card } from '@/features/home/grid';
 import { DAY_LIST_TEMPLATE, DateDay } from '@/features/home/date-day';
+import { GroundFoot } from '@/features/home/ground-foot';
+import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { PostRow } from '@/features/home/post-row';
 import { StairBoard } from '@/features/home/stair-board';
 import { useFlip } from '@/features/home/use-flip';
@@ -50,6 +52,7 @@ export function LanePage({
   topParam?: string | null;
 }) {
   const router = useRouter();
+  const { openSheet } = useInputSheet();
   const saved = useOptimisticAction({ name: lane.name, icon: lane.icon ?? '' });
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(lane.name);
@@ -96,12 +99,18 @@ export function LanePage({
   const shownLane = { ...lane, name: saved.value.name, icon: saved.value.icon };
 
   return (
+    // As Home on a wide screen (review): the list left, the stack right, the
+    // nav as a vertical rail at the far right edge; a phone keeps one column.
     <div
       data-lane-page={lane.id}
-      className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col"
+      data-ground-row
+      className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col lg:max-w-7xl lg:flex-row lg:gap-8"
       style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
     >
-      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto pt-4 pb-6">
+      <div
+        data-grid-column
+        className="no-scrollbar min-h-0 flex-1 overflow-y-auto pt-4 pb-6 lg:min-w-0"
+      >
         {/* No side padding on the scroller itself: the day list's rail is
             sticky to its left edge, and padding there pushed it over the
             rows (review). The parts above and below carry their own. */}
@@ -212,7 +221,8 @@ export function LanePage({
       {/* Home's stack over this lane's posts, at the foot of the page. */}
       <div
         data-lane-stack
-        className="shrink-0 pt-2"
+        data-board-column
+        className="shrink-0 pt-2 lg:flex lg:min-h-0 lg:min-w-0 lg:flex-1 lg:flex-col lg:py-10"
         style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}
       >
         <StairBoard
@@ -245,6 +255,15 @@ export function LanePage({
           hrefFor={(id) => `/splash/${id}?from=${encodeURIComponent(`${here}?top=${id}`)}`}
         />
       </div>
+
+      {/* Wide: Home, Pool and compose, the vertical rail at the far right. */}
+      <GroundFoot
+        slot="wide"
+        here="home"
+        homeLabel="Home"
+        onHome={() => router.push('/')}
+        onCompose={() => openSheet()}
+      />
     </div>
   );
 }

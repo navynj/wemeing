@@ -178,10 +178,11 @@ export function PoolGround({
   return (
     <div data-pool-ground={poolId} className="water-ground flex min-h-0 flex-1 flex-col">
       <div
+        data-ground-row
         className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col lg:max-w-7xl lg:flex-row lg:gap-8"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
-        <div className="flex min-h-0 flex-1 flex-col lg:min-w-0 lg:flex-1">
+        <div data-grid-column className="flex min-h-0 flex-1 flex-col lg:min-w-0 lg:flex-1">
           <header data-pool-header className="flex shrink-0 items-center gap-2 px-4 pt-4">
             <button
               type="button"

@@ -239,10 +239,11 @@ export function HomeGround({
           grid left and the board right, the board's column as tall as the
           screen (review). */}
       <div
+        data-ground-row
         className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col lg:max-w-7xl lg:flex-row lg:gap-8"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
-        <div className="flex min-h-0 flex-1 flex-col lg:min-w-0 lg:flex-1">
+        <div data-grid-column className="flex min-h-0 flex-1 flex-col lg:min-w-0 lg:flex-1">
           {/* The header (round 3): lane management at the left, the view
               toggle at the centre. No settings page exists, so no gear. */}
           <header data-home-header className="flex shrink-0 items-center gap-3 px-4 pt-3 pb-6">

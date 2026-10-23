@@ -227,8 +227,7 @@ function Page({
           card={card}
           lane={lane}
           initials={initials}
-          titleHeight={PEEK_PX}
-          onTop={onTop}
+          edge={onTop ? 'full' : 'top'}
           onClickCapture={guard}
         />
       </motion.div>

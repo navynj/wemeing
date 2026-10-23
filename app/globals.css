@@ -206,3 +206,21 @@ body {
     animation: none;
   }
 }
+
+/*
+ * Frosted glass (H22 review): a card in the board's upper stair softens the
+ * water behind it — the grid's marks and ropes blur instead of showing
+ * through sharply — under a translucent fill of the pale tint. Clipped by
+ * the card's own rounded box. Where the browser cannot blur a backdrop,
+ * the fill rises to 85% with no blur.
+ */
+.frosted {
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+@supports not ((backdrop-filter: blur(12px)) or (-webkit-backdrop-filter: blur(12px))) {
+  .frosted {
+    background: rgba(235, 235, 251, 0.85) !important;
+  }
+}

@@ -2,9 +2,12 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ChevronDown, Plus } from 'lucide-react';
 
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
+import { deleteRipple } from '@/features/ripple-sheet/actions';
+import { deleteSplash, setSplashPinned } from '@/features/splash/actions';
 import { CategorySheet } from '@/features/lanes/category-sheet';
 import { LanesSheet } from '@/features/lanes/lanes-sheet';
 import { SessionsSheet } from '@/features/sessions/sessions-sheet';
@@ -14,20 +17,21 @@ import type { MyCategory } from '@/lib/queries/profile';
 import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
 
-import { DiveBoard, type DiveBoardHandle } from './diving-board-dive';
 import { FlipBoard } from './diving-board-flip';
 import { byNewest, newestIn, placeCard, type Card } from './grid';
 import { LaneGrid, type GridHandle, type Ring } from './lane-grid';
 import { PinnedBar } from './pinned-bar';
+import { StairBoard } from './stair-board';
 import { useFlip } from './use-flip';
 
 /**
- * Which board Home shows (review, 2026-10-22): the **dive** — a card flies
- * to its mark in the water and rises from it — or the **page turn** onto a
- * pile of strips. Both stay in the tree; this one word decides.
+ * Which board Home shows (review, 2026-10-22): the **stair** — read cards
+ * stepping up above the top card, unread stepping down below — or the
+ * **page turn** onto a pile of strips. Both stay in the tree; this one word
+ * decides.
  */
-export type Board = 'dive' | 'flip';
-export const BOARD: Board = 'dive';
+export type Board = 'stair' | 'flip';
+export const BOARD: Board = 'stair';
 
 /** How long the commit ripple is given at a new post's mark once the real one has landed. */
 const RING_MS = 1800;
@@ -36,11 +40,11 @@ const RING_MS = 1800;
  * Home, the water ground (SPEC 5, H22; `_docs/mockups/home-grid-stack.png`):
  * one solid #0507C9 surface in two linked halves. Above, the lane grid — a
  * map of recent records, lanes across and days down. Below, the diving
- * board — the newest posts as a stack of cards, read in full; a card dives
- * to its own mark in the water and rises from it (or, on the page-turn
- * board, turns onto a pile). The ring plays at a landing and at a drop;
- * tapping a mark brings its card up. Between them the pinned bar, when
- * anything is pinned; beneath, the compose `+` at the bottom right.
+ * board — the posts as a staircase around the top card, read cards above
+ * and unread below (or, on the page-turn board, a pile beneath). The ring
+ * plays at the mark of whichever card comes to the top; tapping a mark
+ * brings its card there. Between them the pinned bar, when anything is
+ * pinned; beneath, the compose `+` at the bottom right.
  *
  * The title opens the ground's menu: the Locker, the sessions sheet and the
  * lanes sheet. The Home dropdown's pool switching is P3's; nothing here
@@ -84,10 +88,31 @@ export function HomeGround({
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [newLane, setNewLane] = useState(false);
   const [editingLanes, setEditingLanes] = useState(false);
-  const { openSheet, pendingDrop, clearDropped, dropMessage, pendingDeletes } = useInputSheet();
+  const { openSheet, pendingDrop, clearDropped, dropMessage, pendingDeletes, markDeleted } =
+    useInputSheet();
+  const router = useRouter();
   const lanes = useOptimisticAction(categories);
+  // Pinned from the card's menu shows on the bar at once (CLAUDE.md, the principle).
+  const pins = useOptimisticAction(pinned);
+  const pinnedIds = useMemo(() => new Set(pins.value.map((p) => p.id)), [pins.value]);
+  const pin = (card: Card, on: boolean): void =>
+    pins.run(
+      (current) =>
+        on
+          ? [{ ...card.splash, pinnedAt: new Date().toISOString() }, ...current]
+          : current.filter((p) => p.id !== card.splash.id),
+      () => setSplashPinned(card.splash.id, on),
+    );
+  // Gone the moment it is asked for, from every surface; a lone block is its own post.
+  const remove = (card: Card): void => {
+    markDeleted(card.splash.id);
+    void (card.splash.orphan ? deleteRipple(card.splash.id) : deleteSplash(card.splash.id)).then(
+      (result) => {
+        if (result.ok) router.refresh();
+      },
+    );
+  };
   const grid = useRef<GridHandle>(null);
-  const diveBoard = useRef<DiveBoardHandle>(null);
 
   // The post just dropped takes its place before the server has it; once the
   // real row is on the ground the optimistic one steps aside. A post deleted
@@ -109,39 +134,31 @@ export function HomeGround({
   }, [landed, clearDropped]);
 
   const ids = useMemo(() => shown.map((card) => card.splash.id), [shown]);
-  const flip = useFlip(
-    ids,
-    (scrollToMonth ? newestIn(shown, scrollToMonth)?.splash.id : null) ?? ids[0] ?? null,
-    board === 'dive' ? -1 : 1,
+  // What opens on top: the month's newest post under `?m=`, else the newest.
+  const [initialTop] = useState(
+    () => (scrollToMonth ? newestIn(shown, scrollToMonth)?.splash.id : null) ?? ids[0] ?? null,
   );
+  const flip = useFlip(ids, initialTop, board === 'stair' ? -1 : 1);
   const { topId, n, bringForward } = flip;
+  const goTo = bringForward;
 
-  /** Brings a post to the top, the way the board does it. */
-  const goTo = (id: string): void => {
-    if (board === 'dive') diveBoard.current?.goTo(id);
-    else bringForward(id);
-  };
-
-  // The ring: at a landing on the dive board, at the top card on the page
-  // turn, at a drop on either, and at the newest post on open.
-  const [ring, setRing] = useState<Ring | null>(() => (ids[0] ? { id: ids[0], seq: 0 } : null));
+  // The ring: at the mark of whichever card comes to the top, at a drop,
+  // and on open at the post on top — which is also what scrolls the grid
+  // to it (review: under `?m=` that is the month's post, not the newest).
+  const [ring, setRing] = useState<Ring | null>(() =>
+    initialTop ? { id: initialTop, seq: 0 } : null,
+  );
   const seq = useRef(0);
   const ringAt = (id: string): void => {
     seq.current += 1;
     setRing({ id, seq: seq.current });
   };
-  const previous = useRef(n);
+  const previousTop = useRef(topId);
   useEffect(() => {
-    const was = previous.current;
-    previous.current = n;
-    if (board === 'dive') {
-      if (n > was && ids[n - 1]) ringAt(ids[n - 1]);
-    } else if (topId && n !== was) {
-      ringAt(topId);
-    }
-    // The depth changing is the event; the rest is read when it fires.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [n, board]);
+    if (topId && topId !== previousTop.current) ringAt(topId);
+    previousTop.current = topId;
+    // The top changing is the event; the rest is read when it fires.
+  }, [topId]);
 
   // A post just dropped lands on top of the stack, on the spring, ringed.
   const droppedId = pendingDrop?.splash.id ?? null;
@@ -160,7 +177,8 @@ export function HomeGround({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollToMonth]);
 
-  const divedIds = useMemo(() => new Set(board === 'dive' ? ids.slice(0, n) : []), [board, ids, n]);
+  // The upper stair, read: translucent on the grid.
+  const waterIds = useMemo(() => new Set(ids.slice(0, n)), [ids, n]);
 
   return (
     <div data-home-ground className="water-ground flex min-h-0 flex-1 flex-col">
@@ -249,7 +267,7 @@ export function HomeGround({
           categories={lanes.value}
           today={today}
           ring={ring}
-          divedIds={divedIds}
+          waterIds={waterIds}
           initials={initials}
           scrollToMonth={scrollToMonth}
           onPick={goTo}
@@ -259,20 +277,21 @@ export function HomeGround({
 
         <div className="shrink-0 px-6">
           <PinnedBar
-            pinned={pinned.filter((p) => !pendingDeletes.includes(p.id))}
+            pinned={pins.value.filter((p) => !pendingDeletes.includes(p.id))}
             categories={lanes.value}
             month={today.slice(0, 7)}
           />
         </div>
 
-        {board === 'dive' ? (
-          <DiveBoard
-            ref={diveBoard}
+        {board === 'stair' ? (
+          <StairBoard
             cards={shown}
             flip={flip}
             categories={lanes.value}
             initials={initials}
-            locate={(wanted) => grid.current?.revealMarks(wanted) ?? new Map()}
+            pinnedIds={pinnedIds}
+            onPin={pin}
+            onDelete={remove}
           />
         ) : (
           <FlipBoard cards={shown} flip={flip} categories={lanes.value} initials={initials} />

@@ -16,6 +16,8 @@ export const CARD_PX = 200;
 export const CARD_PAD_PX = 20;
 /** A peeking card's edge: one line — this much padding, the emoji, the title, nothing else. */
 export const EDGE_PAD_PX = { top: 8, bottom: 12 } as const;
+/** A spine on the sideways stair: this wide. */
+export const SPINE_PX = 44;
 /** Each step back tints the white face this much toward the water. */
 export const TINT_STEP = 0.08;
 
@@ -48,13 +50,42 @@ export function CardFace({
   card: Card;
   lane: MyCategory | null;
   initials: string;
-  /** Everything, or the title line on the edge that shows. */
-  edge: 'full' | 'top' | 'bottom';
+  /** Everything, or the title line on the edge that shows: a top or bottom band, or a left or right spine. */
+  edge: 'full' | 'top' | 'bottom' | 'left' | 'right';
   /** The title's colour: blue on a pale face, white on a card in the water. */
   ink?: 'blue' | 'white';
   onClickCapture?: (event: React.MouseEvent) => void;
 }) {
   const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
+  const inkClass = ink === 'white' ? 'text-white' : 'text-main-900';
+  if (edge === 'left' || edge === 'right') {
+    // A book spine: the emoji at the top, the title written downward and
+    // ellipsised to the card's height.
+    return (
+      <span
+        aria-hidden
+        data-card-spine=""
+        className={`absolute inset-y-0 flex flex-col items-center ${inkClass} ${edge === 'left' ? 'left-0' : 'right-0'}`}
+        style={{
+          width: SPINE_PX,
+          paddingTop: EDGE_PAD_PX.bottom,
+          paddingBottom: EDGE_PAD_PX.bottom,
+          opacity: ink === 'white' ? 'var(--ink-opacity, 0.6)' : undefined,
+        }}
+      >
+        {lane?.icon ? <span className="text-base/none">{lane.icon}</span> : null}
+        <span
+          data-card-title
+          className={`mt-2 min-h-0 flex-1 overflow-hidden text-sm/none font-semibold text-ellipsis whitespace-nowrap ${
+            card.splash.title.trim() ? '' : 'opacity-40'
+          }`}
+          style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
+        >
+          {title}
+        </span>
+      </span>
+    );
+  }
   const titleLine = (
     <span
       data-card-title

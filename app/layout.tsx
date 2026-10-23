@@ -35,8 +35,11 @@ export const metadata: Metadata = {
  * under the home indicator on a notched phone and every sheet's last control
  * is half unreachable.
  *
- * Zoom is left alone. Pinching out of a small time label is the kind of thing
- * a diary has to allow.
+ * No zoom on a phone (review, 2026-10-23): the app is a PWA and should hold
+ * still like one. A pinch or a double tap must not knock the grid, the stack
+ * or a sheet out of frame, and tapping a field must not zoom into it. The meta
+ * stops Android and the iOS focus zoom; iOS ignores `user-scalable=no` for a
+ * pinch, so `touch-action` in globals.css stops that. Desktop ignores both.
  *
  * The status bar is white, not #0507C9. Law 5 gives a solid #0507C9 *content*
  * surface one meaning — a live session — and the status bar is always there,
@@ -47,6 +50,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: 'cover',
   themeColor: '#ffffff',
 };

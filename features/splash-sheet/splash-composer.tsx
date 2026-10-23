@@ -358,7 +358,6 @@ export function SplashComposer({
       {pool ? (
         <PoolLanePicker
           scope={pool}
-          categories={categories}
           pick={pick}
           onPick={(next) => {
             setPick(next);

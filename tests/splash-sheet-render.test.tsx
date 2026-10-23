@@ -394,9 +394,6 @@ describe('compose from a pool (H23)', () => {
 
   it('opens on Pool lanes and drops a joint splash on the chosen pool lane', async () => {
     const view = poolSheet();
-    expect(view.getByRole('tab', { name: 'Pool lanes' }).getAttribute('aria-selected')).toBe(
-      'true',
-    );
     fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Rematch Friday' } });
     fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-trips"]')!);
     fireEvent.click(view.drop());
@@ -410,17 +407,11 @@ describe('compose from a pool (H23)', () => {
     expect(placed).toEqual([]);
   });
 
-  it('lists only my lanes linked to this pool, and places my splash here', async () => {
+  it('makes Just mine on a linked pool lane my splash in my linked lane, placed here', async () => {
     const view = poolSheet();
-    fireEvent.click(view.getByRole('tab', { name: 'My lanes' }));
-    const offered = [...view.container.querySelectorAll('[data-pick-my-lane]')].map((el) =>
-      el.getAttribute('data-pick-my-lane'),
-    );
-    // Mood is linked in pools, but not in this one: not offered.
-    expect(offered).toEqual(['c-place']);
-    expect(view.getByText('→ Trips')).toBeTruthy();
+    fireEvent.click(view.getByRole('switch', { name: 'Just mine' }));
     fireEvent.change(view.getByLabelText('Content'), { target: { value: 'Twin Falls' } });
-    fireEvent.click(view.container.querySelector('[data-pick-my-lane="c-place"]')!);
+    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-trips"]')!);
     fireEvent.click(view.drop());
     await waitFor(() => expect(placed).toHaveLength(1));
     expect(drops[0]).toMatchObject({ declaredLaneId: 'c-place' });
@@ -428,11 +419,17 @@ describe('compose from a pool (H23)', () => {
     expect(joints).toEqual([]);
   });
 
+  it('shows the pool’s lanes alone: no My lanes tab', () => {
+    const view = poolSheet();
+    expect(view.queryByRole('tab', { name: 'My lanes' })).toBeNull();
+    expect(view.container.querySelectorAll('[data-pick-pool-lane]')).toHaveLength(2);
+  });
+
   it('has no Audience chip', () => {
     const view = poolSheet();
     expect(view.container.querySelector('[data-audience-chip]')).toBeNull();
-    fireEvent.click(view.getByRole('tab', { name: 'My lanes' }));
-    fireEvent.click(view.container.querySelector('[data-pick-my-lane="c-place"]')!);
+    fireEvent.click(view.getByRole('switch', { name: 'Just mine' }));
+    fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-trips"]')!);
     expect(view.container.querySelector('[data-audience-chip]')).toBeNull();
   });
 
@@ -451,10 +448,9 @@ describe('compose from a pool (H23)', () => {
     const view = poolSheet();
     fireEvent.click(view.container.querySelector('[data-pick-pool-lane="pl-trips"]')!);
     const filled = [...view.container.querySelectorAll('[data-pool-lane-picker] .bg-ink')];
-    // Only the chosen lane chip is filled in ink; the tabs are text.
+    // Only the chosen lane chip is filled in ink.
     expect(filled.map((el) => el.getAttribute('data-pick-pool-lane'))).toEqual(['pl-trips']);
     expect(view.container.querySelector('[data-joint-unlinked]')).toBeNull();
-    expect(view.getByRole('tab', { name: 'Pool lanes' }).className).toContain('border-ink');
   });
 });
 

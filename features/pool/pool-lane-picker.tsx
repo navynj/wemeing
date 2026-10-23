@@ -1,18 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
-
-import { useInputSheet } from '@/features/input-sheet/sheet-provider';
-import type { MyCategory } from '@/lib/queries/profile';
 
 import type { PoolScope } from './compose-scope';
 import { Switch } from './lane-match';
 
 /**
- * The choice when composing from a pool (H23): a pool lane — a joint
- * splash the pool owns, or "Just mine" on it — or one of my lanes linked
- * here — my own splash, placed in this pool.
+ * The choice when composing from a pool (H23): a pool lane, and whose — a
+ * joint splash the pool owns; or, Just mine, my own splash in the lane I
+ * linked to it (placed here), or with no lane of mine when I linked none.
  */
 export type PoolPick =
   | { kind: 'joint'; poolLaneId: string }
@@ -21,156 +17,74 @@ export type PoolPick =
   | { kind: 'lane'; poolLaneId: string; myCategoryId: string }
   | null;
 
-type Segment = 'pool' | 'mine';
-
-/** A lane chip: the one filled element here — ink when chosen (H20f), outlined otherwise. */
-const chip = (selected: boolean): string =>
-  `flex shrink-0 flex-col items-start rounded-2xl px-3.5 py-2 text-left ${
-    selected ? 'bg-ink text-white' : 'border-pool-200 text-ink border'
-  }`;
-
 /**
- * Composing from a pool (review): the lane is the one decision, and the two
- * toggles qualify it. *Pool lanes | My lanes* are text tabs above the chips
- * — the chosen one in ink with a 2px underline, the other muted, at a
- * section label's size. The lane chips are the only filled element. Under
- * Pool lanes, one *Just mine* switch at the row's right end: on, my splash
- * alone on the pool lane; off, the pool's, everyone's. My
- * ripple on a joint splash takes the lane I linked to that pool lane, or
- * none (0016) — nothing to ask. There is no audience here: what is written
- * in a pool is in that pool.
+ * Composing from a pool (review): one row — this pool's lanes, the chips
+ * the only filled element — and one *Just mine* switch at its right end.
+ * Off (the default): a joint splash on the chosen pool lane, everyone's.
+ * On: mine alone. On a pool lane I have linked, that is my own splash in
+ * my linked lane, placed here — it shows in that lane on my Home too; on
+ * one I have not, a Just-mine splash with no lane of mine (0014), in the
+ * pool's column on my Home. No separate "My lanes": the link decides where
+ * mine lands. My ripple on a joint splash takes my linked lane, or none
+ * (0016) — nothing to ask. There is no audience here: what is written in a
+ * pool is in that pool.
  */
 export function PoolLanePicker({
   scope,
-  categories,
   pick,
   onPick,
 }: {
   scope: PoolScope;
-  categories: Pick<MyCategory, 'id' | 'name' | 'icon'>[];
   pick: PoolPick;
   onPick: (pick: PoolPick) => void;
 }) {
-  const { closeSheet } = useInputSheet();
-  const [segment, setSegment] = useState<Segment>('pool');
-  const linked = scope.lanes.filter((lane) => lane.myCategoryId);
-  const onPoolLane = pick?.kind === 'joint' || pick?.kind === 'own';
-  // One switch (review): on, my splash alone on the pool lane (0014); off,
-  // the pool's, everyone's. Set before or after a lane is picked.
   const [justMine, setJustMine] = useState(false);
-  const kind = (mine: boolean): 'own' | 'joint' => (mine ? 'own' : 'joint');
+  const chosen = pick?.poolLaneId ?? null;
+  const pickFor = (laneId: string, mine: boolean): PoolPick => {
+    if (!mine) return { kind: 'joint', poolLaneId: laneId };
+    const myLane = scope.lanes.find((l) => l.id === laneId)?.myCategoryId ?? null;
+    return myLane
+      ? { kind: 'lane', poolLaneId: laneId, myCategoryId: myLane }
+      : { kind: 'own', poolLaneId: laneId };
+  };
 
   return (
     <div data-pool-lane-picker className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-4">
-        <div role="tablist" aria-label="Lanes" data-lane-segment className="flex gap-5 text-xs">
-          {(
-            [
-              ['pool', 'Pool lanes'],
-              ['mine', 'My lanes'],
-            ] as const
-          ).map(([value, label]) => (
+        <span className="text-pool-500 text-xs">{scope.poolName} lanes</span>
+        <label data-just-mine className="text-pool-500 flex items-center gap-2 text-xs">
+          Just mine
+          <Switch
+            on={justMine}
+            label="Just mine"
+            onChange={(on) => {
+              setJustMine(on);
+              if (chosen) onPick(pickFor(chosen, on));
+            }}
+          />
+        </label>
+      </div>
+      <div className="no-scrollbar flex gap-2 overflow-x-auto">
+        {scope.lanes.map((lane) => {
+          const selected = chosen === lane.id;
+          return (
             <button
-              key={value}
+              key={lane.id}
               type="button"
-              role="tab"
-              aria-selected={segment === value}
-              data-segment={value}
-              onClick={() => {
-                if (segment === value) return;
-                setSegment(value);
-                onPick(null);
-              }}
-              className={`border-b-2 pb-1 ${
-                segment === value
-                  ? 'border-ink text-ink font-semibold'
-                  : 'text-pool-500 border-transparent'
+              aria-pressed={selected}
+              data-pick-pool-lane={lane.id}
+              onClick={() => onPick(selected ? null : pickFor(lane.id, justMine))}
+              className={`h-10 shrink-0 rounded-full px-4 text-sm font-semibold ${
+                // Selection is ink (H20f); the chips are the one fill here.
+                selected ? 'bg-ink text-white' : 'border-pool-200 text-ink border'
               }`}
             >
-              {label}
+              {lane.icon ? `${lane.icon} ` : ''}
+              {lane.name}
             </button>
-          ))}
-        </div>
-        {segment === 'pool' ? (
-          <label data-just-mine className="text-pool-500 flex items-center gap-2 text-xs">
-            Just mine
-            <Switch
-              on={justMine}
-              label="Just mine"
-              onChange={(on) => {
-                setJustMine(on);
-                if (onPoolLane) onPick({ kind: kind(on), poolLaneId: pick.poolLaneId });
-              }}
-            />
-          </label>
-        ) : null}
+          );
+        })}
       </div>
-
-      {segment === 'pool' ? (
-        <>
-          <div className="no-scrollbar flex gap-2 overflow-x-auto">
-            {scope.lanes.map((lane) => {
-              const selected = onPoolLane && pick.poolLaneId === lane.id;
-              return (
-                <button
-                  key={lane.id}
-                  type="button"
-                  aria-pressed={selected}
-                  data-pick-pool-lane={lane.id}
-                  onClick={() =>
-                    onPick(selected ? null : { kind: kind(justMine), poolLaneId: lane.id })
-                  }
-                  className={`h-10 shrink-0 rounded-full px-4 text-sm font-semibold ${
-                    selected ? 'bg-ink text-white' : 'border-pool-200 text-ink border'
-                  }`}
-                >
-                  {lane.icon ? `${lane.icon} ` : ''}
-                  {lane.name}
-                </button>
-              );
-            })}
-          </div>
-        </>
-      ) : (
-        <div className="no-scrollbar flex gap-2 overflow-x-auto">
-          {linked.map((lane) => {
-            const mine = categories.find((c) => c.id === lane.myCategoryId);
-            const selected = pick?.kind === 'lane' && pick.poolLaneId === lane.id;
-            return (
-              <button
-                key={lane.id}
-                type="button"
-                aria-pressed={selected}
-                data-pick-my-lane={lane.myCategoryId!}
-                onClick={() =>
-                  onPick(
-                    selected
-                      ? null
-                      : { kind: 'lane', poolLaneId: lane.id, myCategoryId: lane.myCategoryId! },
-                  )
-                }
-                className={chip(selected)}
-              >
-                <span className="text-sm font-semibold">
-                  {mine?.icon ? `${mine.icon} ` : ''}
-                  {mine?.name ?? 'Lane'}
-                </span>
-                <span className={`text-[10px] ${selected ? 'text-white/70' : 'text-pool-500'}`}>
-                  → {lane.name}
-                </span>
-              </button>
-            );
-          })}
-          <Link
-            href={`/pool/${scope.poolId}/settings`}
-            onClick={closeSheet}
-            data-link-a-lane
-            className="border-pool-200 text-pool-500 flex shrink-0 items-center rounded-2xl border border-dashed px-3.5 text-sm"
-          >
-            + Link a lane
-          </Link>
-        </div>
-      )}
     </div>
   );
 }

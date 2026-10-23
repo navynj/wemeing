@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 
 import { initialsOf } from '@/features/home/grid';
 import { PoolSplashPage } from '@/features/pool/pool-splash-page';
+import { authorClock } from '@/features/pool/times';
 import { dayOf } from '@/lib/flow-key';
 import { signRippleMedia } from '@/lib/media';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
@@ -26,6 +27,7 @@ export default async function PoolSplashRoute({ params }: PageProps<'/pool/[id]/
   if (!view || !splash) notFound();
 
   const initials = new Map(view.members.map((m) => [m.userId, m.initials]));
+  const zoneOf = new Map(view.members.map((m) => [m.userId, m.timeZone]));
   const blocks = view.ripples
     .filter((r) => r.splash_id === sid)
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
@@ -54,6 +56,11 @@ export default async function PoolSplashRoute({ params }: PageProps<'/pool/[id]/
         note: r.note,
         photos: photos[at],
         day: dayOf({ ...r, splash: { declared_start: splash.declared_start } }, profile.timezone),
+        clock: authorClock(
+          r.started_at ?? r.created_at,
+          profile.timezone,
+          zoneOf.get(r.author_id) ?? profile.timezone,
+        ),
       }))}
       myInitials={initialsOf(profile.display_name)}
       myLane={

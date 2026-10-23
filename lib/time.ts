@@ -51,6 +51,19 @@ export function formatPagerDate(date: IsoDate): {
 }
 
 /** The browser's zone, captured once at profile bootstrap. */
+/**
+ * An IANA zone this runtime knows. A profile's zone cuts every new record's
+ * day in the database (0013), where an unknown name would refuse the write.
+ */
+export function isTimeZone(zone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function detectTimezone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 }

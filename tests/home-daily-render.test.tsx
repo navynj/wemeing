@@ -12,6 +12,7 @@ import { ROW_SURFACE } from '@/features/home-daily/depth';
 import { RippleRow } from '@/features/home-daily/ripple-row';
 import type { RippleWithCategory } from '@/lib/queries/ripples';
 import { wallClockToInstant } from '@/lib/ripple-kind';
+import { written } from './written-on';
 
 const TZ = 'America/Vancouver';
 const NOW = new Date('2026-09-19T20:00:00.000Z');
@@ -35,7 +36,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 function ripple(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
-  return {
+  return written({
     id: 'r1',
     author_id: 'a1',
     category_id: 'c1',
@@ -52,7 +53,7 @@ function ripple(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
     started_at: null,
     category: { name: 'Focus', icon: '🔍' },
     ...over,
-  };
+  });
 }
 
 function row(over: Partial<RippleWithCategory> = {}) {

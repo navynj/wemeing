@@ -16,6 +16,7 @@ import { formatStopwatch } from '@/features/home-daily/use-elapsed';
 import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
 import type { RippleWithCategory } from '@/lib/queries/ripples';
 import { wallClockToInstant } from '@/lib/ripple-kind';
+import { written } from './written-on';
 
 const TZ = 'America/Vancouver';
 
@@ -38,7 +39,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 function ripple(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
-  return {
+  return written({
     id: 'r1',
     author_id: 'a1',
     category_id: 'c1',
@@ -55,7 +56,7 @@ function ripple(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
     started_at: wallClockToInstant('2026-09-19', '09:00', TZ).toISOString(),
     category: { name: 'Focus', icon: '🔍' },
     ...over,
-  };
+  });
 }
 
 function band(row: RippleWithCategory, openBreakId: string | null = null) {

@@ -14,6 +14,7 @@ vi.mock('@/features/ripple-sheet/actions', () => ({
 
 import { DetailSheet } from '@/features/ripple-sheet/detail-sheet';
 import type { RippleWithCategory } from '@/lib/queries/ripples';
+import { written } from './written-on';
 
 const TZ = 'America/Vancouver';
 const TODAY = '2026-09-19';
@@ -21,7 +22,7 @@ const TODAY = '2026-09-19';
 afterEach(cleanup);
 
 function ripple(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
-  return {
+  return written({
     id: 'r1',
     author_id: 'a1',
     category_id: 'c1',
@@ -38,7 +39,7 @@ function ripple(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
     splash_id: null,
     category: { name: 'Place', icon: '📍' },
     ...over,
-  };
+  });
 }
 
 function sheet(props: Partial<Parameters<typeof DetailSheet>[0]> = {}) {

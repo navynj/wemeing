@@ -3,11 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { defaultInnerTime } from '@/features/ripple-sheet/inner-slot';
 import { parentBoundsMessage } from '@/features/ripple-sheet/end-rules';
 import type { RippleWithCategory } from '@/lib/queries/ripples';
+import { written } from './written-on';
 
 const TZ = 'America/Vancouver';
 
 function session(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
-  return {
+  return written({
     id: 'sess',
     author_id: 'a1',
     category_id: 'c1',
@@ -25,7 +26,7 @@ function session(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
     splash_id: null,
     category: { name: 'Focus', icon: '🔍' },
     ...over,
-  };
+  });
 }
 
 function child(from: string, to: string): RippleWithCategory {

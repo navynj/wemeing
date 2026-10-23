@@ -1,6 +1,5 @@
 import type { Database } from '@/lib/database.types';
-import { dayOf, END_OF_DAY, flowInstant, type FlowKeyed } from '@/lib/flow-key';
-import { wallClockToInstant } from '@/lib/ripple-kind';
+import { dayOf, flowInstant, restingInstant, type FlowKeyed } from '@/lib/flow-key';
 import { todayIn, type IsoDate } from '@/lib/time';
 
 export type Splash = Database['public']['Tables']['splashes']['Row'];
@@ -49,6 +48,8 @@ export type SplashSummary = {
   blocks: { day: IsoDate; endDay: IsoDate; instant: number }[];
   /** When the post last received something, for recency and the open rule. */
   latestCreatedAt: string;
+  /** The author's local date when the post was made (0013): its row with no range. */
+  writtenOn: IsoDate;
   open: boolean;
   createdAt: string;
   pinnedAt: string | null;
@@ -146,7 +147,13 @@ export function summarizeSplash(
         note: block.note,
       };
     })
-    .sort((a, b) => a.instant - b.instant || a.createdAt.localeCompare(b.createdAt));
+    // The day first: an in-day instant means nothing across days (0013).
+    .sort(
+      (a, b) =>
+        (a.day < b.day ? -1 : a.day > b.day ? 1 : 0) ||
+        a.instant - b.instant ||
+        a.createdAt.localeCompare(b.createdAt),
+    );
 
   const declaredRange = splash.declared_start
     ? { start: splash.declared_start, end: splash.declared_end ?? splash.declared_start }
@@ -176,6 +183,7 @@ export function summarizeSplash(
     count: blocks.length,
     blocks: placed.map(({ day, endDay, instant }) => ({ day, endDay, instant })),
     latestCreatedAt: latestCreatedAt ?? splash.created_at,
+    writtenOn: splash.written_on ?? todayIn(timeZone, new Date(splash.created_at)),
     open: isSplashOpen(blocks.length, latestCreatedAt, now),
     createdAt: splash.created_at,
     pinnedAt: splash.pinned_at,
@@ -204,6 +212,7 @@ export function summarizeOrphan(block: SplashBlock, timeZone: string, now: Date)
       { day, endDay: spanEndDay(block, day, timeZone), instant: flowInstant(block, timeZone) },
     ],
     latestCreatedAt: block.created_at,
+    writtenOn: day,
     open: isSplashOpen(1, block.created_at, now),
     createdAt: block.created_at,
     pinnedAt: null,
@@ -285,10 +294,10 @@ export function monthsBetween(a: string, b: string): string[] {
  * touches, or the month it was made in while it has nothing and declares
  * nothing.
  */
-export function monthsOf(summary: SplashSummary, timeZone: string): string[] {
+export function monthsOf(summary: SplashSummary): string[] {
   if (summary.range)
     return monthsBetween(monthKey(summary.range.start), monthKey(summary.range.end));
-  return [monthKey(todayIn(timeZone, new Date(summary.createdAt)))];
+  return [monthKey(summary.writtenOn)];
 }
 
 /**
@@ -301,7 +310,6 @@ export function monthsOf(summary: SplashSummary, timeZone: string): string[] {
 export function positionInMonth(
   summary: SplashSummary,
   month: string,
-  timeZone: string,
 ): { instant: number; date: IsoDate; span: DateRange } {
   const last = lastDayOf(month);
   const inMonth = summary.blocks.filter((block) => monthKey(block.day) === month);
@@ -316,12 +324,12 @@ export function positionInMonth(
   if (summary.range) {
     const date = summary.range.end < last ? summary.range.end : last;
     return {
-      instant: wallClockToInstant(date, END_OF_DAY, timeZone).getTime(),
+      instant: restingInstant(date),
       date,
       span: { start: date, end: date },
     };
   }
-  const made = todayIn(timeZone, new Date(summary.createdAt));
+  const made = summary.writtenOn;
   return { instant: Date.parse(summary.createdAt), date: made, span: { start: made, end: made } };
 }
 

@@ -6,6 +6,7 @@ import { depthSurface, DEPTH_SURFACES } from '@/lib/depth';
 import { impressionLineCount, MAX_IMPRESSION_LINES } from '@/components/ui/waves';
 import { tallyLaneCounts, type LaneCounts } from '@/lib/queries/lanes';
 import type { RippleWithCategory } from '@/lib/queries/ripples';
+import { written } from './written-on';
 
 const FOCUS = 'c-focus';
 const PLACE = 'c-place';
@@ -159,7 +160,7 @@ describe('the past sinks, by month (law 1)', () => {
 
 describe("the Trail groups by the author's own days", () => {
   function ripple(over: Partial<RippleWithCategory>): RippleWithCategory {
-    return {
+    return written({
       id: 'r',
       author_id: 'a1',
       category_id: FOCUS,
@@ -176,7 +177,7 @@ describe("the Trail groups by the author's own days", () => {
       splash_id: null,
       category: { name: 'Focus', icon: '🔍' },
       ...over,
-    };
+    });
   }
 
   it('sections newest day first, each day still reading early to late', () => {
@@ -210,7 +211,8 @@ describe("the Trail groups by the author's own days", () => {
 
   it('lands an unannotated fragment on the author-local day it was written (H20c)', () => {
     // 15:30Z on the 8th is 00:30 on the 9th in Seoul: the coalesced day is
-    // the day the author was living, not the server's.
+    // the day the author was living, not the server's. Since 0013 it is
+    // stored when written, from the author's zone.
     const days = groupByDay(
       [
         ripple({
@@ -218,6 +220,7 @@ describe("the Trail groups by the author's own days", () => {
           occurred_on: null,
           occurred_time: null,
           created_at: '2027-07-08T15:30:00.000Z',
+          written_on: '2027-07-09',
         }),
       ],
       'Asia/Seoul',
@@ -227,11 +230,13 @@ describe("the Trail groups by the author's own days", () => {
   });
 
   it('moves a fragment to its annotation and back when the annotation is removed', () => {
+    // Written in Seoul on the 9th (16:00Z on the 8th), as the trigger stores it.
     const annotated = ripple({
       id: 'x',
       occurred_on: '2027-06-02',
       occurred_time: null,
       created_at: '2027-07-08T16:00:00.000Z',
+      written_on: '2027-07-09',
     });
     expect(groupByDay([annotated], 'Asia/Seoul')[0].date).toBe('2027-06-02');
 

@@ -25,6 +25,7 @@ import { byNewest, placeCard } from '@/features/home/grid';
 import { LanePage } from '@/features/lanes/lane-page';
 import { summarizeSplash, type SplashBlock } from '@/features/splash/summary';
 import type { MyCategory } from '@/lib/queries/profile';
+import { written } from './written-on';
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -65,7 +66,7 @@ function post(id: string, title: string, day: string) {
     created_at: `${day}T16:00:00.000Z`,
   };
   return summarizeSplash(
-    {
+    written({
       id,
       owner_id: 'a1',
       title,
@@ -82,7 +83,7 @@ function post(id: string, title: string, day: string) {
       prompt: null,
       ends_at: null,
       created_at: `${day}T16:00:00.000Z`,
-    },
+    }),
     [block],
     TZ,
     NOW,

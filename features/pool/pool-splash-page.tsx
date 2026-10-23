@@ -20,6 +20,8 @@ export type PoolEntry = {
   note: string | null;
   photos: string[];
   day: IsoDate;
+  /** When it was written: in my zone, and in the author's when theirs differs (0013). */
+  clock: { mine: string; theirs: string | null } | null;
 };
 
 /**
@@ -72,7 +74,14 @@ export function PoolSplashPage({
     thread.run(
       (current) => [
         ...current,
-        { id: crypto.randomUUID(), initials: myInitials, note, photos: [], day: today },
+        {
+          id: crypto.randomUUID(),
+          initials: myInitials,
+          note,
+          photos: [],
+          day: today,
+          clock: null,
+        },
       ],
       () => addJointRipple({ splashId, poolId, myCategoryId: laneId, body: note }),
     );
@@ -118,7 +127,17 @@ export function PoolSplashPage({
         entries={thread.value.map((entry) => ({
           id: entry.id,
           initials: entry.initials,
-          meta: cardDate(entry.day),
+          meta: (
+            <>
+              {cardDate(entry.day)}
+              {entry.clock ? ` · ${entry.clock.mine}` : null}
+              {entry.clock?.theirs ? (
+                <span data-author-clock className="text-pool-500/70 ml-1 text-[10px]">
+                  · {entry.clock.theirs}
+                </span>
+              ) : null}
+            </>
+          ),
           body: (
             <span className="flex flex-col gap-3">
               {entry.note ? (

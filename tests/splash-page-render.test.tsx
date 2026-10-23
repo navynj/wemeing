@@ -44,6 +44,7 @@ import { SplashPage } from '@/features/splash/splash-page';
 import { summarizeOrphan, summarizeSplash, type Splash } from '@/features/splash/summary';
 import type { MyCategory } from '@/lib/queries/profile';
 import type { RippleWithCategory } from '@/lib/queries/ripples';
+import { written } from './written-on';
 
 const TZ = 'America/Vancouver';
 const TODAY = '2026-09-25';
@@ -66,7 +67,7 @@ const LANES = [
   lane('c-day', 'Day', '🖋', 2),
 ];
 function block(over: Partial<RippleWithCategory> & { id: string }): RippleWithCategory {
-  return {
+  return written({
     author_id: 'a1',
     category_id: 'c-place',
     note: 'fixture',
@@ -82,7 +83,7 @@ function block(over: Partial<RippleWithCategory> & { id: string }): RippleWithCa
     splash_id: 's1',
     category: { name: 'Place', icon: '📍' },
     ...over,
-  };
+  });
 }
 
 const board: Splash = {
@@ -102,6 +103,7 @@ const board: Splash = {
   prompt: null,
   ends_at: null,
   created_at: '2026-08-16T16:00:00.000Z',
+  written_on: '2026-08-16',
 };
 
 // Oldest first, as the page receives them.

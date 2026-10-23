@@ -36,6 +36,7 @@ const NEEDS_LOCAL_STACK = [
   'tests/date-only-span.test.ts',
   'tests/sessions.test.ts',
   'tests/pools-rls.test.ts',
+  'tests/written-on-db.test.ts',
 ];
 
 export default defineConfig({

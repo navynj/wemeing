@@ -10,12 +10,13 @@ import {
   rippleState,
   wallClockToInstant,
 } from '@/lib/ripple-kind';
+import { written } from './written-on';
 
 const VANCOUVER = 'America/Vancouver';
 const SEOUL = 'Asia/Seoul';
 
 function ripple(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
-  return {
+  return written({
     id: 'r1',
     author_id: 'a1',
     category_id: 'c1',
@@ -32,7 +33,7 @@ function ripple(over: Partial<RippleWithCategory> = {}): RippleWithCategory {
     started_at: null,
     category: { name: 'Focus', icon: '🔍' },
     ...over,
-  };
+  });
 }
 
 describe('author-local placement', () => {

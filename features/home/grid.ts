@@ -1,6 +1,6 @@
 import { monthKey, representativeLane, type SplashSummary } from '@/features/splash/summary';
 import type { MyCategory } from '@/lib/queries/profile';
-import { todayIn, type IsoDate } from '@/lib/time';
+import type { IsoDate } from '@/lib/time';
 
 /**
  * At most this many lanes show at once (round 3): with this many or fewer
@@ -77,7 +77,8 @@ export function placeCard(
     ? [{ id: splash.id, note: body, createdAt: splash.latestCreatedAt }]
     : [],
 ): Card {
-  const day = splash.range?.end ?? todayIn(timeZone, new Date(splash.createdAt));
+  // The author's own day, stored (0013): no reader's zone moves the row.
+  const day = splash.range?.end ?? splash.writtenOn;
   const onDay = splash.blocks.filter((block) => block.day === day);
   const instant =
     onDay.length > 0 ? onDay[onDay.length - 1].instant : Date.parse(splash.latestCreatedAt);

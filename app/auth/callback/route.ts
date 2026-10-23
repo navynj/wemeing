@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { bootstrapProfile } from '@/features/auth/bootstrap-profile';
 import { safeNext } from '@/lib/next-path';
+import { isTimeZone } from '@/lib/time';
 import { NEXT_COOKIE, siteUrl, TIMEZONE_COOKIE } from '@/lib/site';
 import { createClient } from '@/lib/supabase/server';
 
@@ -22,7 +23,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   const cookieStore = await cookies();
-  const timezone = cookieStore.get(TIMEZONE_COOKIE)?.value;
+  const sent = cookieStore.get(TIMEZONE_COOKIE)?.value;
+  // Only a zone the runtime knows is stored: the database cuts days in it.
+  const timezone = sent && isTimeZone(decodeURIComponent(sent)) ? sent : undefined;
 
   const { user } = data;
   // Idempotent: an account can reach here with a session but no profile if an
@@ -36,6 +39,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   });
 
   const next = cookieStore.get(NEXT_COOKIE)?.value;
+  // A returning author signing in somewhere new: the profile follows the
+  // device's zone, so the next record lands on the day being lived (0013).
+  if (timezone) {
+    await supabase
+      .from('profiles')
+      .update({ timezone: decodeURIComponent(timezone) })
+      .eq('id', user.id);
+  }
+
   const response = NextResponse.redirect(
     `${home}${safeNext(next ? decodeURIComponent(next) : null)}`,
   );

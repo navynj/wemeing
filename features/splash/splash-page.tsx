@@ -182,6 +182,8 @@ export function SplashPage({
         planned: false,
         participants: [],
         created_at: new Date().toISOString(),
+        // Mine, written now: today in my zone, as the trigger will store it.
+        written_on: today,
         parent_ripple_id: null,
         splash_id: target.splashId,
         category: null,

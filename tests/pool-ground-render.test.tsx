@@ -30,6 +30,7 @@ import { PoolIndex } from '@/features/pool/pool-index';
 import { lastPool, rememberVisit } from '@/features/pool/remembered';
 import type { Splash } from '@/features/splash/summary';
 import type { MyPool, PoolRipple, PoolView } from '@/lib/queries/pools';
+import { written } from './written-on';
 
 const TZ = 'America/Vancouver';
 const ME = 'u-me';
@@ -37,7 +38,7 @@ const MINA = 'u-mina';
 const GONE = 'u-gone';
 
 function splash(over: Partial<Splash> & { id: string }): Splash {
-  return {
+  return written({
     owner_id: ME,
     title: '',
     declared_start: null,
@@ -54,11 +55,11 @@ function splash(over: Partial<Splash> & { id: string }): Splash {
     ends_at: null,
     created_at: '2026-10-20T18:00:00.000Z',
     ...over,
-  };
+  });
 }
 
 function ripple(over: Partial<PoolRipple> & { id: string; splash_id: string }): PoolRipple {
-  return {
+  return written({
     author_id: ME,
     note: 'words',
     media: [],
@@ -67,8 +68,9 @@ function ripple(over: Partial<PoolRipple> & { id: string; splash_id: string }): 
     ended_at: null,
     created_at: '2026-10-21T18:00:00.000Z',
     category_id: 'my-lane',
+    started_at: null,
     ...over,
-  };
+  });
 }
 
 const LANE = (id: string, pool: string, name: string, icon: string, position: number) => ({
@@ -84,9 +86,30 @@ const LANE = (id: string, pool: string, name: string, icon: string, position: nu
 const A: PoolView = {
   pool: { id: 'p-a', name: 'Our Pool' },
   members: [
-    { userId: ME, name: 'Yoonji Lee', initials: 'YL', joinedAt: '2026-10-01', former: false },
-    { userId: MINA, name: 'Mina', initials: 'MI', joinedAt: '2026-10-02', former: false },
-    { userId: GONE, name: 'Gone', initials: 'GO', joinedAt: '2026-10-03', former: true },
+    {
+      userId: ME,
+      name: 'Yoonji Lee',
+      initials: 'YL',
+      joinedAt: '2026-10-01',
+      former: false,
+      timeZone: TZ,
+    },
+    {
+      userId: MINA,
+      name: 'Mina',
+      initials: 'MI',
+      joinedAt: '2026-10-02',
+      former: false,
+      timeZone: TZ,
+    },
+    {
+      userId: GONE,
+      name: 'Gone',
+      initials: 'GO',
+      joinedAt: '2026-10-03',
+      former: true,
+      timeZone: TZ,
+    },
   ],
   lanes: [LANE('l-food', 'p-a', 'Food', '🍽️', 0), LANE('l-media', 'p-a', 'Media', '🎬', 1)],
   myLinks: [{ poolLaneId: 'l-food', myCategoryId: 'my-lane' }],
@@ -120,7 +143,14 @@ const A: PoolView = {
 const B: PoolView = {
   pool: { id: 'p-b', name: 'Study Crew' },
   members: [
-    { userId: ME, name: 'Yoonji Lee', initials: 'YL', joinedAt: '2026-10-05', former: false },
+    {
+      userId: ME,
+      name: 'Yoonji Lee',
+      initials: 'YL',
+      joinedAt: '2026-10-05',
+      former: false,
+      timeZone: TZ,
+    },
   ],
   lanes: [LANE('l-notes', 'p-b', 'Notes', '📓', 0)],
   myLinks: [],

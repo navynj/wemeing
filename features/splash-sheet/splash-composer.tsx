@@ -188,6 +188,8 @@ export function SplashComposer({
         prompt: null,
         ends_at: null,
         created_at: now.toISOString(),
+        // Mine, written now: today in my zone, as the trigger will store it.
+        written_on: today,
       },
       hasBlock
         ? [

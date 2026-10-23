@@ -512,6 +512,7 @@ export type Database = {
           planned: boolean
           splash_id: string | null
           started_at: string | null
+          written_on: string
         }
         Insert: {
           author_id: string
@@ -528,6 +529,7 @@ export type Database = {
           planned?: boolean
           splash_id?: string | null
           started_at?: string | null
+          written_on?: string
         }
         Update: {
           author_id?: string
@@ -544,6 +546,7 @@ export type Database = {
           planned?: boolean
           splash_id?: string | null
           started_at?: string | null
+          written_on?: string
         }
         Relationships: [
           {
@@ -694,6 +697,7 @@ export type Database = {
           session_id: string | null
           title: string
           type: Database["public"]["Enums"]["splash_type"]
+          written_on: string
         }
         Insert: {
           created_at?: string
@@ -712,6 +716,7 @@ export type Database = {
           session_id?: string | null
           title: string
           type?: Database["public"]["Enums"]["splash_type"]
+          written_on?: string
         }
         Update: {
           created_at?: string
@@ -730,6 +735,7 @@ export type Database = {
           session_id?: string | null
           title?: string
           type?: Database["public"]["Enums"]["splash_type"]
+          written_on?: string
         }
         Relationships: [
           {

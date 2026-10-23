@@ -14,7 +14,8 @@ import {
   type Splash,
   type SplashBlock,
 } from '@/features/splash/summary';
-import { dayOf, flowInstant } from '@/lib/flow-key';
+import { dayOf, flowInstant, restingInstant } from '@/lib/flow-key';
+import { written } from './written-on';
 
 const TZ = 'America/Vancouver';
 const NOW = new Date('2026-09-25T20:00:00.000Z');
@@ -31,7 +32,7 @@ function block(over: Partial<SplashBlock> & { id: string }): SplashBlock {
 }
 
 function splash(over: Partial<Splash> = {}): Splash {
-  return {
+  return written({
     id: 's1',
     owner_id: 'a1',
     title: 'Whistler',
@@ -49,7 +50,7 @@ function splash(over: Partial<Splash> = {}): Splash {
     ends_at: null,
     created_at: '2026-09-01T16:00:00.000Z',
     ...over,
-  };
+  });
 }
 
 describe('a declaration is a default, never an override (H21f)', () => {
@@ -61,8 +62,9 @@ describe('a declaration is a default, never an override (H21f)', () => {
     expect(dayOf(resting, TZ)).toBe('2026-08-17');
     expect(dayOf(placed, TZ)).toBe('2026-09-02');
     expect(dayOf(plain, TZ)).toBe('2026-09-20');
-    // A resting block sits at the declared day's end, like a date-only one.
-    expect(flowInstant(resting, TZ)).toBe(Date.parse('2026-08-18T06:59:59.999Z'));
+    // A resting block sits above every real instant of its day, like a
+    // date-only one — a rank, so no reader's zone can move it (0013).
+    expect(flowInstant(resting, TZ)).toBe(restingInstant('2026-08-17'));
   });
 
   it('summarises its blocks against its own declared date before any join exists', () => {
@@ -100,7 +102,7 @@ describe('a post’s range and months (H21e)', () => {
     );
     expect(summary.declaredRange).toEqual({ start: '2026-08-17', end: '2026-08-20' });
     expect(summary.range).toEqual({ start: '2026-08-17', end: '2026-09-02' });
-    expect(monthsOf(summary, TZ)).toEqual(['2026-08', '2026-09']);
+    expect(monthsOf(summary)).toEqual(['2026-08', '2026-09']);
   });
 
   it('appears in every month it touches, positioned by its latest block in each', () => {
@@ -114,9 +116,9 @@ describe('a post’s range and months (H21e)', () => {
       TZ,
       NOW,
     );
-    expect(monthsOf(summary, TZ)).toEqual(['2026-08', '2026-09']);
-    expect(positionInMonth(summary, '2026-08', TZ).date).toBe('2026-08-30');
-    expect(positionInMonth(summary, '2026-09', TZ).date).toBe('2026-09-03');
+    expect(monthsOf(summary)).toEqual(['2026-08', '2026-09']);
+    expect(positionInMonth(summary, '2026-08').date).toBe('2026-08-30');
+    expect(positionInMonth(summary, '2026-09').date).toBe('2026-09-03');
   });
 
   it('sits at the clipped end of its range in a month it declares but has no block in', () => {
@@ -126,8 +128,8 @@ describe('a post’s range and months (H21e)', () => {
       TZ,
       NOW,
     );
-    expect(positionInMonth(summary, '2026-09', TZ).date).toBe('2026-09-03');
-    expect(positionInMonth(summary, '2026-08', TZ).date).toBe('2026-08-29');
+    expect(positionInMonth(summary, '2026-09').date).toBe('2026-09-03');
+    expect(positionInMonth(summary, '2026-08').date).toBe('2026-08-29');
   });
 
   it('counts a span’s last day into the range, and reads the period on the pill', () => {
@@ -141,7 +143,7 @@ describe('a post’s range and months (H21e)', () => {
     const summary = summarizeSplash(splash(), [span], TZ, NOW);
     expect(summary.range).toEqual({ start: '2026-09-12', end: '2026-09-14' });
     expect(summary.blocks[0].endDay).toBe('2026-09-14');
-    const at = positionInMonth(summary, '2026-09', TZ);
+    const at = positionInMonth(summary, '2026-09');
     expect(at.date).toBe('2026-09-12');
     expect(at.span).toEqual({ start: '2026-09-12', end: '2026-09-14' });
     expect(formatPillDate(at.span)).toBe('Sep 12–14');
@@ -152,7 +154,7 @@ describe('a post’s range and months (H21e)', () => {
       TZ,
       NOW,
     );
-    expect(positionInMonth(point, '2026-09', TZ).span).toEqual({
+    expect(positionInMonth(point, '2026-09').span).toEqual({
       start: '2026-09-03',
       end: '2026-09-03',
     });
@@ -161,8 +163,8 @@ describe('a post’s range and months (H21e)', () => {
   it('sits where it was made while it has nothing and declares nothing', () => {
     const summary = summarizeSplash(splash({ created_at: '2026-09-23T16:00:00Z' }), [], TZ, NOW);
     expect(summary.range).toBeNull();
-    expect(monthsOf(summary, TZ)).toEqual(['2026-09']);
-    expect(positionInMonth(summary, '2026-09', TZ).date).toBe('2026-09-23');
+    expect(monthsOf(summary)).toEqual(['2026-09']);
+    expect(positionInMonth(summary, '2026-09').date).toBe('2026-09-23');
   });
 
   it('walks months inclusively, across a year', () => {

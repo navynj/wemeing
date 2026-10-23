@@ -21,6 +21,8 @@ export type PoolRipple = Pick<
   | 'ended_at'
   | 'created_at'
   | 'category_id'
+  | 'written_on'
+  | 'started_at'
 >;
 
 export type PoolMember = {
@@ -30,6 +32,8 @@ export type PoolMember = {
   joinedAt: string;
   /** Left, and chose to keep their records here: labelled "Former member". */
   former: boolean;
+  /** Their profile's zone: their records are summarised in it, never the reader's (0013). */
+  timeZone: string;
 };
 
 /** A pool in the switcher: who is in it, and when something last happened there. */
@@ -63,7 +67,7 @@ export type PoolView = {
 };
 
 const RIPPLE_COLUMNS =
-  'id, author_id, splash_id, note, media, occurred_on, occurred_time, ended_at, created_at, category_id';
+  'id, author_id, splash_id, note, media, occurred_on, occurred_time, ended_at, created_at, category_id, written_on, started_at';
 
 type MemberRow = {
   pool_id: string;
@@ -71,7 +75,7 @@ type MemberRow = {
   joined_at: string;
   left_at: string | null;
   keep_on_leave: boolean | null;
-  profile: { display_name: string } | null;
+  profile: { display_name: string; timezone: string } | null;
 };
 
 function toMember(row: MemberRow): PoolMember {
@@ -82,6 +86,7 @@ function toMember(row: MemberRow): PoolMember {
     initials: initialsOf(name),
     joinedAt: row.joined_at,
     former: row.left_at !== null,
+    timeZone: row.profile?.timezone ?? 'UTC',
   };
 }
 
@@ -99,7 +104,9 @@ async function membersOf(supabase: DuringClient, poolIds: string[]): Promise<Mem
   if (poolIds.length === 0) return [];
   const { data, error } = await supabase
     .from('pool_members')
-    .select('pool_id, user_id, joined_at, left_at, keep_on_leave, profile:profiles(display_name)')
+    .select(
+      'pool_id, user_id, joined_at, left_at, keep_on_leave, profile:profiles(display_name, timezone)',
+    )
     .in('pool_id', poolIds)
     .returns<MemberRow[]>();
   if (error) throw error;

@@ -55,6 +55,7 @@ import {
 } from '@/features/splash/summary';
 import { DETAIL_TITLE_CLASS } from '@/features/splash/splash-header';
 import type { MyCategory } from '@/lib/queries/profile';
+import { written } from './written-on';
 
 const TZ = 'America/Vancouver';
 const NOW = new Date('2026-09-25T20:00:00.000Z');
@@ -122,7 +123,7 @@ function post(
   over: Partial<Splash> = {},
 ): SplashSummary {
   return summarizeSplash(
-    {
+    written({
       id,
       owner_id: 'a1',
       title,
@@ -140,7 +141,7 @@ function post(
       ends_at: null,
       created_at: '2026-09-01T16:00:00.000Z',
       ...over,
-    },
+    }),
     blocks,
     TZ,
     NOW,

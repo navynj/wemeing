@@ -39,6 +39,10 @@ export function poolCards(
   now: Date = new Date(),
 ): Card[] {
   const initialsOf = new Map(view.members.map((m) => [m.userId, m.initials]));
+  // Each post is read in its author's zone (0013): its day is stored, and a
+  // span's end day and a timed block's place are the author's too. `timeZone`
+  // (mine) only stands in for an author whose profile is unreadable.
+  const zoneOf = new Map(view.members.map((m) => [m.userId, m.timeZone]));
   const laneOf = new Map(view.lanes.map((lane) => [lane.id, lane]));
   const byPost = new Map<string, PoolRipple[]>();
   for (const r of view.ripples) {
@@ -54,7 +58,13 @@ export function poolCards(
     const blocks = (byPost.get(splash.id) ?? []).sort((a, b) =>
       a.created_at.localeCompare(b.created_at),
     );
-    const summary: SplashSummary = summarizeSplash(splash, blocks, timeZone, now);
+    const writer = splash.owner_id ?? splash.created_by;
+    const summary: SplashSummary = summarizeSplash(
+      splash,
+      blocks,
+      (writer && zoneOf.get(writer)) || timeZone,
+      now,
+    );
     const thread = blocks
       .filter((r) => r.note)
       .map((r) => ({

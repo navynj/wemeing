@@ -38,6 +38,9 @@ const UP_ALPHA = 0.2;
 const UP_SOLID = [0x37, 0x39, 0xd4] as const;
 const UP_INK = 0.6;
 
+/** How far the finger travels before a drag's axis is decided (review). */
+export const AXIS_PX = 8;
+
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 
@@ -238,11 +241,20 @@ export function StairBoard({
   const onPanStart = (): void => {
     panned.current = true;
     grabbed.current = false;
+    decided.current = null;
   };
+  // The axis is decided from the first 8px (review): a drag that starts
+  // across the stair is not a flip, and never becomes one mid-gesture.
+  const decided = useRef<'along' | 'across' | null>(null);
   const onPan = (_: PointerEvent, info: PanInfo): void => {
     const { offset } = along(info);
+    if (decided.current === null) {
+      const across = horizontal ? info.offset.y : info.offset.x;
+      if (Math.hypot(offset, across) < AXIS_PX) return;
+      decided.current = Math.abs(offset) >= Math.abs(across) ? 'along' : 'across';
+    }
+    if (decided.current === 'across') return;
     if (!grabbed.current) {
-      if (Math.abs(offset) < 4) return;
       const target = offset < 0 ? ids[n + 1] : ids[n - 1];
       if (!target) return;
       grabbed.current = true;
@@ -426,9 +438,14 @@ function Step({
         height: stair.height,
         ...(horizontal ? { left: cardLeft, width: cardWidth } : {}),
       }}
-      onPanStart={onTop ? onPanStart : undefined}
-      onPan={onTop ? onPan : undefined}
-      onPanEnd={onTop ? onPanEnd : undefined}
+      // The finger's handlers stay on the card it went down on: the card at
+      // rest on top (`from`), not the card heading there (`to`). Keyed on
+      // `to`, a grab moved them to the incoming card mid-gesture, the
+      // release never arrived and the stack stayed stuck in flight — every
+      // tap and swipe after the first went dead (review, touch).
+      onPanStart={from === 0 ? onPanStart : undefined}
+      onPan={from === 0 ? onPan : undefined}
+      onPanEnd={from === 0 ? onPanEnd : undefined}
     >
       {/* The face, clipped to the card's corners so the frost stays inside. */}
       <motion.div

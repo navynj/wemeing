@@ -581,6 +581,64 @@ describe('the diving board, a staircase', () => {
   });
 });
 
+describe('the stair under a finger (touch)', () => {
+  const touch = { pointerId: 1, isPrimary: true, pointerType: 'touch', button: 0 } as const;
+  /** A finger on the element, dragged by `dy` in a few frames, and lifted. */
+  async function swipe(el: Element, dy: number): Promise<void> {
+    fireEvent.pointerDown(el, { ...touch, clientX: 200, clientY: 600 });
+    for (let k = 1; k <= 8; k += 1) {
+      fireEvent.pointerMove(window, { ...touch, clientX: 200, clientY: 600 + (dy * k) / 8 });
+      await new Promise((r) => setTimeout(r, 16));
+    }
+    fireEvent.pointerUp(window, { ...touch, clientX: 200, clientY: 600 + dy });
+  }
+
+  it('flips forward on a tap of the first lower card', async () => {
+    const { container } = ground();
+    const step = container.querySelector('[data-step-card="mid"]')!;
+    fireEvent.pointerDown(step, { ...touch, clientX: 200, clientY: 700 });
+    fireEvent.pointerUp(step, { ...touch, clientX: 200, clientY: 700 });
+    fireEvent.click(step);
+    await settled(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('mid');
+  });
+
+  it('flips forward on a swipe up and back on a swipe down, and keeps answering after', async () => {
+    const { container } = ground();
+    await swipe(topCard(container), -160);
+    await settled(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('mid');
+    // The second gesture is the one that went dead (review): the stack must
+    // have settled, not stayed in flight.
+    expect(container.querySelector('[data-moving]')).toBeNull();
+    await swipe(topCard(container), 160);
+    await settled(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('late');
+    await swipe(topCard(container), -160);
+    await settled(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('mid');
+    fireEvent.click(container.querySelector('[data-step-card="soup"]')!);
+    await settled(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('soup');
+  });
+
+  it('springs back on a short swipe, and ignores a drag that starts across the stair', async () => {
+    const { container } = ground();
+    await swipe(topCard(container), -30);
+    await settled(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('late');
+    const el = topCard(container);
+    fireEvent.pointerDown(el, { ...touch, clientX: 100, clientY: 600 });
+    for (let k = 1; k <= 8; k += 1) {
+      fireEvent.pointerMove(window, { ...touch, clientX: 100 + k * 25, clientY: 600 - k * 4 });
+      await new Promise((r) => setTimeout(r, 16));
+    }
+    fireEvent.pointerUp(window, { ...touch, clientX: 300, clientY: 568 });
+    await settled(container);
+    expect(topCard(container).getAttribute('data-stack-card')).toBe('late');
+  });
+});
+
 describe('the staircase sideways, on a wide screen', () => {
   const wide = (): void => {
     Object.defineProperty(window, 'matchMedia', {

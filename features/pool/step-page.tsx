@@ -9,16 +9,19 @@ import { ChevronLeft } from 'lucide-react';
 export function StepPage({
   step,
   onBack,
+  wide = false,
   children,
 }: {
   /** "1 / 2", or null for a page that is not a numbered step. */
   step: string | null;
   onBack: () => void;
+  /** Both steps side by side on a wide screen (review): wider, and no step count there. */
+  wide?: boolean;
   children: ReactNode;
 }) {
   return (
     <main
-      className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-white px-6"
+      className={`mx-auto flex min-h-dvh w-full max-w-md flex-col bg-white px-6 ${wide ? 'lg:max-w-5xl' : ''}`}
       style={{
         paddingTop: 'calc(1.5rem + env(safe-area-inset-top, 0px))',
         paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))',
@@ -29,7 +32,10 @@ export function StepPage({
           <ChevronLeft aria-hidden size={22} strokeWidth={2.5} />
         </button>
         {step ? (
-          <span data-step className="text-base font-semibold tabular-nums">
+          <span
+            data-step
+            className={`text-base font-semibold tabular-nums ${wide ? 'lg:hidden' : ''}`}
+          >
             {step}
           </span>
         ) : null}

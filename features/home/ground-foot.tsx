@@ -115,7 +115,8 @@ export function GroundFoot({
           href="/pool/new"
           aria-label="Open a new Pool"
           data-strip-new
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-dashed border-white/40 text-white/80"
+          // A pool to be: the pools' rounded square, dashed (review).
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-dashed border-white/40 text-white/80"
         >
           <Plus aria-hidden size={18} />
         </Link>

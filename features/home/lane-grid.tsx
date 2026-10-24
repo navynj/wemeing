@@ -37,7 +37,6 @@ import {
   weekdayOf,
   type Card,
   type GridColumn,
-  JOINT_PILL_PX,
 } from './grid';
 import { DAY_RAIL_PX, DateDay } from './date-day';
 import { JointBand, JointCount, JointFaces } from './joint-band';
@@ -464,19 +463,25 @@ export const LaneGrid = forwardRef<
             const monthChanges = !rows
               .slice(0, index)
               .some((r) => r.kind === 'day' && monthKey(r.day) === monthKey(day));
-            const marks = (lane: string, icon: string | null): ReactNode =>
-              (byCell.get(`${day}|${lane}`) ?? []).map((card) => (
-                <Mark
-                  key={card.splash.id}
-                  card={card}
-                  // A member's column has no emoji: the post's own lane stands in (H23).
-                  icon={card.splash.icon ?? card.lane?.icon ?? icon}
-                  dived={waterIds.has(card.splash.id)}
-                  ring={ringAt?.id === card.splash.id ? ringAt.seq : null}
-                  titled={titled}
-                  onPick={onPick}
-                />
-              ));
+            const marks = (
+              lane: string,
+              icon: string | null,
+              only?: ReadonlySet<string>,
+            ): ReactNode =>
+              (byCell.get(`${day}|${lane}`) ?? [])
+                .filter((card) => !only || only.has(card.splash.id))
+                .map((card) => (
+                  <Mark
+                    key={card.splash.id}
+                    card={card}
+                    // A member's column has no emoji: the post's own lane stands in (H23).
+                    icon={card.splash.icon ?? card.lane?.icon ?? icon}
+                    dived={waterIds.has(card.splash.id)}
+                    ring={ringAt?.id === card.splash.id ? ringAt.seq : null}
+                    titled={titled}
+                    onPick={onPick}
+                  />
+                ));
             if (dateView) {
               return (
                 <DateDay key={day} day={day} monthChanges={monthChanges}>
@@ -503,34 +508,52 @@ export const LaneGrid = forwardRef<
                 </DateDay>
               );
             }
-            // A day holding only joint splashes is named on its first band's rail.
-            const joints = (byDay.get(day) ?? []).filter(banded);
-            const plain = (byDay.get(day) ?? []).length > joints.length;
+            // A day reads newest first, as the stack does (review): a run of
+            // plain marks shares a row, a band is a row of its own, and only the
+            // first row names the day.
+            const segments: ({ kind: 'marks'; ids: Set<string> } | { kind: 'band'; card: Card })[] =
+              [];
+            for (const card of byDay.get(day) ?? []) {
+              const last = segments[segments.length - 1];
+              if (banded(card)) segments.push({ kind: 'band', card });
+              else if (last?.kind === 'marks') last.ids.add(card.splash.id);
+              else segments.push({ kind: 'marks', ids: new Set([card.splash.id]) });
+            }
             return (
               <Fragment key={day}>
-                {plain ? (
-                  <DayRow day={day} monthChanges={monthChanges}>
-                    {categories.map((lane, at) => (
-                      <Cell key={lane.id} lane={lane.id} first={at === 0}>
-                        {marks(lane.id, lane.icon)}
-                      </Cell>
-                    ))}
-                    {orphans ? <Cell lane="">{marks('', null)}</Cell> : null}
-                    {plusColumn ? <Cell lane="+" /> : null}
-                  </DayRow>
-                ) : null}
-                {joints.map((card, at) => (
-                  <JointBand
-                    key={card.splash.id}
-                    card={card}
-                    day={day}
-                    label={!plain && at === 0 ? { monthChanges } : null}
-                    icon={card.splash.icon ?? laneOfCard(card, categories)?.icon ?? null}
-                    dived={waterIds.has(card.splash.id)}
-                    ring={ringAt?.id === card.splash.id ? ringAt.seq : null}
-                    onPick={onPick}
-                  />
-                ))}
+                {segments.map((segment, at) =>
+                  segment.kind === 'marks' ? (
+                    <DayRow
+                      key={`marks-${at}`}
+                      day={day}
+                      monthChanges={monthChanges}
+                      labelled={at === 0}
+                    >
+                      {categories.map((lane, column) => (
+                        <Cell key={lane.id} lane={lane.id} first={column === 0}>
+                          {marks(lane.id, lane.icon, segment.ids)}
+                        </Cell>
+                      ))}
+                      {orphans ? <Cell lane="">{marks('', null, segment.ids)}</Cell> : null}
+                      {plusColumn ? <Cell lane="+" /> : null}
+                    </DayRow>
+                  ) : (
+                    <JointBand
+                      key={segment.card.splash.id}
+                      card={segment.card}
+                      day={day}
+                      label={at === 0 ? { monthChanges } : null}
+                      icon={
+                        segment.card.splash.icon ??
+                        laneOfCard(segment.card, categories)?.icon ??
+                        null
+                      }
+                      dived={waterIds.has(segment.card.splash.id)}
+                      ring={ringAt?.id === segment.card.splash.id ? ringAt.seq : null}
+                      onPick={onPick}
+                    />
+                  ),
+                )}
               </Fragment>
             );
           })}
@@ -592,12 +615,28 @@ function ColumnHeader({ column }: { column: GridColumn }) {
 function DayRow({
   day,
   monthChanges,
+  labelled = true,
   children,
 }: {
   day: IsoDate;
   monthChanges: boolean;
+  /** A later row of the same day (after a band): its rail stays blank. */
+  labelled?: boolean;
   children: ReactNode;
 }) {
+  if (!labelled) {
+    return (
+      <>
+        <div
+          aria-hidden
+          data-day-continued={day}
+          className="bg-main-900 sticky left-0 z-10"
+          style={{ minHeight: ROW_PX }}
+        />
+        {children}
+      </>
+    );
+  }
   return (
     <>
       {/* The rail reads quieter than the marks: one readable opacity (review).
@@ -748,10 +787,13 @@ function Mark({
         data-ring={ring !== null ? '' : undefined}
         aria-label={title}
         onClick={() => onPick(card.splash.id)}
-        data-joint-pill={card.joint ? '' : undefined}
-        className={`relative flex shrink-0 items-center justify-center rounded-full text-sm/none ${surface}`}
-        // A joint splash is a pill, so the Lane view shows it is the pool's (review).
-        style={{ width: card.joint ? JOINT_PILL_PX : MARK_PX, height: MARK_PX }}
+        data-joint-mark={card.joint ? '' : undefined}
+        // A joint splash is the pool's rounded square, as pools are on the
+        // strip, so the Lane view shows it is the pool's (review).
+        className={`relative flex shrink-0 items-center justify-center text-sm/none ${
+          card.joint ? 'rounded-lg' : 'rounded-full'
+        } ${surface}`}
+        style={{ width: MARK_PX, height: MARK_PX }}
       >
         {icon ? (
           <span aria-hidden className={`leading-none ${dived ? 'opacity-60' : ''}`}>

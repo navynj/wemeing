@@ -367,6 +367,8 @@ describe('switching pools (H23)', () => {
     expect(strip.querySelector('[data-strip-pool="p-a"] [data-unseen-dot]')).toBeNull();
     expect(strip.querySelector('[data-strip-pool="p-b"]')!.getAttribute('href')).toBe('/pool/p-b');
     expect(strip.querySelector('[data-strip-new]')!.getAttribute('href')).toBe('/pool/new');
+    // A pool to be is the pools' rounded square too.
+    expect(strip.querySelector('[data-strip-new]')!.className).toContain('rounded-lg');
     // No name dropdown any more: the strip is the way between pools.
     expect(container.querySelector('[data-pool-switcher]')).toBeNull();
   });
@@ -691,16 +693,17 @@ describe('a conversion shows at once (0022)', () => {
 });
 
 describe('a joint splash reads as the pool’s at a glance (review)', () => {
-  it('is a pill in the Lane view; a post of one person stays a disc', () => {
+  it('is a rounded square in the Lane view; a post of one person stays a disc', () => {
     setView('lane');
     const { container } = ground(A);
     const joint = container.querySelector('[data-mark="s-joint"]') as HTMLElement;
-    expect(joint.hasAttribute('data-joint-pill')).toBe(true);
-    expect(joint.style.width).toBe('44px');
-    expect(joint.style.height).toBe('28px');
+    expect(joint.hasAttribute('data-joint-mark')).toBe(true);
+    expect(joint.className).toContain('rounded-lg');
+    expect(joint.className).not.toContain('rounded-full');
+    expect(joint.style.width).toBe('28px');
     const mine = container.querySelector('[data-mark="s-mine"]') as HTMLElement;
-    expect(mine.hasAttribute('data-joint-pill')).toBe(false);
-    expect(mine.style.width).toBe('28px');
+    expect(mine.hasAttribute('data-joint-mark')).toBe(false);
+    expect(mine.className).toContain('rounded-full');
   });
 
   it('is a pill across the whole row in the Date view', () => {
@@ -737,5 +740,41 @@ describe('the joint surface is solid, and the faces’ ring is its colour (revie
     expect(row.className).toContain(SURFACE);
     expect(row.className).not.toMatch(/bg-white\//);
     expect(faces(row).every((face) => face.className.includes(RING))).toBe(true);
+  });
+});
+
+describe('a day reads newest first, bands and marks alike (review)', () => {
+  // An older post of mine on the joint splash's day (Oct 20), written before it.
+  const C: PoolView = {
+    ...A,
+    splashes: [
+      ...A.splashes,
+      splash({ id: 's-old', title: 'Older', created_at: '2026-10-19T18:00:00.000Z' }),
+    ],
+    ripples: [
+      ...A.ripples,
+      ripple({
+        id: 'r-old',
+        splash_id: 's-old',
+        occurred_on: '2026-10-20',
+        created_at: '2026-10-19T18:00:00.000Z',
+      }),
+    ],
+    placements: [
+      ...A.placements,
+      { splashId: 's-old', poolId: 'p-a', poolLaneId: 'l-food', shared: true, ownerId: ME },
+    ],
+  };
+
+  it('puts the newer joint band above the older mark of the same day, the date named once', () => {
+    setView('swimmers');
+    const { container } = ground(C);
+    const band = container.querySelector('[data-joint-band="s-joint"]')!;
+    const older = container.querySelector('[data-mark="s-old"]')!;
+    // The band precedes the older mark in the grid.
+    expect(band.compareDocumentPosition(older) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Oct 20 is named on the band's rail; the row after it leaves the rail blank.
+    expect(container.querySelectorAll('[data-day-row="2026-10-20"]')).toHaveLength(1);
+    expect(container.querySelector('[data-day-continued="2026-10-20"]')).not.toBeNull();
   });
 });

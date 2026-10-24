@@ -77,9 +77,6 @@ export type CardLane = { icon: string | null; name: string };
  */
 export const JOINT_SURFACE = '#3739D4';
 
-/** A joint splash's mark and row icon: the disc's height, stretched to a pill (review). */
-export const JOINT_PILL_PX = 44;
-
 /** A joint splash's ripple, as a branch off its band: the column it drops into, and whose it is. */
 export type Branch = { id: string; column: string; initials: string; authorId?: string };
 

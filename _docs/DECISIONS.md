@@ -504,3 +504,8 @@ A member's column in Swimmers opens nothing.
 - **Dots:** a dot needs this device's visit history, so it appears only once the browser has it. A dot drawn by the server and removed by the client had caused a hydration error on Home.
 
 **A joint splash is a pill wherever it is a mark or a row (review, 2026-10-23).** In the Lane view, on Home and in a pool, a joint splash's mark is a pill: the disc's 28px height stretched to 44px. In the Date view its row is one pill across the whole row (icon, title, lane chip, faces, ripple count), where other rows keep their faint line. Either way it reads as the pool's at a glance. In Swimmers it stays the band. Cards carry `joint`, so a joint splash just written or just converted takes the shape from its first frame.
+
+**A day reads newest first; joint marks are rounded squares; a wide screen opens a pool in one view (review, 2026-10-23).**
+- **Day order:** within a day the grid follows the stack's order, newest first. A run of plain marks shares a row and a band is a row of its own, so a newer joint splash is no longer pushed below older marks. Only the first row names the day.
+- **Joint marks:** in the Lane view a joint splash's mark is a rounded square, matching pools on the strip; the pill read ambiguously. In the Date view its row stays one pill across the whole row. The strip's "Open a new Pool" tile is a dashed rounded square too.
+- **Creating a pool:** on a wide screen, step 1 (name, visibility, lanes) sits on the left and step 2 (matching) on the right, live as lanes are added. A name match is suggested wherever I haven't chosen; "Don't connect" is a choice and is kept. A phone still walks the two steps.

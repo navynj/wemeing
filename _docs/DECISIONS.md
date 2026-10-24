@@ -487,3 +487,10 @@ A member's column in Swimmers opens nothing.
 - **Removed:** back chips and the `?from=` links that fed them.
 
 **Back closes the splash sheet with its exit, and only the top card opens it (review, 2026-10-23).** A mark, a pinned card, a Date row or a lane page row brings its post to the top of the stack; only the top card opens the sheet. When the route closes the sheet (back, or any navigation away), Next has already taken the sheet away. It therefore leaves a still, inert copy of itself in place, which plays the exit (the board's spring down, the scrim fading; a fade alone under reduced motion) and is removed when it finishes. A sheet that closed itself has already played its exit, and adds no copy. React's development double-run of effects plays nothing.
+
+**A strip of places replaces the Pool tab and the pool switcher (review, 2026-10-23).**
+- **The strip:** the foot is my face (Home), then a monogram per pool I am in now, the one I opened most recently first, then a small `+` to open a new pool. Compose stays apart at the right.
+- **Each place:** a 40px circle. The one I am in wears an ink ring (selection). A pool with something new since my last visit on this device carries the dot.
+- **Taps:** tapping a place goes there; tapping the one I am in walks its views (Home: Lane ↔ Date; a pool: Swimmers → Lane → Date).
+- **Layout:** the strip scrolls sideways, one axis per gesture. On a wide screen the right-edge rail lists the same places in the same order, then compose.
+- **Removed:** the pool name's dropdown switcher, the Pool tab and its dot. The strip carries the dots.

@@ -952,8 +952,9 @@ describe('a post\u2019s own icon (0008)', () => {
 describe('the Home button at the foot', () => {
   it('switches the view on each tap, and the header toggle follows', () => {
     const { container } = ground();
+    // Home is my face, first on the strip, ringed: I am here.
     const home = container.querySelector('[data-home-foot] [data-home-tab]')!;
-    expect(home.textContent).toBe('Home');
+    expect(home.getAttribute('aria-current')).toBe('page');
     expect(container.querySelector('[data-mark]')).not.toBeNull();
     fireEvent.click(home);
     expect(container.querySelector('[data-pill]')).not.toBeNull();

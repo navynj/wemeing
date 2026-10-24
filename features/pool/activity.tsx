@@ -2,24 +2,40 @@
 
 import { createContext, useContext, type ReactNode } from 'react';
 
-import { useUnseenPools } from './remembered';
+import { isNewSince, usePoolVisits } from './remembered';
 
-/** Each of my pools' latest activity by someone else, loaded once by the shell. */
-const Context = createContext<Record<string, string | null>>({});
+type MyPoolName = { id: string; name: string };
+type Activity = { activity: Record<string, string | null>; pools: MyPoolName[] };
+
+/** My pools, and each one's latest activity by someone else, loaded once by the shell. */
+const Context = createContext<Activity>({ activity: {}, pools: [] });
 
 export function PoolActivityProvider({
   activity,
+  pools = [],
   children,
 }: {
   activity: Record<string, string | null>;
+  pools?: MyPoolName[];
   children: ReactNode;
 }) {
-  return <Context.Provider value={activity}>{children}</Context.Provider>;
+  return <Context.Provider value={{ activity, pools }}>{children}</Context.Provider>;
 }
 
-/** True when a pool (other than `except`) has something I have not seen on this device. */
-export function useHasUnseenPool(except: string | null = null): boolean {
-  return useUnseenPools(useContext(Context), except).length > 0;
+/**
+ * The pool strip's pools (review): every pool I am in now, the one I opened
+ * most recently first, each with whether it has something new for me.
+ */
+export function useStripPools(): (MyPoolName & { fresh: boolean })[] {
+  const { activity, pools } = useContext(Context);
+  const visits = usePoolVisits();
+  return pools
+    .map((pool, at) => ({ pool, at, seen: visits[pool.id] ?? '' }))
+    .sort((a, b) => b.seen.localeCompare(a.seen) || a.at - b.at)
+    .map(({ pool }) => ({
+      ...pool,
+      fresh: isNewSince(pool.id, activity[pool.id] ?? null),
+    }));
 }
 
 /**

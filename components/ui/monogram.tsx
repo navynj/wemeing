@@ -9,6 +9,8 @@ const SIZES = {
   chip: 'h-4 min-w-4 rounded px-0.5 text-[10px]',
   // A Home column of a pool's Just-mine splashes, where an emoji would be.
   head: 'h-7 w-7 rounded-lg text-[10px]',
+  // An item of the pool strip at the foot (review): a 40px circle.
+  nav: 'h-10 w-10 rounded-full text-sm',
 } as const;
 
 /**

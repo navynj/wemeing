@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, Plus, Settings } from 'lucide-react';
+import { Plus, Settings } from 'lucide-react';
 
 import { GroundFoot } from '@/features/home/ground-foot';
 import { withEdits, type Card } from '@/features/home/grid';
@@ -15,12 +15,11 @@ import { useFlip } from '@/features/home/use-flip';
 import { SegmentedToggle } from '@/features/home/view-toggle';
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { deleteSplash, setSplashPinned } from '@/features/splash/actions';
-import type { MyPool, PoolView } from '@/lib/queries/pools';
+import type { PoolView } from '@/lib/queries/pools';
 import type { IsoDate } from '@/lib/time';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
 import { Avatar } from '@/features/people/avatar';
 
-import { UnseenDot, useHasUnseenPool } from './activity';
 import { poolScopeOf } from './compose-scope';
 import { deleteJointSplash } from './actions';
 import { InvitePanel } from './invite-panel';
@@ -29,7 +28,6 @@ import { poolCards, poolColumns, poolPinned, withPoolMoves, type PoolViewKind } 
 import { PoolLanesSheet } from './pool-lanes-sheet';
 import { rememberVisit, usePoolView } from './remembered';
 import { PoolSheet, SheetTitle } from './sheet';
-import { PoolSwitcher } from './switcher';
 
 /** The view after this one, in the toggle's order. */
 function nextView(view: PoolViewKind): PoolViewKind {
@@ -48,12 +46,12 @@ const VIEWS = [
 /** How many members' initials the header shows before the `+`. */
 const HEADER_AVATARS = 3;
 
-type Sheet = 'switcher' | 'members' | 'invite' | 'lanes' | null;
+type Sheet = 'members' | 'invite' | 'lanes' | null;
 
 /**
  * A pool's home (H23; `_docs/mockups/pool-home.png`, `pool-swimmers.png`):
  * the same water ground as Home, scoped to one pool. The header is the
- * pool's name with the switcher's chevron, the members' initials and a `+`
+ * pool's name (going to another pool is the foot's strip), the members' initials and a `+`
  * that opens the invite link, and the settings gear; beneath it the lane
  * glyph (the pool's lanes, any member edits them), the Lane | Date |
  * Swimmers toggle, and the members icon. Pinned cards and the stair stack
@@ -63,14 +61,12 @@ type Sheet = 'switcher' | 'members' | 'invite' | 'lanes' | null;
  */
 export function PoolGround({
   view,
-  pools,
   me,
   today,
   timeZone,
   topParam = null,
 }: {
   view: PoolView;
-  pools: MyPool[];
   me: string;
   today: IsoDate;
   timeZone: string;
@@ -79,7 +75,6 @@ export function PoolGround({
   const router = useRouter();
   const poolId = view.pool.id;
   const [kind, setKind] = usePoolView();
-  const otherUnseen = useHasUnseenPool(poolId);
   const [sheet, setSheet] = useState<Sheet>(null);
   const {
     openSheet,
@@ -208,22 +203,13 @@ export function PoolGround({
       >
         <div data-grid-column className="flex min-h-0 flex-1 flex-col lg:min-w-0 lg:flex-1">
           <header data-pool-header className="flex shrink-0 items-center gap-2 px-4 pt-4">
-            <button
-              type="button"
-              data-pool-switcher
-              aria-label={`${view.pool.name}, switch Pool`}
-              onClick={() => setSheet('switcher')}
-              className="flex min-w-0 flex-1 items-center gap-1.5 text-white"
+            {/* The pool's name; going to another pool is the strip's (review). */}
+            <h1
+              data-pool-title
+              className="min-w-0 flex-1 truncate text-3xl/tight font-semibold text-white"
             >
-              <span data-pool-title className="truncate text-3xl/tight font-semibold">
-                {view.pool.name}
-              </span>
-              <span className="relative flex shrink-0">
-                <ChevronDown aria-hidden size={22} strokeWidth={2.5} />
-                {/* Another of my pools has something new (review). */}
-                {otherUnseen ? <UnseenDot label="New in another Pool" /> : null}
-              </span>
-            </button>
+              {view.pool.name}
+            </h1>
             <span className="flex shrink-0 items-center">
               {/* The members' faces are the way to the member list (review). */}
               <button
@@ -327,6 +313,7 @@ export function PoolGround({
           />
           <GroundFoot
             here="pool"
+            poolId={poolId}
             onPool={cycleView}
             poolLabel={`Pool, showing ${kind}; tap for ${nextView(kind)}`}
             onCompose={composeHere}
@@ -337,15 +324,13 @@ export function PoolGround({
         <GroundFoot
           slot="wide"
           here="pool"
+          poolId={poolId}
           onPool={cycleView}
           poolLabel={`Pool, showing ${kind}; tap for ${nextView(kind)}`}
           onCompose={composeHere}
         />
       </div>
 
-      {sheet === 'switcher' ? (
-        <PoolSwitcher pools={pools} currentId={poolId} onClose={() => setSheet(null)} />
-      ) : null}
       {sheet === 'members' ? (
         <MembersSheet
           poolId={poolId}

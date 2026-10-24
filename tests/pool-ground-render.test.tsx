@@ -27,6 +27,7 @@ vi.mock('@/features/pool/actions', () => ({
 
 import { InputSheetProvider, useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { PeopleProvider } from '@/features/people/people-provider';
+import { PoolActivityProvider } from '@/features/pool/activity';
 import { PoolGround } from '@/features/pool/pool-ground';
 import { PoolIndex } from '@/features/pool/pool-index';
 import { lastPool, rememberVisit } from '@/features/pool/remembered';
@@ -178,11 +179,16 @@ const POOLS: MyPool[] = [
   },
 ];
 
+/** As the shell provides them: my pools and what is new in each (review). */
+const ACTIVITY = Object.fromEntries(POOLS.map((p) => [p.id, p.latestActivity]));
+
 function ground(view: PoolView) {
   return render(
-    <InputSheetProvider>
-      <PoolGround view={view} pools={POOLS} me={ME} today="2026-10-23" timeZone={TZ} />
-    </InputSheetProvider>,
+    <PoolActivityProvider activity={ACTIVITY} pools={POOLS}>
+      <InputSheetProvider>
+        <PoolGround view={view} me={ME} today="2026-10-23" timeZone={TZ} />
+      </InputSheetProvider>
+    </PoolActivityProvider>,
   );
 }
 
@@ -333,21 +339,43 @@ describe('Swimmers (H23)', () => {
 });
 
 describe('switching pools (H23)', () => {
-  it('lists every pool in the switcher, the current one checked', () => {
-    const { container, getByText } = ground(A);
-    fireEvent.click(container.querySelector('[data-pool-switcher]')!);
-    expect(container.ownerDocument.querySelectorAll('[data-switch-pool]')).toHaveLength(2);
-    expect(
-      container.ownerDocument
-        .querySelector('[data-switch-pool="p-a"]')!
-        .getAttribute('aria-current'),
-    ).toBe('true');
+  it('lists my face then my pools on the strip, the current one ringed, news dotted', () => {
+    const { container } = ground(A);
+    const strip = container.querySelector('[data-home-foot="phone"] [data-place-strip]')!;
+    const order = [...strip.children].map(
+      (el) =>
+        (el.hasAttribute('data-strip-home') && 'home') ||
+        el.getAttribute('data-strip-pool') ||
+        (el.hasAttribute('data-strip-new') && 'new'),
+    );
+    // A visited just now, so it leads the pools; the `+` closes the strip.
+    expect(order).toEqual(['home', 'p-a', 'p-b', 'new']);
+    const current = strip.querySelector('[data-strip-pool="p-a"]')!;
+    expect(current.getAttribute('aria-current')).toBe('page');
+    expect(current.className).toContain('ring-ink');
     // Something happened in B since a visit that never was: the dot.
-    expect(
-      container.ownerDocument.querySelector('[data-switch-pool="p-b"] [data-pool-new]'),
-    ).not.toBeNull();
-    fireEvent.click(getByText('Study Crew'));
-    expect(pushed).toEqual(['/pool/p-b']);
+    expect(strip.querySelector('[data-strip-pool="p-b"] [data-unseen-dot]')).not.toBeNull();
+    expect(strip.querySelector('[data-strip-pool="p-a"] [data-unseen-dot]')).toBeNull();
+    expect(strip.querySelector('[data-strip-pool="p-b"]')!.getAttribute('href')).toBe('/pool/p-b');
+    expect(strip.querySelector('[data-strip-new]')!.getAttribute('href')).toBe('/pool/new');
+    // No name dropdown any more: the strip is the way between pools.
+    expect(container.querySelector('[data-pool-switcher]')).toBeNull();
+  });
+
+  it('lists the same places in the same order on the wide rail', () => {
+    const { container } = ground(A);
+    const ids = (slot: string) =>
+      [
+        ...container.querySelectorAll(
+          `[data-home-foot="${slot}"] [data-strip-home], [data-home-foot="${slot}"] [data-strip-pool], [data-home-foot="${slot}"] [data-strip-new]`,
+        ),
+      ].map(
+        (el) =>
+          el.getAttribute('data-strip-pool') ??
+          (el.hasAttribute('data-strip-home') ? 'home' : 'new'),
+      );
+    expect(ids('wide')).toEqual(ids('phone'));
+    expect(ids('wide')).toEqual(['home', 'p-a', 'p-b', 'new']);
   });
 
   it('shows only the other pool’s records once switched, in the same view', () => {
@@ -387,12 +415,11 @@ describe('switching pools (H23)', () => {
     expect(replaced).toEqual(['/pool/p-a']);
   });
 
-  it('marks a pool seen once visited', () => {
+  it('drops a pool’s dot once visited', () => {
     rememberVisit('p-b', new Date('2026-10-23T00:00:00Z'));
     const { container } = ground(A);
-    fireEvent.click(container.querySelector('[data-pool-switcher]')!);
     expect(
-      container.ownerDocument.querySelector('[data-switch-pool="p-b"] [data-pool-new]'),
+      container.querySelector('[data-home-foot="phone"] [data-strip-pool="p-b"] [data-unseen-dot]'),
     ).toBeNull();
   });
 });
@@ -505,7 +532,7 @@ describe('faces (0018)', () => {
     render(
       <PeopleProvider me={ME} people={PEOPLE}>
         <InputSheetProvider>
-          <PoolGround view={view} pools={POOLS} me={ME} today="2026-10-23" timeZone={TZ} />
+          <PoolGround view={view} me={ME} today="2026-10-23" timeZone={TZ} />
         </InputSheetProvider>
       </PeopleProvider>,
     );
@@ -566,7 +593,7 @@ describe('moving a pool’s splash to another lane (0020, review)', () => {
     render(
       <InputSheetProvider>
         <Mover id="s-joint" to={to} />
-        <PoolGround view={A} pools={POOLS} me={ME} today="2026-10-23" timeZone={TZ} />
+        <PoolGround view={A} me={ME} today="2026-10-23" timeZone={TZ} />
       </InputSheetProvider>,
     );
 
@@ -583,7 +610,7 @@ describe('moving a pool’s splash to another lane (0020, review)', () => {
     rerender(
       <InputSheetProvider>
         <Mover id="s-joint" to={null} />
-        <PoolGround view={A} pools={POOLS} me={ME} today="2026-10-23" timeZone={TZ} />
+        <PoolGround view={A} me={ME} today="2026-10-23" timeZone={TZ} />
       </InputSheetProvider>,
     );
     expect(container.querySelector('[data-cell="l-media"] [data-mark="s-joint"]')).not.toBeNull();
@@ -617,7 +644,7 @@ describe('a conversion shows at once (0022)', () => {
     const { container } = render(
       <InputSheetProvider>
         <Convert id="s-mine" kind="joint" />
-        <PoolGround view={A} pools={POOLS} me={ME} today="2026-10-23" timeZone={TZ} />
+        <PoolGround view={A} me={ME} today="2026-10-23" timeZone={TZ} />
       </InputSheetProvider>,
     );
     expect(container.querySelector('[data-joint-band="s-mine"]')).not.toBeNull();
@@ -628,7 +655,7 @@ describe('a conversion shows at once (0022)', () => {
     const { container } = render(
       <InputSheetProvider>
         <Convert id="s-joint" kind="own" />
-        <PoolGround view={A} pools={POOLS} me={ME} today="2026-10-23" timeZone={TZ} />
+        <PoolGround view={A} me={ME} today="2026-10-23" timeZone={TZ} />
       </InputSheetProvider>,
     );
     expect(container.querySelector('[data-joint-band="s-joint"]')).toBeNull();

@@ -121,7 +121,7 @@ describe('desktop layout at 1280px', () => {
       window.localStorage.setItem('weming.pool-view', view);
       const { container } = render(
         <InputSheetProvider>
-          <PoolGround view={VIEW} pools={[]} me="u" today="2026-10-23" timeZone="UTC" />
+          <PoolGround view={VIEW} me="u" today="2026-10-23" timeZone="UTC" />
         </InputSheetProvider>,
       );
       expectDesktopRow(container);

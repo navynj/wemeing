@@ -296,6 +296,7 @@ export function LanePage({
       <GroundFoot
         slot="wide"
         here={pool ? 'pool' : 'home'}
+        poolId={pool?.poolId ?? null}
         homeLabel="Home"
         onHome={() => router.push('/')}
         onPool={pool ? () => router.push(`/pool/${pool.poolId}`) : undefined}

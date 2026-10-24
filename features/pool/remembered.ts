@@ -62,22 +62,19 @@ function subscribeVisits(onChange: () => void): () => void {
   };
 }
 
-/**
- * The pools with something new since my last visit on this device (H23),
- * from each pool's latest activity; `except` leaves out the pool I am in.
- * Nothing on the server render: a dot is a device's memory.
- */
-export function useUnseenPools(
-  activity: Record<string, string | null>,
-  except: string | null = null,
-): string[] {
+/** When I last opened each pool on this device, by id; empty on the server. */
+export function usePoolVisits(): Record<string, string> {
   const raw = useSyncExternalStore(
     subscribeVisits,
     () => read(VISITS) ?? '',
-    () => null,
+    () => '',
   );
-  if (raw === null) return [];
-  return Object.keys(activity).filter((id) => id !== except && isNewSince(id, activity[id]));
+  try {
+    const parsed: unknown = JSON.parse(raw || '{}');
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
 }
 
 /** Something new since my last visit on this device; never-visited counts as new when anything is there. */

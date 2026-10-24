@@ -8,7 +8,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 import { GroundFoot } from '@/features/home/ground-foot';
-import { PoolActivityProvider, useHasUnseenPool } from '@/features/pool/activity';
+import { PoolActivityProvider } from '@/features/pool/activity';
 import { rememberVisit } from '@/features/pool/remembered';
 
 beforeEach(() => window.localStorage.clear());
@@ -18,15 +18,23 @@ const ACTIVITY = { 'p-a': '2026-10-23T10:00:00.000Z', 'p-b': null };
 
 function foot(activity: Record<string, string | null> = ACTIVITY) {
   return render(
-    <PoolActivityProvider activity={activity}>
+    <PoolActivityProvider
+      activity={activity}
+      pools={[
+        { id: 'p-a', name: 'Sarang' },
+        { id: 'p-b', name: 'Study Crew' },
+      ]}
+    >
       <GroundFoot here="home" onCompose={() => {}} />
     </PoolActivityProvider>,
   );
 }
 
-const dot = (root: Element) => root.querySelector('[data-pool-tab] [data-unseen-dot]');
+// The dot rides on the pool's own place on the strip (review).
+const dot = (root: Element) =>
+  root.querySelector('[data-home-foot] [data-strip-pool="p-a"] [data-unseen-dot]');
 
-describe('the Pool tab’s dot (review)', () => {
+describe('a pool’s dot on the strip (review)', () => {
   it('shows when a pool has something I have not seen on this device', () => {
     expect(dot(foot().container)).not.toBeNull();
   });
@@ -42,23 +50,5 @@ describe('the Pool tab’s dot (review)', () => {
 
   it('stays off when no pool has anything by anyone else', () => {
     expect(dot(foot({ 'p-a': null, 'p-b': null }).container)).toBeNull();
-  });
-});
-
-describe('the dot on the pool switcher’s arrow (review)', () => {
-  function Probe({ except }: { except: string }) {
-    return <span data-other>{String(useHasUnseenPool(except))}</span>;
-  }
-  const other = (except: string) =>
-    render(
-      <PoolActivityProvider activity={ACTIVITY}>
-        <Probe except={except} />
-      </PoolActivityProvider>,
-    ).container.querySelector('[data-other]')!.textContent;
-
-  it('counts other pools only, never the one I am in', () => {
-    expect(other('p-b')).toBe('true');
-    cleanup();
-    expect(other('p-a')).toBe('false');
   });
 });

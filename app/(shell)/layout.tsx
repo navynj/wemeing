@@ -50,7 +50,7 @@ export default async function ShellLayout({ children, modal }: LayoutProps<'/'>)
   );
   return (
     <PeopleProvider me={profile?.id ?? null} people={people}>
-      <PoolActivityProvider activity={activity}>
+      <PoolActivityProvider activity={activity} pools={context?.pools ?? []}>
         <InputSheetProvider>
           <div className="flex min-h-dvh flex-col">
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>

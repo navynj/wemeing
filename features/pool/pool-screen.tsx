@@ -2,7 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 
 import { PoolGround } from '@/features/pool/pool-ground';
 import { getMyProfile } from '@/lib/queries/profile';
-import { getMyPools, getPoolView } from '@/lib/queries/pools';
+import { getPoolView } from '@/lib/queries/pools';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
 import { poolScopeOf } from '@/features/pool/compose-scope';
@@ -18,10 +18,7 @@ export async function PoolScreen({ id, top }: { id: string; top?: string }) {
   const profile = await getMyProfile(supabase);
   if (!profile) redirect('/sign-in');
 
-  const [view, pools] = await Promise.all([
-    getPoolView(supabase, id, profile.id),
-    getMyPools(supabase, profile.id),
-  ]);
+  const view = await getPoolView(supabase, id, profile.id);
   if (!view) notFound();
 
   return (
@@ -30,7 +27,6 @@ export async function PoolScreen({ id, top }: { id: string; top?: string }) {
       <PoolEditScope scope={poolScopeOf(view)}>
         <PoolGround
           view={view}
-          pools={pools}
           me={profile.id}
           today={todayIn(profile.timezone)}
           timeZone={profile.timezone}

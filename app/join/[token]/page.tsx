@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 
 import { JoinFlow } from '@/features/pool/join-flow';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
+import { signInvitePhoto } from '@/lib/avatars';
 import { createClient } from '@/lib/supabase/server';
 
 /**
@@ -25,9 +26,12 @@ export default async function JoinPage({ params }: PageProps<'/join/[token]'>) {
     .maybeSingle();
   if (mine) redirect(`/pool/${mine.pool_id}`);
 
-  const [{ data: preview }, { data: lanes }] = await Promise.all([
+  // The preview, and the pool's photo signed for ten minutes when the token
+  // is valid, unexpired and unrevoked (0024, invite_photo; server only).
+  const [{ data: preview }, { data: lanes }, photo] = await Promise.all([
     supabase.rpc('invite_preview', { p_token: token }),
     supabase.rpc('invite_lanes', { p_token: token }),
+    signInvitePhoto(token),
   ]);
   const pool = preview?.[0];
   if (!pool) {
@@ -47,6 +51,7 @@ export default async function JoinPage({ params }: PageProps<'/join/[token]'>) {
     <JoinFlow
       token={token}
       poolName={pool.pool_name}
+      photo={photo}
       initials={pool.member_initials}
       lanes={(lanes ?? []).map((lane) => ({
         key: lane.id,

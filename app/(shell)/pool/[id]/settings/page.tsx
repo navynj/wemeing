@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { PoolSettings } from '@/features/pool/settings';
 import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
 import { getPoolView } from '@/lib/queries/pools';
+import { signPoolPhotos } from '@/lib/avatars';
 import { createClient } from '@/lib/supabase/server';
 
 /** Pool settings (H23): the invite link and my lane links. Members only. */
@@ -16,5 +17,18 @@ export default async function PoolSettingsPage({ params }: PageProps<'/pool/[id]
     getMyCategories(supabase),
   ]);
   if (!view) notFound();
-  return <PoolSettings view={view} categories={categories} me={profile.id} />;
+  // The pool's photo, for the creator's photo field (0024).
+  const photo =
+    (
+      await signPoolPhotos(supabase, [
+        { id: view.pool.id, version: view.pool.photoVersion ?? null },
+      ])
+    )[view.pool.id] ?? null;
+  return (
+    <PoolSettings
+      view={{ ...view, pool: { ...view.pool, photo } }}
+      categories={categories}
+      me={profile.id}
+    />
+  );
 }

@@ -52,3 +52,24 @@ describe('a pool’s dot on the strip (review)', () => {
     expect(dot(foot({ 'p-a': null, 'p-b': null }).container)).toBeNull();
   });
 });
+
+describe('a pool’s photo on the strip (0024)', () => {
+  it('draws the photo in the pool’s rounded square; a pool without one keeps its letters', () => {
+    const { container } = render(
+      <PoolActivityProvider
+        activity={{}}
+        pools={[
+          { id: 'p-a', name: 'Sarang', photo: 'https://signed/p-a' },
+          { id: 'p-b', name: 'Study Crew', photo: null },
+        ]}
+      >
+        <GroundFoot here="home" onCompose={() => {}} />
+      </PoolActivityProvider>,
+    );
+    const a = container.querySelector('[data-home-foot="phone"] [data-strip-pool="p-a"]')!;
+    expect(a.querySelector('img[data-pool-photo]')!.getAttribute('src')).toBe('https://signed/p-a');
+    const b = container.querySelector('[data-home-foot="phone"] [data-strip-pool="p-b"]')!;
+    expect(b.querySelector('img')).toBeNull();
+    expect(b.textContent).toBe('ST');
+  });
+});

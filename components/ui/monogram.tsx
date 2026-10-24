@@ -22,13 +22,31 @@ const SIZES = {
 export function Monogram({
   name,
   size = 'row',
+  photo = null,
   className = '',
 }: {
   name: string;
   size?: keyof typeof SIZES;
+  /** The pool's photo (0024), drawn in the same tile; the letters when there is none. */
+  photo?: string | null;
   className?: string;
 }) {
   const letters = monogram(name);
+  if (photo) {
+    return (
+      // A signed URL that holds for a day (0024): the browser caches it.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={photo}
+        alt=""
+        aria-hidden
+        data-monogram={letters}
+        data-pool-photo
+        draggable={false}
+        className={`inline-flex shrink-0 object-cover ${SIZES[size]} ${className}`}
+      />
+    );
+  }
   return (
     <span
       aria-hidden

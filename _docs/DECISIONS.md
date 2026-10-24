@@ -509,3 +509,9 @@ A member's column in Swimmers opens nothing.
 - **Day order:** within a day the grid follows the stack's order, newest first. A run of plain marks shares a row and a band is a row of its own, so a newer joint splash is no longer pushed below older marks. Only the first row names the day.
 - **Joint marks:** in the Lane view a joint splash's mark is a rounded square, matching pools on the strip; the pill read ambiguously. In the Date view its row stays one pill across the whole row. The strip's "Open a new Pool" tile is a dashed rounded square too.
 - **Creating a pool:** on a wide screen, step 1 (name, visibility, lanes) sits on the left and step 2 (matching) on the right, live as lanes are added. A name match is suggested wherever I haven't chosen; "Don't connect" is a choice and is kept. A phone still walks the two steps.
+
+**A pool's photo (0024, 2026-10-23).** A pool may have a photo in its monogram's place.
+- **Where it shows:** on the strip, Home's pool column, the pool's header, the create tile, settings and the join screen. It is always the pool's rounded square; the 16px chips keep their letters, and a pool I left keeps the neutral tile.
+- **Pipeline:** the same as profile photos. It is picked (JPEG, PNG, WebP, HEIC, with the same unsupported-format message), cropped square in a rounded-square mask, and drawn into a 512px WebP. One file per pool sits in the private `pool-photos` bucket, read only through 24-hour signed URLs cached per (pool, version), and only by current members (`visible_pool_photos`).
+- **Who changes it:** only the creator, as with renaming (`set_pool_photo`, and storage policies through `is_pool_creator`). A new pool's photo is saved right after the pool exists.
+- **The join screen:** `invite_preview` is unchanged. A server-only `invite_photo` applies the same token checks (valid, unexpired, unrevoked), and the server signs a ten-minute URL for the preview, so the photo's path never reaches a browser.

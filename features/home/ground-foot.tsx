@@ -107,7 +107,7 @@ export function GroundFoot({
                 ...(current ? { 'data-pool-tab': '' } : {}),
               }}
             >
-              <Monogram name={pool.name} size="nav" />
+              <Monogram name={pool.name} size="nav" photo={pool.photo} />
             </Place>
           );
         })}

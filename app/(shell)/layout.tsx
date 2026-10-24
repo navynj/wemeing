@@ -9,6 +9,7 @@ import { getMyCategories, getMyProfile } from '@/lib/queries/profile';
 import { getMyLinks, getMyPoolNames, getPoolActivity } from '@/lib/queries/pools';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
+import { signPoolPhotos } from '@/lib/avatars';
 
 /**
  * The shell: the page and the composer, a bottom sheet from the compose
@@ -45,12 +46,24 @@ export default async function ShellLayout({ children, modal }: LayoutProps<'/'>)
         context.pools.map((p) => p.id),
       )
     : new Map<string, string>();
+  // Each pool's photo for the strip (0024), signed once here.
+  const poolPhotos = context
+    ? await signPoolPhotos(
+        supabase,
+        context.pools.map((p) => ({ id: p.id, version: p.photoVersion })),
+      )
+    : {};
+  const stripPools = (context?.pools ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    photo: poolPhotos[p.id] ?? null,
+  }));
   const activity: Record<string, string | null> = Object.fromEntries(
     (context?.pools ?? []).map((p) => [p.id, latest.get(p.id) ?? null]),
   );
   return (
     <PeopleProvider me={profile?.id ?? null} people={people}>
-      <PoolActivityProvider activity={activity} pools={context?.pools ?? []}>
+      <PoolActivityProvider activity={activity} pools={stripPools}>
         <InputSheetProvider>
           <div className="flex min-h-dvh flex-col">
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>

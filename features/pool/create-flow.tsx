@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { Monogram } from '@/components/ui/monogram';
 import { saveLane } from '@/features/lanes/actions';
 import type { MyCategory } from '@/lib/queries/profile';
 
@@ -18,6 +17,7 @@ import {
   type Directions,
   type Links,
 } from './match';
+import { PoolPhotoField, savePoolPhoto, type PoolPhotoChange } from './pool-photo-field';
 import { PrimaryButton, StepPage } from './step-page';
 
 /**
@@ -38,6 +38,7 @@ export function CreateFlow({ categories }: { categories: MyCategory[] }) {
   const [chosen, setChosen] = useState<Links>({});
   const [directions, setDirections] = useState<Directions>({});
   const [includeHistory, setIncludeHistory] = useState(false);
+  const [photo, setPhoto] = useState<PoolPhotoChange>({ kind: 'keep' });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -73,6 +74,10 @@ export function CreateFlow({ categories }: { categories: MyCategory[] }) {
       setBusy(false);
       return;
     }
+    // The photo needs the pool's id, so it follows the pool (0024). A photo
+    // that will not save leaves the pool as it is: settings can add it.
+    const photoFailed = await savePoolPhoto(made.id, photo);
+    if (photoFailed) console.error(`[during] pool photo not saved: ${photoFailed}`);
     router.replace(`/pool/${made.id}`);
   };
 
@@ -88,8 +93,9 @@ export function CreateFlow({ categories }: { categories: MyCategory[] }) {
           <h1 className="text-main-900 text-3xl/tight font-semibold">Open a new Pool</h1>
           <p className="text-pool-500 mt-3 text-sm">A pool for the people you keep records with.</p>
 
-          <div className="mt-10 flex items-end gap-4">
-            <Monogram name={name} size="tile" />
+          <div className="mt-10 flex items-start gap-4">
+            {/* The pool's photo (0024): the tile, the letters until one is picked. */}
+            <PoolPhotoField name={name} current={null} change={photo} onChange={setPhoto} />
             <label className="flex min-w-0 flex-1 flex-col gap-2">
               <span className="text-pool-500 text-xs">Pool name</span>
               <input

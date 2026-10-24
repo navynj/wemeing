@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Plus, Settings } from 'lucide-react';
 
+import { Monogram } from '@/components/ui/monogram';
+
 import { GroundFoot } from '@/features/home/ground-foot';
 import { withEdits, type Card } from '@/features/home/grid';
 import { LaneGrid, type Ring } from '@/features/home/lane-grid';
@@ -203,7 +205,9 @@ export function PoolGround({
       >
         <div data-grid-column className="flex min-h-0 flex-1 flex-col lg:min-w-0 lg:flex-1">
           <header data-pool-header className="flex shrink-0 items-center gap-2 px-4 pt-4">
-            {/* The pool's name; going to another pool is the strip's (review). */}
+            {/* The pool's photo or monogram, then its name (0024); going to
+                another pool is the strip's (review). */}
+            <Monogram name={view.pool.name} size="row" photo={view.pool.photo ?? null} />
             <h1
               data-pool-title
               className="min-w-0 flex-1 truncate text-3xl/tight font-semibold text-white"

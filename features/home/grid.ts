@@ -92,6 +92,8 @@ export type GridColumn = {
    * the pool's name, or '' for a neutral tile (a pool I left).
    */
   monogram?: string;
+  /** That pool's photo (0024), in the monogram's place; none for a pool I left. */
+  photo?: string | null;
   /** Where the header goes: a lane's page on Home; null for no link. */
   href?: string | null;
 };

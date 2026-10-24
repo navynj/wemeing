@@ -24,6 +24,7 @@ import { getMySplashes, summarizeSplashes } from '@/lib/queries/splashes';
 import { getMyTrail } from '@/lib/queries/trail';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
+import { signPoolPhotos } from '@/lib/avatars';
 
 /**
  * Home (SPEC 5, H22): the water ground — the lane grid or the date list
@@ -131,6 +132,13 @@ export async function HomeScreen({
       if (s.own_pool_id && lane) ownLaneIcon.set(s.id, iconOf.get(lane) ?? null);
     }
   }
+  // A pool I am in shows its photo (0024); one I left keeps the neutral tile.
+  const columnPhotos = await signPoolPhotos(
+    supabase,
+    pools
+      .filter((p) => ownPools.includes(p.id))
+      .map((p) => ({ id: p.id, version: p.photoVersion })),
+  );
   const poolColumns: GridColumn[] = ownPools.map((id) => {
     const name = poolName.get(id);
     return {
@@ -138,6 +146,7 @@ export async function HomeScreen({
       name: name ?? 'A pool you left',
       icon: null,
       monogram: name ?? '',
+      photo: name ? (columnPhotos[id] ?? null) : null,
       href: null,
     };
   });

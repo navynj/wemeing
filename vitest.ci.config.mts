@@ -42,6 +42,7 @@ const NEEDS_LOCAL_STACK = [
   'tests/avatars-db.test.ts',
   'tests/splash-edit-db.test.ts',
   'tests/conversions-db.test.ts',
+  'tests/pool-photo-db.test.ts',
 ];
 
 export default defineConfig({

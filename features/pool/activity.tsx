@@ -4,7 +4,7 @@ import { createContext, useContext, type ReactNode } from 'react';
 
 import { isNewSince, usePoolVisits } from './remembered';
 
-type MyPoolName = { id: string; name: string };
+type MyPoolName = { id: string; name: string; photo?: string | null };
 type Activity = { activity: Record<string, string | null>; pools: MyPoolName[] };
 
 /** My pools, and each one's latest activity by someone else, loaded once by the shell. */

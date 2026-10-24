@@ -355,6 +355,8 @@ export type Database = {
           kind: Database["public"]["Enums"]["pool_kind"] | null
           name: string
           owner_id: string | null
+          photo_path: string | null
+          photo_version: number | null
           visibility: Database["public"]["Enums"]["pool_visibility"]
         }
         Insert: {
@@ -366,6 +368,8 @@ export type Database = {
           kind?: Database["public"]["Enums"]["pool_kind"] | null
           name: string
           owner_id?: string | null
+          photo_path?: string | null
+          photo_version?: number | null
           visibility?: Database["public"]["Enums"]["pool_visibility"]
         }
         Update: {
@@ -377,6 +381,8 @@ export type Database = {
           kind?: Database["public"]["Enums"]["pool_kind"] | null
           name?: string
           owner_id?: string | null
+          photo_path?: string | null
+          photo_version?: number | null
           visibility?: Database["public"]["Enums"]["pool_visibility"]
         }
         Relationships: [
@@ -922,6 +928,13 @@ export type Database = {
           name: string
         }[]
       }
+      invite_photo: {
+        Args: { p_token: string }
+        Returns: {
+          photo_path: string
+          photo_version: number
+        }[]
+      }
       invite_preview: {
         Args: { p_token: string }
         Returns: {
@@ -931,6 +944,7 @@ export type Database = {
       }
       is_current_member: { Args: { pid: string }; Returns: boolean }
       is_linked: { Args: { other: string }; Returns: boolean }
+      is_pool_creator: { Args: { object_name: string }; Returns: boolean }
       join_pool: {
         Args: { p_include_history: boolean; p_links: Json; p_token: string }
         Returns: string
@@ -962,6 +976,10 @@ export type Database = {
         Args: { p_links: Json; p_pool: string }
         Returns: undefined
       }
+      set_pool_photo: {
+        Args: { p_on: boolean; p_pool: string }
+        Returns: undefined
+      }
       set_splash_lane: {
         Args: { p_my_lane: string; p_place_on?: string; p_splash: string }
         Returns: undefined
@@ -983,6 +1001,7 @@ export type Database = {
       }
       splash_writable: { Args: { sid: string }; Returns: boolean }
       visible_avatars: { Args: { uids: string[] }; Returns: string[] }
+      visible_pool_photos: { Args: { pids: string[] }; Returns: string[] }
     }
     Enums: {
       audience_target: "list" | "pool" | "lock"

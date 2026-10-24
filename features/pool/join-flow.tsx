@@ -29,12 +29,15 @@ import { PrimaryButton, StepPage } from './step-page';
 export function JoinFlow({
   token,
   poolName,
+  photo = null,
   initials,
   lanes,
   categories,
 }: {
   token: string;
   poolName: string;
+  /** The pool's photo, signed briefly for this invite (0024); the letters without one. */
+  photo?: string | null;
   initials: string[];
   lanes: MatchLane[];
   categories: Pick<MyCategory, 'id' | 'name' | 'icon'>[];
@@ -53,7 +56,7 @@ export function JoinFlow({
       <StepPage step="1 / 2" onBack={() => router.replace('/')}>
         <p className="text-pool-500 text-sm">You are invited to</p>
         <div className="mt-4 flex items-center gap-4">
-          <Monogram name={poolName} size="tile" />
+          <Monogram name={poolName} size="tile" photo={photo} />
           <h1
             data-invite-pool
             className="text-main-900 min-w-0 text-3xl/tight font-semibold break-words"

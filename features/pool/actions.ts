@@ -135,6 +135,23 @@ export async function setLaneLinks(poolId: string, links: z.infer<typeof LINKS>)
   return { ok: true };
 }
 
+/** The creator sets or clears the pool's photo (0024); the bytes went up from the browser first. */
+export async function setPoolPhoto(poolId: string, on: boolean): Promise<Done> {
+  if (!z.uuid().safeParse(poolId).success) return { ok: false, message: 'No such Pool.' };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('set_pool_photo', { p_pool: poolId, p_on: on });
+  if (error) {
+    return {
+      ok: false,
+      message:
+        error.code === '42501' ? 'Only the Pool’s creator can change its photo.' : error.message,
+    };
+  }
+  revalidatePool(poolId);
+  revalidatePath('/');
+  return { ok: true };
+}
+
 /** Pool settings: the creator renames the pool (0021). */
 export async function renamePool(poolId: string, name: string): Promise<Done> {
   const parsed = z

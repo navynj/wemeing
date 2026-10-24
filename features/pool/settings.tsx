@@ -8,6 +8,7 @@ import type { MyCategory } from '@/lib/queries/profile';
 import type { PoolView } from '@/lib/queries/pools';
 import { useOptimisticAction } from '@/lib/use-optimistic-action';
 
+import { PoolPhotoField, previewOf, savePoolPhoto, type PoolPhotoChange } from './pool-photo-field';
 import { renamePool, setLaneLinks } from './actions';
 import { DeletePool } from './delete-pool';
 import { InvitePanel } from './invite-panel';
@@ -48,6 +49,7 @@ export function PoolSettings({
   const [message, setMessage] = useState<string | null>(null);
   // The name shows at once; a refusal takes it back and says why.
   const name = useOptimisticAction(view.pool.name);
+  const photo = useOptimisticAction<string | null>(view.pool.photo ?? null);
   const changed =
     JSON.stringify(links) !== JSON.stringify(initial) ||
     JSON.stringify(directions) !== JSON.stringify(initialDirections);
@@ -60,13 +62,28 @@ export function PoolSettings({
       {view.pool.ownerId === me ? (
         <PoolName
           name={name.value}
-          message={name.message}
-          onSave={(next) =>
-            name.run(
-              () => next,
-              () => renamePool(poolId, next),
-            )
-          }
+          photo={photo.value}
+          message={name.message ?? photo.message}
+          onSave={(next, change) => {
+            if (next !== name.value) {
+              name.run(
+                () => next,
+                () => renamePool(poolId, next),
+              );
+            }
+            if (change.kind !== 'keep') {
+              // Shown at once; the upload and the row run behind it (0024).
+              photo.run(
+                () => previewOf(change, photo.value),
+                async () => {
+                  const failed = await savePoolPhoto(poolId, change);
+                  if (failed) return { ok: false, message: failed };
+                  router.refresh();
+                  return { ok: true };
+                },
+              );
+            }
+          }}
         />
       ) : null}
 
@@ -144,18 +161,26 @@ export function PoolSettings({
 /** The pool's name, the creator's to change (0021): a field and its own Save. */
 function PoolName({
   name,
+  photo,
   message,
   onSave,
 }: {
   name: string;
+  /** The pool's photo now (a signed URL, or a preview of one just saved). */
+  photo: string | null;
   message: string | null;
-  onSave: (name: string) => void;
+  onSave: (name: string, photo: PoolPhotoChange) => void;
 }) {
   const [draft, setDraft] = useState(name);
+  const [change, setChange] = useState<PoolPhotoChange>({ kind: 'keep' });
   const next = draft.trim();
+  const changed = (next !== '' && next !== name) || change.kind !== 'keep';
   return (
     <section data-settings-name className="mt-10">
-      <h2 className="text-ink mb-3 font-semibold">Name</h2>
+      <h2 className="text-ink mb-3 font-semibold">Photo and name</h2>
+      <div className="mb-4">
+        <PoolPhotoField name={draft || name} current={photo} change={change} onChange={setChange} />
+      </div>
       <div className="flex gap-2">
         <input
           value={draft}
@@ -167,8 +192,11 @@ function PoolName({
         <button
           type="button"
           data-save-name
-          disabled={!next || next === name}
-          onClick={() => onSave(next)}
+          disabled={!next || !changed}
+          onClick={() => {
+            onSave(next, change);
+            setChange({ kind: 'keep' });
+          }}
           className="bg-main-900 rounded-full px-5 text-sm font-semibold text-white disabled:opacity-40"
         >
           Save

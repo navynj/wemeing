@@ -576,7 +576,7 @@ function ColumnHeader({ column }: { column: GridColumn }) {
   const body = (
     <>
       {column.monogram !== undefined ? (
-        <Monogram name={column.monogram} size="head" />
+        <Monogram name={column.monogram} size="head" photo={column.photo} />
       ) : column.avatar !== undefined ? (
         <span data-column-avatar className="flex">
           <Avatar

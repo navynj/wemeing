@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
 import { poolScopeOf } from '@/features/pool/compose-scope';
 import { PoolEditScope } from '@/features/pool/edit-scope';
+import { signPoolPhotos } from '@/lib/avatars';
 
 /**
  * A pool's home (H23). RLS decides whether it exists for this viewer at all:
@@ -18,7 +19,22 @@ export async function PoolScreen({ id, top }: { id: string; top?: string }) {
   const profile = await getMyProfile(supabase);
   if (!profile) redirect('/sign-in');
 
-  const view = await getPoolView(supabase, id, profile.id);
+  const found = await getPoolView(supabase, id, profile.id);
+  // The pool's photo for its header (0024).
+  const view = found
+    ? {
+        ...found,
+        pool: {
+          ...found.pool,
+          photo:
+            (
+              await signPoolPhotos(supabase, [
+                { id: found.pool.id, version: found.pool.photoVersion ?? null },
+              ])
+            )[found.pool.id] ?? null,
+        },
+      }
+    : null;
   if (!view) notFound();
 
   return (

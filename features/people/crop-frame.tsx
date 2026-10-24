@@ -15,10 +15,13 @@ export function CropFrame({
   image,
   view,
   onChange,
+  shape = 'circle',
 }: {
   image: HTMLImageElement;
   view: CropView;
   onChange: (view: CropView) => void;
+  /** The face it will become: a person's circle, or a pool's rounded square (0024). */
+  shape?: 'circle' | 'square';
 }) {
   const drag = useRef<{ x: number; y: number; from: CropView } | null>(null);
   const size = { width: image.naturalWidth, height: image.naturalHeight };
@@ -69,7 +72,9 @@ export function CropFrame({
         {/* The face it will become: everything outside the circle dimmed. */}
         <span
           aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-full"
+          className={`pointer-events-none absolute inset-0 ${
+            shape === 'circle' ? 'rounded-full' : 'rounded-[18%]'
+          }`}
           style={{ boxShadow: '0 0 0 999px rgb(0 0 0 / 0.45)' }}
         />
       </div>

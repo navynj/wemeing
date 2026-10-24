@@ -56,7 +56,12 @@ export type Placement = {
 
 export type PoolView = {
   /** `ownerId`: the creator, who alone may delete the pool (0015); null once their account is gone. */
-  pool: Pick<PoolRow, 'id' | 'name'> & { ownerId: string | null };
+  pool: Pick<PoolRow, 'id' | 'name'> & {
+    ownerId: string | null;
+    /** Its photo (0024): the version the row names, and the signed URL once the screen signs it. */
+    photoVersion?: number | null;
+    photo?: string | null;
+  };
   /** Current members, me first then join order (D7), then former members who kept theirs. */
   members: PoolMember[];
   lanes: PoolLane[];
@@ -195,7 +200,7 @@ export async function getPoolView(
 ): Promise<PoolView | null> {
   const { data: pool, error } = await supabase
     .from('pools')
-    .select('id, name, owner_id')
+    .select('id, name, owner_id, photo_version')
     .eq('id', poolId)
     .maybeSingle();
   if (error) throw error;
@@ -265,7 +270,13 @@ export async function getPoolView(
   }
 
   return {
-    pool: { id: pool.id, name: pool.name, ownerId: pool.owner_id },
+    pool: {
+      id: pool.id,
+      name: pool.name,
+      ownerId: pool.owner_id,
+      photoVersion: pool.photo_version,
+      photo: null,
+    },
     members: orderMembers(members.map(toMember), me),
     lanes: lanes.data ?? [],
     myLinks: (links.data ?? []).map((l) => ({
@@ -328,16 +339,20 @@ export async function getMyLinks(supabase: DuringClient, me: string): Promise<My
 export async function getMyPoolNames(
   supabase: DuringClient,
   me: string,
-): Promise<{ id: string; name: string }[]> {
+): Promise<{ id: string; name: string; photoVersion: number | null }[]> {
   const { data, error } = await supabase
     .from('pool_members')
-    .select('pool:pools(id, name)')
+    .select('pool:pools(id, name, photo_version)')
     .eq('user_id', me)
     .is('left_at', null)
     .order('joined_at', { ascending: false })
-    .returns<{ pool: { id: string; name: string } | null }[]>();
+    .returns<{ pool: { id: string; name: string; photo_version: number | null } | null }[]>();
   if (error) throw error;
-  return data.flatMap((row) => (row.pool ? [row.pool] : []));
+  return data.flatMap((row) =>
+    row.pool
+      ? [{ id: row.pool.id, name: row.pool.name, photoVersion: row.pool.photo_version }]
+      : [],
+  );
 }
 
 /** My posts' placements in pools I am in now, switched on or off. */

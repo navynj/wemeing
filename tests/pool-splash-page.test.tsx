@@ -111,7 +111,6 @@ function page() {
         photos={{}}
         lockedIds={[]}
         categories={[]}
-        origin={{ label: 'Our Pool', href: '/pool/p?top=s-joint' }}
         timeZone="America/Vancouver"
         today="2026-10-23"
         initials="YO"
@@ -132,16 +131,14 @@ describe('a pool’s splash on Home’s page (review)', () => {
     expect(container.querySelector('[data-block-editor="r-me"]')).not.toBeNull();
   });
 
-  it('shows every ripple’s author, the origin tag and the way back to the pool', () => {
+  it('shows every ripple’s author and the origin tag, with no back chip (the sheet closes it)', () => {
     const { container, getByText } = page();
     const avatars = [...container.querySelectorAll('[data-thread-avatar]')].map(
       (a) => a.textContent,
     );
     expect(avatars).toEqual(['MI', 'YO']);
     expect(getByText('Our Pool · 🎬 Media')).toBeTruthy();
-    expect(container.querySelector('[data-back-chip]')!.getAttribute('href')).toBe(
-      '/pool/p?top=s-joint',
-    );
+    expect(container.querySelector('[data-back-chip]')).toBeNull();
   });
 
   it('lets a member edit a joint splash’s title, not its dates or lane, and hides delete while others wrote in it', () => {
@@ -159,10 +156,19 @@ describe('a pool’s splash on Home’s page (review)', () => {
   });
 
   it('is the same component on Home and in a pool: no pool-only detail remains', () => {
-    const route = readFileSync('app/(shell)/pool/[id]/splash/[sid]/page.tsx', 'utf8');
-    const home = readFileSync('app/(shell)/splash/[id]/page.tsx', 'utf8');
-    for (const source of [route, home]) {
+    // Both are read into the same detail, in the same sheet (review).
+    const pool = readFileSync('features/pool/pool-splash.tsx', 'utf8');
+    const home = readFileSync('features/splash/home-splash.tsx', 'utf8');
+    for (const source of [pool, home]) {
       expect(source).toContain("import { SplashPage } from '@/features/splash/splash-page'");
+    }
+    for (const route of [
+      'app/(shell)/pool/[id]/splash/[sid]/page.tsx',
+      'app/(shell)/splash/[id]/page.tsx',
+      'app/(shell)/@modal/(.)pool/[id]/splash/[sid]/page.tsx',
+      'app/(shell)/@modal/(.)splash/[id]/page.tsx',
+    ]) {
+      expect(readFileSync(route, 'utf8')).toContain('<SplashModal');
     }
     expect(existsSync('features/pool/pool-splash-page.tsx')).toBe(false);
   });

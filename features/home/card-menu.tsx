@@ -7,7 +7,6 @@ import { MoreHorizontal, Pencil } from 'lucide-react';
 import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 
 import { splashHref } from '@/features/home/scope';
-import { monthKey } from '@/features/splash/summary';
 import { usePoolEditScope } from '@/features/pool/edit-scope';
 
 import type { Card } from './grid';
@@ -78,7 +77,7 @@ export function CardMenu({
             <li>
               <Link
                 role="menuitem"
-                href={card.href ?? splashHref(card.splash.id, monthKey(card.day))}
+                href={card.href ?? splashHref(card.splash.id)}
                 className="block px-4 py-2.5"
               >
                 Open

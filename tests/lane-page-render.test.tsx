@@ -153,10 +153,8 @@ describe('a lane’s page (round 3)', () => {
     expect(top.className).toContain('border-white/15');
     expect(top.className).not.toMatch(/rounded-full|bg-white /);
     expect(container.querySelector('[data-pill="ramen"]')!.className).toContain('opacity-60');
-    // The top card opens the post, coming back here with it on top.
-    expect(stack.querySelector('[data-card-link]')!.getAttribute('href')).toBe(
-      `/splash/noodles?from=${encodeURIComponent('/lane/c-food?top=noodles')}`,
-    );
+    // The top card opens the post as a sheet over this page (review).
+    expect(stack.querySelector('[data-card-link]')!.getAttribute('href')).toBe('/splash/noodles');
     fireEvent.click(container.querySelector('[data-pill="soup"]')!);
     await waitFor(() =>
       expect(container.querySelector('[data-pill="soup"]')!.hasAttribute('data-dived')).toBe(false),

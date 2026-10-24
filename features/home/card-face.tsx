@@ -3,7 +3,7 @@
 import Link from 'next/link';
 
 import { OutlineChip } from '@/components/ui/chips/category-chip';
-import { splashFromHome } from '@/features/home/scope';
+import { splashHref } from '@/features/home/scope';
 import { RippleThread } from '@/features/splash/ripple-thread';
 import { DETAIL_TITLE_CLASS } from '@/features/splash/splash-header';
 import { Monogram } from '@/components/ui/monogram';
@@ -118,7 +118,7 @@ export function CardFace({
   }
   return (
     <Link
-      href={href ?? card.href ?? splashFromHome(card.splash.id)}
+      href={href ?? card.href ?? splashHref(card.splash.id)}
       data-card-link={card.splash.id}
       onClickCapture={onClickCapture}
       draggable={false}

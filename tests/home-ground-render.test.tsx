@@ -488,9 +488,7 @@ describe('the diving board, a staircase', () => {
     expect(card.textContent).toContain('🍜');
     expect(card.textContent).toContain('Toy Story 5');
     expect(card.textContent).toContain('YL');
-    expect(card.querySelector('[data-card-link]')!.getAttribute('href')).toBe(
-      `/splash/late?from=${encodeURIComponent('/?top=late')}`,
-    );
+    expect(card.querySelector('[data-card-link]')!.getAttribute('href')).toBe('/splash/late');
     const behind = container.querySelector('[data-stack-card="mid"] [data-card-title]')!;
     expect(behind.className).not.toContain('text-3xl');
   });
@@ -562,7 +560,7 @@ describe('the diving board, a staircase', () => {
     expect(container.querySelector('[data-pinned-cards]')).toBeNull();
     fireEvent.click(topCard(container).querySelector('[data-card-menu-button]')!);
     const menu = container.querySelector('[data-card-menu]')!;
-    expect(menu.querySelector('a[href="/splash/late?from=2026-09"]')!.textContent).toBe('Open');
+    expect(menu.querySelector('a[href="/splash/late"]')!.textContent).toBe('Open');
     fireEvent.click(getByRole('menuitem', { name: 'Pin' }));
     await waitFor(() =>
       expect(container.querySelector('[data-pinned-card="late"]')).not.toBeNull(),
@@ -976,10 +974,10 @@ describe('coming back from a post\u2019s page', () => {
     expect(topCard(container).getAttribute('data-stack-card')).toBe('soup');
   });
 
-  it('links the top card to its page with the way back to it', () => {
+  it('links the top card to its splash, which opens as a sheet over Home (review)', () => {
     const { container } = ground();
     expect(topCard(container).querySelector('[data-card-link]')!.getAttribute('href')).toBe(
-      `/splash/late?from=${encodeURIComponent('/?top=late')}`,
+      '/splash/late',
     );
   });
 

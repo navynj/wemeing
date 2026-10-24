@@ -18,16 +18,11 @@ export function monthHref(month: string): string {
 }
 
 /**
- * A post's page opened from Home's board: the back chip returns to Home
- * with this post on top again, rather than to a fresh stack (review).
+ * A post's URL. Opened in the app it is a sheet over the current screen,
+ * which stays as it was beneath (review), so it carries no way back.
  */
-export function splashFromHome(id: string): string {
-  return `/splash/${id}?from=${encodeURIComponent(`/?top=${id}`)}`;
-}
-
-/** Where a post's page says it came from, for the month it was opened in. */
-export function splashHref(id: string, month: string): string {
-  return `/splash/${id}?from=${month}`;
+export function splashHref(id: string): string {
+  return `/splash/${id}`;
 }
 
 /** `September`, from `2026-09`. */

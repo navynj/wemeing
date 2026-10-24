@@ -164,7 +164,6 @@ function page(over: Partial<Parameters<typeof SplashPage>[0]> = {}) {
         photos={{ night: [null, 'https://signed/x.jpg'] }}
         lockedIds={[]}
         categories={LANES}
-        origin={{ label: 'August', href: '/?m=2026-08' }}
         timeZone={TZ}
         today={TODAY}
         {...over}
@@ -174,15 +173,11 @@ function page(over: Partial<Parameters<typeof SplashPage>[0]> = {}) {
 }
 
 describe('the white page above the water (SPEC 5, H21c)', () => {
-  it('is a white page, not a sheet, with a back chip in blue naming where it came from', () => {
+  it('is the white detail with no back chip: the sheet it sits in closes it (review)', () => {
     const { container } = page();
     const root = container.querySelector('[data-splash-page]')!;
     expect(root.className).toContain('bg-white');
-    expect(container.querySelector('[role="dialog"]')).toBeNull();
-    const back = container.querySelector('[data-back-chip]')!;
-    expect(back.textContent).toBe('August');
-    expect(back.getAttribute('href')).toBe('/?m=2026-08');
-    expect(back.className).toContain('text-main-900');
+    expect(container.querySelector('[data-back-chip]')).toBeNull();
   });
 
   it('stacks the header left-aligned: tags declared first, title, range, wave underline by blocks', () => {
@@ -331,7 +326,7 @@ describe('the header menu', () => {
     expect(calls.find((c) => c.name === 'setSplashPinned')!.args).toEqual(['s1', true]);
   });
 
-  it('says a delete takes the blocks with it (H21), then goes back where it came from', async () => {
+  it('says a delete takes the blocks with it (H21), then, outside a sheet, goes Home', async () => {
     const { getByLabelText, getByText, container } = page();
     fireEvent.click(getByLabelText('More'));
     fireEvent.click(getByText('Delete'));
@@ -340,7 +335,7 @@ describe('the header menu', () => {
     );
     fireEvent.click(container.querySelector('[role="alertdialog"] .text-main-900')!);
     await waitFor(() => expect(calls.some((c) => c.name === 'deleteSplash')).toBe(true));
-    expect(router.push).toHaveBeenCalledWith('/?m=2026-08');
+    expect(router.push).toHaveBeenCalledWith('/');
     // Gone from every surface at once: the provider carries the id. Waited
     // for: the state lands a render after the action is called.
     await waitFor(() => expect(container.querySelector('[data-deleted]')!.textContent).toBe('s1'));

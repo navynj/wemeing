@@ -287,9 +287,7 @@ export function LanePage({
             )
           }
           hrefFor={(id) =>
-            pool
-              ? (shown.find((card) => card.splash.id === id)?.href ?? here)
-              : `/splash/${id}?from=${encodeURIComponent(`${here}?top=${id}`)}`
+            pool ? (shown.find((card) => card.splash.id === id)?.href ?? here) : `/splash/${id}`
           }
         />
       </div>

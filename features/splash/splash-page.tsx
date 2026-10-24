@@ -1,9 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
-import { ChevronLeft } from 'lucide-react';
 
 import { GhostRing } from '@/components/ui/ghost-ring';
 import { commitRipple, type CommitResult } from '@/features/input-sheet/commit';
@@ -22,11 +20,9 @@ import { adoptRipple, deleteSplash, setSplashPinned, updateSplashHeader } from '
 import { BlockEditor, type BlockDraft, type EditorTarget } from './block-editor';
 import { BlockView } from './block';
 import { RippleThread } from './ripple-thread';
+import { useCloseSplash } from './splash-modal';
 import { SplashHeader, type HeaderEdit } from './splash-header';
 import { laneTags, type SplashSummary } from './summary';
-
-/** Where the page came from, for the back chip. */
-export type Origin = { label: string; href: string };
 
 /**
  * The page read inside a pool (review): the same page as Home's, with each
@@ -61,8 +57,8 @@ function outcome(result: CommitResult): ActionOutcome {
 type PageState = { splash: SplashSummary; blocks: RippleWithCategory[]; lockedIds: string[] };
 
 /**
- * A post's page (SPEC 5, H21c): the white page above the water. The back chip
- * names where it came from; the header stack; the blocks oldest first, each
+ * A post's detail (SPEC 5, H21c), shown in the splash sheet over the screen it
+ * was opened from (review): the header stack; the blocks oldest first, each
  * edited in place; an add slot at the bottom that starts a new block on the
  * page. No sheet here.
  *
@@ -82,7 +78,6 @@ export function SplashPage({
   photos,
   lockedIds,
   categories,
-  origin,
   timeZone,
   today,
   initials = '',
@@ -96,7 +91,6 @@ export function SplashPage({
   photos: Record<string, (string | null)[]>;
   lockedIds: string[];
   categories: MyCategory[];
-  origin: Origin;
   timeZone: string;
   today: IsoDate;
   /** The author's initials, for each ripple's avatar in the thread (round 3). */
@@ -117,6 +111,8 @@ export function SplashPage({
   const router = useRouter();
   const { markDeleted, openEdit, pendingEdits } = useInputSheet();
   const editScope = usePoolEditScope();
+  // Inside the splash sheet (review): a delete closes it over the screen beneath.
+  const closeSheet = useCloseSplash();
   const [editor, setEditor] = useState<EditorTarget | null>(null);
   const {
     value: page,
@@ -133,7 +129,7 @@ export function SplashPage({
     if (!page.splash.orphan) return page.splash.id;
     const result = await adoptRipple(page.splash.id);
     if (!result.ok) return null;
-    router.replace(`/splash/${result.splash.id}?from=${encodeURIComponent(origin.href)}`);
+    router.replace(`/splash/${result.splash.id}`);
     return result.splash.id;
   }
 
@@ -288,18 +284,9 @@ export function SplashPage({
   return (
     <div
       data-splash-page
-      className="page-rise flex flex-1 flex-col bg-white pt-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-16"
+      className="flex flex-1 flex-col bg-white pt-1 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-16"
     >
       <div data-splash-side className="flex flex-col lg:sticky lg:top-0 lg:pt-3">
-        <Link
-          href={origin.href}
-          data-back-chip
-          className="text-main-900 -ml-1 flex w-fit items-center gap-0.5 pb-5 text-sm font-medium"
-        >
-          <ChevronLeft aria-hidden size={16} />
-          {origin.label}
-        </Link>
-
         <SplashHeader
           // Remounted when an edit from the sheet lands, so it reads the new words.
           key={`${headerSplash.id}:${headerSplash.title}:${headerSplash.icon ?? ''}`}
@@ -324,7 +311,8 @@ export function SplashPage({
             // the principle): back where it came from, and the rows follow. A
             // lone block is its own post, so deleting it deletes the block.
             markDeleted(page.splash.id);
-            router.push(origin.href);
+            if (closeSheet) closeSheet();
+            else router.push('/');
             const result =
               scope === 'joint'
                 ? await deleteJointSplash(pool!.poolId, page.splash.id)

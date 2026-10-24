@@ -478,3 +478,10 @@ A member's column in Swimmers opens nothing.
 - **From a pool:** that pool's lane chips with Just mine, by the compose table. Making it joint asks first. A joint splash someone else wrote in cannot turn Just mine on ("Others have written here.").
 - **From Home:** my lanes, with a line per pool saying whether it moves or stops being shared. A joint splash only I wrote in becomes mine after a warning. A joint splash with others' ripples keeps its pool's lanes, with "Others have written here, so it stays in <Pool>."
 - Every conversion shows at once and goes back, with the reason, if it is refused.
+
+**A splash opens as a bottom sheet over the screen it came from (review, 2026-10-23).** The post's page is retired as a page. Opening a splash from Home, a pool or a lane page shows the same detail component in a sheet, and the screen beneath stays exactly as it was: its stack, its scroll and its view.
+- **Routing:** the URL is still the splash's own (`/splash/[id]`, `/pool/[id]/splash/[sid]`), through an intercepting `@modal` slot on the shell layout, so the back button closes the sheet and a link to it works. A direct visit draws the sheet over that splash's context (Home, or its pool) with the post on top; closing it leaves for that context.
+- **Size:** it fits its content up to 92dvh on a phone and 88dvh on a wide screen, where it is min(1040px, 90vw) wide and keeps the detail's two halves. The header stays pinned while the body scrolls.
+- **Dismissal:** drag down on the handle or header, or on the body once it is scrolled to its top; tap the dimmed screen; Escape (left to a field being written in); or back. It opens and closes on the board's spring; under reduced motion only the fade remains.
+- **Keyboard and focus:** above the keyboard it sizes itself to the visual viewport. Focus is held inside and returned to what opened it, and the page behind does not scroll. The pencil opens the edit sheet on top of it.
+- **Removed:** back chips and the `?from=` links that fed them.

@@ -18,7 +18,7 @@ import { todayIn } from '@/lib/time';
  * The composer needs the lanes only: sessions are date-based, so it has no
  * session field.
  */
-export default async function ShellLayout({ children }: LayoutProps<'/'>) {
+export default async function ShellLayout({ children, modal }: LayoutProps<'/'>) {
   const supabase = await createClient();
   const profile = await getMyProfile(supabase);
 
@@ -55,6 +55,8 @@ export default async function ShellLayout({ children }: LayoutProps<'/'>) {
           <div className="flex min-h-dvh flex-col">
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
           </div>
+          {/* A splash opened from inside the app: a sheet over the screen (review). */}
+          {modal}
           {context ? <SheetHost context={context} /> : null}
           {profile ? <TimezoneSync profileZone={profile.timezone} /> : null}
         </InputSheetProvider>

@@ -496,3 +496,9 @@ A member's column in Swimmers opens nothing.
 - **Removed:** the pool name's dropdown switcher, the Pool tab and its dot. The strip carries the dots.
 
 **Link retires: one sharing model (0023, 2026-10-23).** Pools are the one way to share, and a pool's settings are the single place that decides who sees what. A link between two people used to let either read the other's unlocked ripples, splashes, media and profile, a second sharing path beside pools that no pool setting could see or limit. It is gone: ripples are read by their author and through pools, profiles by their owner and pool companions, and `can_see_ripple` has no link branch. No new link can be made. The links table, its rows, its read and delete policies and `is_linked` stay, unused, because nothing needs deleting. Following someone is a pool of two; discovery comes later from Open pools. Production held 0 links, so nothing anyone could see changed. Rejected: scoping the Link path to shared pools, which would have kept two models that must always agree.
+
+**The strip: people are circles, pools rounded squares; selection is white; the order holds (review, 2026-10-23).**
+- **Shapes:** my face is a circle and a pool a rounded square (`rounded-lg`), so a pool never reads as a person.
+- **Selection:** the place I am in wears a white border. This is a stated exception on the water to ink-for-selection (H20f): on the blue ground, white carries what matters. The other places are faded at 50%, the image only, so a pool's dot stays at full strength.
+- **Order:** pools keep a fixed order, the one I joined most recently first. The earlier "most recently opened first" moved a place the moment it was tapped, which was confusing.
+- **Dots:** a dot needs this device's visit history, so it appears only once the browser has it. A dot drawn by the server and removed by the client had caused a hydration error on Home.

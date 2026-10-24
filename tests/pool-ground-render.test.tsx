@@ -348,11 +348,20 @@ describe('switching pools (H23)', () => {
         el.getAttribute('data-strip-pool') ||
         (el.hasAttribute('data-strip-new') && 'new'),
     );
-    // A visited just now, so it leads the pools; the `+` closes the strip.
+    // The order I joined them in, newest first; the `+` closes the strip.
     expect(order).toEqual(['home', 'p-a', 'p-b', 'new']);
     const current = strip.querySelector('[data-strip-pool="p-a"]')!;
     expect(current.getAttribute('aria-current')).toBe('page');
-    expect(current.className).toContain('ring-ink');
+    // Selected: a white border, and a pool is a rounded square, not a circle.
+    expect(current.className).toContain('ring-white');
+    expect(current.className).toContain('rounded-lg');
+    expect(current.querySelector('[data-place-image]')!.className).not.toContain('opacity-50');
+    // Not selected: faded — the image only, so the dot stays full strength.
+    const other = strip.querySelector('[data-strip-pool="p-b"]')!;
+    expect(other.querySelector('[data-place-image]')!.className).toContain('opacity-50');
+    expect(other.querySelector('[data-place-image] [data-unseen-dot]')).toBeNull();
+    // I am a circle.
+    expect(strip.querySelector('[data-strip-home]')!.className).toContain('rounded-full');
     // Something happened in B since a visit that never was: the dot.
     expect(strip.querySelector('[data-strip-pool="p-b"] [data-unseen-dot]')).not.toBeNull();
     expect(strip.querySelector('[data-strip-pool="p-a"] [data-unseen-dot]')).toBeNull();
@@ -360,6 +369,24 @@ describe('switching pools (H23)', () => {
     expect(strip.querySelector('[data-strip-new]')!.getAttribute('href')).toBe('/pool/new');
     // No name dropdown any more: the strip is the way between pools.
     expect(container.querySelector('[data-pool-switcher]')).toBeNull();
+  });
+
+  it('keeps its order when another pool is opened: a place never moves when tapped', () => {
+    const order = () =>
+      [...document.querySelectorAll('[data-home-foot="phone"] [data-strip-pool]')].map((el) =>
+        el.getAttribute('data-strip-pool'),
+      );
+    ground(A);
+    expect(order()).toEqual(['p-a', 'p-b']);
+    cleanup();
+    // Opening B (it is now the most recently visited) moves nothing.
+    ground(B);
+    expect(order()).toEqual(['p-a', 'p-b']);
+    expect(
+      document
+        .querySelector('[data-home-foot="phone"] [data-strip-pool="p-b"]')!
+        .getAttribute('aria-current'),
+    ).toBe('page');
   });
 
   it('lists the same places in the same order on the wide rail', () => {

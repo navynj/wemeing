@@ -23,19 +23,18 @@ export function PoolActivityProvider({
 }
 
 /**
- * The pool strip's pools (review): every pool I am in now, the one I opened
- * most recently first, each with whether it has something new for me.
+ * The pool strip's pools (review): every pool I am in now, in a fixed order —
+ * the one I joined most recently first — so a place never moves when it is
+ * tapped; each with whether it has something new for me, known only once
+ * this device's visits are (never on the server).
  */
 export function useStripPools(): (MyPoolName & { fresh: boolean })[] {
   const { activity, pools } = useContext(Context);
   const visits = usePoolVisits();
-  return pools
-    .map((pool, at) => ({ pool, at, seen: visits[pool.id] ?? '' }))
-    .sort((a, b) => b.seen.localeCompare(a.seen) || a.at - b.at)
-    .map(({ pool }) => ({
-      ...pool,
-      fresh: isNewSince(pool.id, activity[pool.id] ?? null),
-    }));
+  return pools.map((pool) => ({
+    ...pool,
+    fresh: visits !== null && isNewSince(pool.id, activity[pool.id] ?? null),
+  }));
 }
 
 /**

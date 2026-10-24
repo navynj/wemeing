@@ -15,9 +15,10 @@ import { UnseenDot, useStripPools } from '@/features/pool/activity';
  * The ground's foot (review): the places I go, as a strip — my face first
  * (Home), then a monogram per pool I am in, the one I opened last first, then
  * a small `+` to open a new pool — and compose at the right as the white disc
- * with the blue plus, outside the strip. Each place is a 40px circle; the one
- * I am in wears an ink ring (selection), and a pool with something new since
- * my last visit carries the dot. Tapping a place goes there; tapping the one
+ * with the blue plus, outside the strip. I am a circle and a pool a rounded
+ * square, so a pool never reads as a person (review). The place I am in wears
+ * a white border; the others sit back, faded — the image only, so a pool's
+ * dot for something new since my last visit stays at full strength. Tapping a place goes there; tapping the one
  * I am in walks its views (Home: Lane ↔ Date; a pool: Swimmers → Lane →
  * Date). The strip scrolls sideways, one axis per gesture.
  *
@@ -81,6 +82,7 @@ export function GroundFoot({
           label={atHome ? homeLabel : 'Home'}
           href="/"
           onTap={atHome ? onHome : undefined}
+          shape="circle"
           data={{ 'data-home-tab': '', 'data-strip-home': '' }}
         >
           <Avatar
@@ -99,6 +101,7 @@ export function GroundFoot({
               href={`/pool/${pool.id}`}
               onTap={current ? onPool : undefined}
               dot={pool.fresh && !current}
+              shape="square"
               data={{
                 'data-strip-pool': pool.id,
                 ...(current ? { 'data-pool-tab': '' } : {}),
@@ -137,6 +140,7 @@ function Place({
   href,
   onTap,
   dot = false,
+  shape,
   data,
   children,
 }: {
@@ -145,14 +149,20 @@ function Place({
   href: string;
   onTap?: () => void;
   dot?: boolean;
+  /** A person is a circle, a pool a rounded square (review). */
+  shape: 'circle' | 'square';
   data: Record<string, string>;
   children: ReactNode;
 }) {
-  // Selection is ink (H20f): a ring on the place I am in.
-  const className = `relative flex shrink-0 rounded-full ${current ? 'ring-ink ring-[3px]' : ''}`;
+  // On the strip the place I am in wears a white border (review: white on
+  // the water, not ink); the rest are faded, the image only.
+  const round = shape === 'circle' ? 'rounded-full' : 'rounded-lg';
+  const className = `relative flex shrink-0 ${round} ${current ? 'ring-[3px] ring-white' : ''}`;
   const body = (
     <>
-      {children}
+      <span data-place-image className={`flex ${current ? '' : 'opacity-50'}`}>
+        {children}
+      </span>
       {dot ? <UnseenDot label="New here" /> : null}
     </>
   );

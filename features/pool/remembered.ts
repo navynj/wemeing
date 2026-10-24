@@ -62,13 +62,19 @@ function subscribeVisits(onChange: () => void): () => void {
   };
 }
 
-/** When I last opened each pool on this device, by id; empty on the server. */
-export function usePoolVisits(): Record<string, string> {
+/**
+ * When I last opened each pool on this device, by id — or null on the server
+ * and during hydration, which cannot know this device: nothing that depends
+ * on it may render until the browser has it (a dot drawn by the server and
+ * taken away by the client is a hydration mismatch).
+ */
+export function usePoolVisits(): Record<string, string> | null {
   const raw = useSyncExternalStore(
     subscribeVisits,
     () => read(VISITS) ?? '',
-    () => '',
+    () => null,
   );
+  if (raw === null) return null;
   try {
     const parsed: unknown = JSON.parse(raw || '{}');
     return parsed && typeof parsed === 'object' ? (parsed as Record<string, string>) : {};

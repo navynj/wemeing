@@ -237,6 +237,7 @@ export function SplashComposer({
             href: poolSplashHref(pool.poolId, id),
             ...(joint
               ? {
+                  joint: true,
                   branches: body
                     ? [
                         {
@@ -272,6 +273,7 @@ export function SplashComposer({
               ...(joint
                 ? {
                     column: jointLink ?? poolColumn.id,
+                    joint: true,
                     pools: [pool.poolName],
                     href: poolSplashHref(pool.poolId, id),
                     menu: { pin: false, delete: false },

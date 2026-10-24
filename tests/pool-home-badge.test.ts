@@ -38,6 +38,17 @@ describe('the pool badge on Home (H23, 0016)', () => {
     expect(card.href).toBe('/pool/p-ours/splash/s-joint');
   });
 
+  it('marks a joint entry on Home as joint, so it is drawn as a pill', () => {
+    const card = withPoolBadge(placeCard(summary('s-joint'), '', 'UTC'), {
+      poolId: 'p-ours',
+      poolName: 'Our Pool',
+      latestLane: 'my-media',
+      poolLane: { name: 'Games', icon: '🎲' },
+    });
+    expect(card.joint).toBe(true);
+    expect(withPoolBadge(placeCard(summary('s-mine'), '', 'UTC'), undefined).joint).toBeUndefined();
+  });
+
   it('lends the pool lane’s emoji to a mark in the pool’s column, never leaving it blank', () => {
     const card = withPoolBadge(placeCard(summary('s-joint'), '', 'UTC'), {
       poolId: 'p-ours',

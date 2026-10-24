@@ -35,6 +35,8 @@ export type Card = {
   authorId?: string;
   /** In a pool: their name, written out under the mark and on the row (review). */
   authorName?: string;
+  /** A joint splash (H23), wherever it is drawn: its mark and its row are a pill, not a disc (review). */
+  joint?: boolean;
   /** A joint splash (H23): drawn as a band across the columns, each ripple a branch. */
   branches?: Branch[];
   /** On Home: the pools this post is shared to, as monogram chips. */
@@ -66,6 +68,9 @@ export type CardRipple = {
 
 /** What a card names as its lane: an emoji and a name. */
 export type CardLane = { icon: string | null; name: string };
+
+/** A joint splash's mark and row icon: the disc's height, stretched to a pill (review). */
+export const JOINT_PILL_PX = 44;
 
 /** A joint splash's ripple, as a branch off its band: the column it drops into, and whose it is. */
 export type Branch = { id: string; column: string; initials: string; authorId?: string };
@@ -284,6 +289,7 @@ export function withEdits(
             column: undefined,
             lane: undefined,
             pools: undefined,
+            joint: false,
             href: undefined,
             menu: undefined,
             editable: true,

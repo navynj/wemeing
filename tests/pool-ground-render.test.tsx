@@ -689,3 +689,29 @@ describe('a conversion shows at once (0022)', () => {
     expect(container.querySelector(`[data-cell="${ME}"] [data-mark="s-joint"]`)).not.toBeNull();
   });
 });
+
+describe('a joint splash reads as the pool’s at a glance (review)', () => {
+  it('is a pill in the Lane view; a post of one person stays a disc', () => {
+    setView('lane');
+    const { container } = ground(A);
+    const joint = container.querySelector('[data-mark="s-joint"]') as HTMLElement;
+    expect(joint.hasAttribute('data-joint-pill')).toBe(true);
+    expect(joint.style.width).toBe('44px');
+    expect(joint.style.height).toBe('28px');
+    const mine = container.querySelector('[data-mark="s-mine"]') as HTMLElement;
+    expect(mine.hasAttribute('data-joint-pill')).toBe(false);
+    expect(mine.style.width).toBe('28px');
+  });
+
+  it('is a pill across the whole row in the Date view', () => {
+    setView('date');
+    const { container } = ground(A);
+    const row = container.querySelector('[data-pill="s-joint"]')!;
+    expect(row.hasAttribute('data-joint-pill')).toBe(true);
+    expect(row.className).toContain('rounded-full');
+    expect(row.className).toContain('w-full');
+    const plain = container.querySelector('[data-pill="s-mine"]')!;
+    expect(plain.hasAttribute('data-joint-pill')).toBe(false);
+    expect(plain.className).toContain('border-b');
+  });
+});

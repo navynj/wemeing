@@ -104,6 +104,7 @@ export function poolCards(
         href,
         menu: { pin: true, delete: blocks.every((r) => r.author_id === me) },
         editable: true,
+        joint: true,
       });
       continue;
     }
@@ -191,6 +192,7 @@ export function withPoolMoves(
         ...moved,
         author: undefined,
         authorId: undefined,
+        joint: true,
         branches: [
           {
             id: `${card.splash.id}-mine`,
@@ -206,6 +208,7 @@ export function withPoolMoves(
       return {
         ...moved,
         branches: undefined,
+        joint: false,
         author: me.initials,
         authorId: me.id,
         column: kind === 'swimmers' ? me.id : column,

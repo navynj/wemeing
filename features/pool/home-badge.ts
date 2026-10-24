@@ -29,6 +29,7 @@ export function withPoolBadge(card: Card, joint: JointOnHome | undefined): Card 
   return {
     ...card,
     pools: name ? [name] : [],
+    joint: true,
     href: poolSplashHref(joint.poolId, card.splash.id),
     menu: { pin: false, delete: false },
     // Its title and icon are any current member's to edit; once I left, not mine.

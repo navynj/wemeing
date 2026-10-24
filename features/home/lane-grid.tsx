@@ -37,6 +37,7 @@ import {
   weekdayOf,
   type Card,
   type GridColumn,
+  JOINT_PILL_PX,
 } from './grid';
 import { DAY_RAIL_PX, DateDay } from './date-day';
 import { JointBand, JointCount, JointFaces } from './joint-band';
@@ -747,8 +748,10 @@ function Mark({
         data-ring={ring !== null ? '' : undefined}
         aria-label={title}
         onClick={() => onPick(card.splash.id)}
+        data-joint-pill={card.joint ? '' : undefined}
         className={`relative flex shrink-0 items-center justify-center rounded-full text-sm/none ${surface}`}
-        style={{ width: MARK_PX, height: MARK_PX }}
+        // A joint splash is a pill, so the Lane view shows it is the pool's (review).
+        style={{ width: card.joint ? JOINT_PILL_PX : MARK_PX, height: MARK_PX }}
       >
         {icon ? (
           <span aria-hidden className={`leading-none ${dived ? 'opacity-60' : ''}`}>

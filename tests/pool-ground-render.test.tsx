@@ -715,3 +715,27 @@ describe('a joint splash reads as the pool’s at a glance (review)', () => {
     expect(plain.className).toContain('border-b');
   });
 });
+
+describe('the joint surface is solid, and the faces’ ring is its colour (review)', () => {
+  const SURFACE = 'bg-[#3739D4]';
+  const RING = 'ring-[#3739D4]';
+  const faces = (root: Element) => [
+    ...root.querySelectorAll('[data-joint-faces] > :not([data-joint-more])'),
+  ];
+
+  it('on the Swimmers band', () => {
+    setView('swimmers');
+    const band = ground(A).container.querySelector('[data-joint-band="s-joint"]')!;
+    expect(band.className).toContain(SURFACE);
+    expect(band.className).not.toMatch(/bg-white\//);
+    expect(faces(band).every((face) => face.className.includes(RING))).toBe(true);
+  });
+
+  it('on the Date view’s pill row', () => {
+    setView('date');
+    const row = ground(A).container.querySelector('[data-pill="s-joint"]')!;
+    expect(row.className).toContain(SURFACE);
+    expect(row.className).not.toMatch(/bg-white\//);
+    expect(faces(row).every((face) => face.className.includes(RING))).toBe(true);
+  });
+});

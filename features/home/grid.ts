@@ -69,6 +69,14 @@ export type CardRipple = {
 /** What a card names as its lane: an emoji and a name. */
 export type CardLane = { icon: string | null; name: string };
 
+/**
+ * A joint splash's surface — its band and its Date-view pill: white at 20%
+ * over the water, as one solid colour (review). Solid, so the faces stacked
+ * on it can wear a ring of the same colour that separates them unseen; over
+ * a translucent fill that ring showed as a line.
+ */
+export const JOINT_SURFACE = '#3739D4';
+
 /** A joint splash's mark and row icon: the disc's height, stretched to a pill (review). */
 export const JOINT_PILL_PX = 44;
 

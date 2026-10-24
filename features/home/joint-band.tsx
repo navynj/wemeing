@@ -59,7 +59,7 @@ export function JointBand({
           data-ring={ring !== null ? '' : undefined}
           aria-label={title}
           onClick={() => onPick(card.splash.id)}
-          className={`flex w-full min-w-0 items-center gap-2.5 rounded-[28px] bg-white/20 pr-4 pl-1.5 text-left text-white ${
+          className={`flex w-full min-w-0 items-center gap-2.5 rounded-[28px] bg-[#3739D4] pr-4 pl-1.5 text-left text-white ${
             dived ? 'opacity-70' : ''
           }`}
           style={{ height: BAND_PX }}
@@ -142,7 +142,9 @@ export function JointFaces({ branches, size }: { branches: Branch[]; size: numbe
           key={writer.authorId ?? writer.initials}
           id={writer.authorId}
           initials={writer.initials}
-          className={`text-main-900/60 ring-main-900 flex items-center justify-center rounded-full bg-[#8283EE] text-[10px] font-medium ring-2 ${
+          // The ring is the surface's own colour (JOINT_SURFACE): it parts
+          // stacked faces without drawing a line (review).
+          className={`text-main-900/60 flex items-center justify-center rounded-full bg-[#8283EE] text-[10px] font-medium ring-2 ring-[#3739D4] ${
             at > 0 ? '-ml-1' : ''
           }`}
           style={{ width: size, height: size }}

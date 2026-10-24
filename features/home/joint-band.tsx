@@ -2,9 +2,9 @@
 
 import { CommitRing } from '@/components/ui/waves';
 import type { IsoDate } from '@/lib/time';
-import { Avatar, PersonName } from '@/features/people/avatar';
+import { Avatar } from '@/features/people/avatar';
 
-import { monthAbbrev, weekdayOf, type Card, type CardLane } from './grid';
+import { monthAbbrev, weekdayOf, type Branch, type Card } from './grid';
 
 /** The band's height, a member's face on it, and how many faces before "+n". */
 const BAND_PX = 44;
@@ -43,10 +43,6 @@ export function JointBand({
   const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
   const branches = card.branches ?? [];
   // Each writer once, in the order they first wrote.
-  const writers = [
-    ...new Map(branches.map((b) => [b.authorId ?? b.initials, b] as const)).values(),
-  ];
-  const more = writers.length - MAX_FACES;
   return (
     <>
       <Rail day={day} label={label} />
@@ -89,33 +85,8 @@ export function JointBand({
             </span>
           </span>
           <span className="min-w-0 flex-1 truncate text-sm font-medium">{title}</span>
-          <span
-            data-joint-count
-            className="shrink-0 text-xs font-medium text-white/70 tabular-nums"
-          >
-            {branches.length === 1 ? '1 ripple' : `${branches.length} ripples`}
-          </span>
-          {writers.length > 0 ? (
-            <span data-joint-faces className="flex shrink-0 items-center">
-              {writers.slice(0, MAX_FACES).map((writer, at) => (
-                <Avatar
-                  key={writer.authorId ?? writer.initials}
-                  id={writer.authorId}
-                  initials={writer.initials}
-                  // Solid, so a face never shows the one beneath it (review).
-                  className={`text-main-900/60 ring-main-900 flex items-center justify-center rounded-full bg-[#8283EE] text-[10px] font-medium ring-2 ${
-                    at > 0 ? '-ml-1' : ''
-                  }`}
-                  style={{ width: FACE_PX, height: FACE_PX }}
-                />
-              ))}
-              {more > 0 ? (
-                <span data-joint-more className="ml-1 text-[10px] font-medium text-white/70">
-                  +{more}
-                </span>
-              ) : null}
-            </span>
-          ) : null}
+          <JointCount count={branches.length} />
+          <JointFaces branches={branches} size={FACE_PX} />
         </button>
       </div>
     </>
@@ -144,80 +115,44 @@ function Rail({ day, label }: { day: IsoDate; label: { monthChanges: boolean } |
   );
 }
 
-/**
- * A joint splash in the Date view: the band is a row, its ripples indented
- * sub-rows hung from it by the same 10% line, each with its author.
- */
-export function JointRows({
-  card,
-  lane,
-  current,
-  ring,
-  onPick,
-}: {
-  card: Card;
-  lane: CardLane | null;
-  current: boolean;
-  ring: number | null;
-  onPick: (id: string) => void;
-}) {
-  const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
-  const icon = card.splash.icon ?? lane?.icon ?? null;
+/** "3 ripples": how many a joint splash holds, on its band and its Date-view row. */
+export function JointCount({ count }: { count: number }) {
   return (
-    <div
-      data-joint-rows={card.splash.id}
-      className={`flex flex-col ${current ? '' : 'opacity-60'}`}
-    >
-      <button
-        type="button"
-        data-pill={card.splash.id}
-        data-joint-band={card.splash.id}
-        data-ring={ring !== null ? '' : undefined}
-        onClick={() => onPick(card.splash.id)}
-        className="flex w-full min-w-0 items-center gap-3 rounded-[28px] bg-white/20 py-1.5 pr-4 pl-1.5 text-left text-white"
-      >
-        <span className="relative flex shrink-0 items-center justify-center">
-          {ring !== null ? (
-            <span
-              key={ring}
-              aria-hidden
-              data-commit-ripple
-              className="pointer-events-none absolute inset-0 flex items-center justify-center text-white"
-            >
-              <span className="flex shrink-0">
-                <CommitRing size={RING_PX} contentSize={28} gap={6} once />
-              </span>
-            </span>
-          ) : null}
-          <span
-            aria-hidden
-            className="relative flex h-7 w-7 items-center justify-center rounded-full bg-white/30 text-sm/none"
-          >
-            {icon}
-          </span>
+    <span data-joint-count className="shrink-0 text-xs font-medium text-white/70 tabular-nums">
+      {count === 1 ? '1 ripple' : `${count} ripples`}
+    </span>
+  );
+}
+
+/**
+ * Who wrote a joint splash's ripples (review): each writer once, in the order
+ * they first wrote, stacked, four faces then "+n". Solid discs, so a face
+ * never shows the one beneath it.
+ */
+export function JointFaces({ branches, size }: { branches: Branch[]; size: number }) {
+  const writers = [
+    ...new Map(branches.map((b) => [b.authorId ?? b.initials, b] as const)).values(),
+  ];
+  if (writers.length === 0) return null;
+  const more = writers.length - MAX_FACES;
+  return (
+    <span data-joint-faces className="flex shrink-0 items-center">
+      {writers.slice(0, MAX_FACES).map((writer, at) => (
+        <Avatar
+          key={writer.authorId ?? writer.initials}
+          id={writer.authorId}
+          initials={writer.initials}
+          className={`text-main-900/60 ring-main-900 flex items-center justify-center rounded-full bg-[#8283EE] text-[10px] font-medium ring-2 ${
+            at > 0 ? '-ml-1' : ''
+          }`}
+          style={{ width: size, height: size }}
+        />
+      ))}
+      {more > 0 ? (
+        <span data-joint-more className="ml-1 text-[10px] font-medium text-white/70">
+          +{more}
         </span>
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold">{title}</span>
-      </button>
-      <ol className="relative ml-5 border-l border-white/10 pb-1">
-        {card.ripples.map((ripple) => (
-          <li key={ripple.id}>
-            <button
-              type="button"
-              data-joint-sub={ripple.id}
-              onClick={() => onPick(card.splash.id)}
-              className="flex w-full min-w-0 items-center gap-2 py-2 pl-3 text-left text-white"
-            >
-              <span className="w-16 shrink-0 truncate text-[10px] font-medium text-white/70">
-                <PersonName
-                  id={ripple.authorId}
-                  name={ripple.authorName ?? ripple.initials ?? ''}
-                />
-              </span>
-              <span className="min-w-0 flex-1 truncate text-xs text-white/80">{ripple.note}</span>
-            </button>
-          </li>
-        ))}
-      </ol>
-    </div>
+      ) : null}
+    </span>
   );
 }

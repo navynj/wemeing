@@ -26,11 +26,15 @@ const JOINT = {
   poolLaneId: 'l-games',
 };
 const loaded = vi.hoisted(() => ({ state: null as unknown }));
+/** What the next save resolves to; unset is a plain success. */
+const outcome = vi.hoisted(() => ({
+  next: null as Promise<{ ok: true } | { ok: false; message: string }> | null,
+}));
 vi.mock('@/features/splash-sheet/edit-actions', () => ({
   loadSplashEdit: () => Promise.resolve(loaded.state ?? JOINT),
   saveSplashEdit: (input: Record<string, unknown>) => {
     saved.push(input);
-    return Promise.resolve({ ok: true });
+    return outcome.next ?? Promise.resolve({ ok: true });
   },
 }));
 
@@ -43,6 +47,7 @@ import type { SplashSummary } from '@/features/splash/summary';
 afterEach(() => {
   cleanup();
   loaded.state = null;
+  outcome.next = null;
   saved.length = 0;
 });
 
@@ -88,8 +93,13 @@ describe('the edit pencil (review)', () => {
 });
 
 function Probe() {
-  const { pendingEdits } = useInputSheet();
-  return <span data-pending>{JSON.stringify(pendingEdits)}</span>;
+  const { pendingEdits, dropMessage } = useInputSheet();
+  return (
+    <>
+      <span data-pending>{JSON.stringify(pendingEdits)}</span>
+      <span data-drop-message>{dropMessage ?? ''}</span>
+    </>
+  );
 }
 
 describe('editing a joint splash (review)', () => {
@@ -234,5 +244,45 @@ describe('a pool’s own splash in the edit sheet (0020)', () => {
   it('keeps my own lane chips, not the pool’s, for my splash shared to a pool', async () => {
     const view = await open({ kind: 'mine', poolLanes: [], poolLaneId: null });
     expect(view.container.querySelector('[data-edit-pool-lanes]')).toBeNull();
+  });
+});
+
+describe('a pool-lane move from the edit sheet (review)', () => {
+  async function moveTo(result: { ok: true } | { ok: false; message: string }) {
+    let settle!: (value: typeof result) => void;
+    outcome.next = new Promise((resolve) => (settle = resolve));
+    loaded.state = { ...JOINT };
+    const view = render(
+      <InputSheetProvider>
+        <SplashEditSheet splashId="s-joint" context={CONTEXT} onClose={() => {}} />
+        <Probe />
+      </InputSheetProvider>,
+    );
+    await waitFor(() => expect(view.container.querySelector('[data-edit-form]')).not.toBeNull());
+    fireEvent.click(view.getByText('Media'));
+    await act(async () => {
+      fireEvent.click(view.container.querySelector('[data-edit-save]')!);
+    });
+    const pending = () =>
+      JSON.parse(view.container.querySelector('[data-pending]')!.textContent!) as Record<
+        string,
+        { poolLane?: { id: string } }
+      >;
+    // Shown before the server answers.
+    expect(pending()['s-joint']?.poolLane?.id).toBe('l-media');
+    await act(async () => settle(result));
+    return { view, pending };
+  }
+
+  it('shows the move before the save returns', async () => {
+    await moveTo({ ok: true });
+  });
+
+  it('takes the move back and says why when the save is refused', async () => {
+    const { view, pending } = await moveTo({ ok: false, message: 'that lane is not in this pool' });
+    expect(pending()['s-joint']).toBeUndefined();
+    expect(view.container.querySelector('[data-drop-message]')!.textContent).toBe(
+      'that lane is not in this pool',
+    );
   });
 });

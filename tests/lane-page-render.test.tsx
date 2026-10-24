@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
+import { useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({
@@ -33,7 +34,7 @@ import { byNewest, placeCard } from '@/features/home/grid';
 import { LanePage } from '@/features/lanes/lane-page';
 import { summarizeSplash, type SplashBlock } from '@/features/splash/summary';
 import type { MyCategory } from '@/lib/queries/profile';
-import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
+import { InputSheetProvider, useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { written } from './written-on';
 
 afterEach(cleanup);
@@ -247,5 +248,36 @@ describe('a pool lane’s page (review)', () => {
         },
       ]),
     );
+  });
+});
+
+describe('a post moved to another pool lane (0020, review)', () => {
+  function Mover() {
+    const { markEdited } = useInputSheet();
+    useEffect(
+      () =>
+        markEdited('ramen', {
+          title: 'Ramen',
+          icon: null,
+          poolLane: { id: 'l-other', icon: '🎬', name: 'Media' },
+        }),
+      [markEdited],
+    );
+    return null;
+  }
+
+  it('leaves this pool lane’s page at once', () => {
+    const { container } = render(
+      <InputSheetProvider>
+        <Mover />
+        <LanePage
+          lane={{ id: 'l-word', name: '말씀', icon: '📖' }}
+          cards={CARDS}
+          pool={{ poolId: 'p-ours', poolName: 'Sarang', lanes: [] }}
+        />
+      </InputSheetProvider>,
+    );
+    expect(container.querySelector('[data-lane-post="ramen"]')).toBeNull();
+    expect(container.querySelector('[data-lane-post="soup"]')).not.toBeNull();
   });
 });

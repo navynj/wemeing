@@ -145,3 +145,32 @@ export function poolPinned(cards: Card[], me: string, view: PoolView): Card[] {
     })
     .sort((a, b) => b.splash.pinnedAt!.localeCompare(a.splash.pinnedAt!));
 }
+
+/**
+ * A pool's own splash moved to another lane a moment ago (0020, review): it
+ * shows there at once — its column in the Lane view, its lane chip and its
+ * origin tag everywhere — until the re-read lands; a refusal clears the edit
+ * and it goes back. Swimmers keeps its author's column.
+ */
+export function withPoolMoves(
+  cards: Card[],
+  edits: Record<string, { poolLane?: { id: string; icon: string | null; name: string } }>,
+  kind: PoolViewKind,
+  poolName: string,
+): Card[] {
+  return cards.map((card) => {
+    const to = edits[card.splash.id]?.poolLane;
+    if (!to) return card;
+    return {
+      ...card,
+      lane: { icon: to.icon, name: to.name },
+      origins: [originTag(poolName, to.icon, to.name)],
+      ...(kind === 'swimmers'
+        ? {}
+        : {
+            column: to.id,
+            branches: card.branches?.map((branch) => ({ ...branch, column: to.id })),
+          }),
+    };
+  });
+}

@@ -1,5 +1,7 @@
 'use client';
 
+import type { ReactNode } from 'react';
+
 import { CommitRing } from '@/components/ui/waves';
 import { Monogram } from '@/components/ui/monogram';
 import { PersonName } from '@/features/people/avatar';
@@ -25,6 +27,7 @@ export function PostRow({
   current,
   ring,
   showLane = true,
+  after,
   onPick,
 }: {
   card: Card;
@@ -35,6 +38,8 @@ export function PostRow({
   ring: number | null;
   /** The lane as a chip at the end; off on a lane's own page, where every row shares it. */
   showLane?: boolean;
+  /** At the row's end, after the lane chip: a joint splash's faces and count (review). */
+  after?: ReactNode;
   onPick: (id: string) => void;
 }) {
   const title = card.splash.title.trim() || card.splash.ghostTitle || 'Untitled';
@@ -99,6 +104,7 @@ export function PostRow({
           {lane.name}
         </span>
       ) : null}
+      {after}
     </button>
   );
 }

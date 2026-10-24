@@ -39,7 +39,7 @@ import {
   type GridColumn,
 } from './grid';
 import { DAY_RAIL_PX, DateDay } from './date-day';
-import { JointBand, JointRows } from './joint-band';
+import { JointBand, JointCount, JointFaces } from './joint-band';
 import { PostRow } from './post-row';
 
 /** The date rail's width and the `+` column's, both fixed; the lanes share the rest. */
@@ -479,27 +479,26 @@ export const LaneGrid = forwardRef<
             if (dateView) {
               return (
                 <DateDay key={day} day={day} monthChanges={monthChanges}>
-                  {(byDay.get(day) ?? []).map((card) =>
-                    card.branches ? (
-                      <JointRows
-                        key={card.splash.id}
-                        card={card}
-                        lane={laneOfCard(card, categories)}
-                        current={!waterIds.has(card.splash.id)}
-                        ring={ringAt?.id === card.splash.id ? ringAt.seq : null}
-                        onPick={onPick}
-                      />
-                    ) : (
-                      <PostRow
-                        key={card.splash.id}
-                        card={card}
-                        lane={laneOfCard(card, categories)}
-                        current={!waterIds.has(card.splash.id)}
-                        ring={ringAt?.id === card.splash.id ? ringAt.seq : null}
-                        onPick={onPick}
-                      />
-                    ),
-                  )}
+                  {(byDay.get(day) ?? []).map((card) => (
+                    <PostRow
+                      key={card.splash.id}
+                      card={card}
+                      lane={laneOfCard(card, categories)}
+                      current={!waterIds.has(card.splash.id)}
+                      ring={ringAt?.id === card.splash.id ? ringAt.seq : null}
+                      onPick={onPick}
+                      // A joint splash is one row, as on the grid (review): its
+                      // writers' faces and ripple count, never its ripples.
+                      after={
+                        card.branches ? (
+                          <>
+                            <JointFaces branches={card.branches} size={26} />
+                            <JointCount count={card.branches.length} />
+                          </>
+                        ) : undefined
+                      }
+                    />
+                  ))}
                 </DateDay>
               );
             }

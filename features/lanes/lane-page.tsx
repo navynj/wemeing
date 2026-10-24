@@ -62,7 +62,7 @@ export function LanePage({
   topParam?: string | null;
 }) {
   const router = useRouter();
-  const { openSheet, pendingEdits } = useInputSheet();
+  const { openSheet, pendingEdits, dropMessage } = useInputSheet();
   const saved = useOptimisticAction({ name: lane.name, icon: lane.icon ?? '' });
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(lane.name);
@@ -74,8 +74,18 @@ export function LanePage({
     cards.filter((card) => card.splash.pinnedAt).map((card) => card.splash.id),
   );
   const shown = useMemo(
-    () => withEdits(cards, pendingEdits).filter((card) => !removed.value.includes(card.splash.id)),
-    [cards, pendingEdits, removed.value],
+    () =>
+      withEdits(cards, pendingEdits).filter(
+        (card) =>
+          !removed.value.includes(card.splash.id) &&
+          // Moved to another of the pool's lanes a moment ago (0020): gone from here at once.
+          !(
+            pool &&
+            pendingEdits[card.splash.id]?.poolLane?.id !== undefined &&
+            pendingEdits[card.splash.id]?.poolLane?.id !== lane.id
+          ),
+      ),
+    [cards, pendingEdits, removed.value, pool, lane.id],
   );
   const ids = useMemo(() => shown.map((card) => card.splash.id), [shown]);
   const [initialTop] = useState(() =>
@@ -192,9 +202,9 @@ export function LanePage({
               </button>
             </>
           )}
-          {saved.message ? (
+          {saved.message || dropMessage ? (
             <p role="alert" className="text-sm text-white/80">
-              {saved.message}
+              {saved.message ?? dropMessage}
             </p>
           ) : null}
         </header>

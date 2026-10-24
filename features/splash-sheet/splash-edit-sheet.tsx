@@ -89,6 +89,10 @@ export function SplashEditSheet({
                   title: edit.title,
                   icon: edit.icon,
                   declaredLaneId: edit.kind === 'mine' ? edit.declaredLaneId : undefined,
+                  // A move among the pool's lanes shows at once too (review, 0020).
+                  poolLane: edit.poolLaneId
+                    ? loaded?.poolLanes.find((lane) => lane.id === edit.poolLaneId)
+                    : undefined,
                 });
                 onClose();
                 void saveSplashEdit({ id: splashId, ...edit }).then((done) => {

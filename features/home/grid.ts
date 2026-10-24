@@ -248,7 +248,15 @@ export function newestIn(cards: Card[], month: string): Card | null {
  */
 export function withEdits(
   cards: Card[],
-  edits: Record<string, { title: string; icon: string | null; declaredLaneId?: string | null }>,
+  edits: Record<
+    string,
+    {
+      title: string;
+      icon: string | null;
+      declaredLaneId?: string | null;
+      poolLane?: { id: string; icon: string | null; name: string };
+    }
+  >,
 ): Card[] {
   if (Object.keys(edits).length === 0) return cards;
   return cards.map((card) => {
@@ -262,6 +270,11 @@ export function withEdits(
         icon: edit.icon,
         ...(edit.declaredLaneId !== undefined ? { declaredLaneId: edit.declaredLaneId } : {}),
       },
+      // Moved to another pool lane (0020): where a mark in its pool's column
+      // on Home borrows the pool lane's emoji, it borrows the new one at once.
+      ...(edit.poolLane && card.lane && cardColumn(card)?.startsWith('pool:')
+        ? { lane: { ...card.lane, icon: edit.poolLane.icon } }
+        : {}),
     };
   });
 }

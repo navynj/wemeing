@@ -22,7 +22,13 @@ export type OpenSheet =
   | null;
 
 /** A splash edited a moment ago, as every surface should show it until the re-read lands. */
-export type PendingEdit = { title: string; icon: string | null; declaredLaneId?: string | null };
+export type PendingEdit = {
+  title: string;
+  icon: string | null;
+  declaredLaneId?: string | null;
+  /** A pool's own splash moved to another of its pool's lanes (0020). */
+  poolLane?: { id: string; icon: string | null; name: string };
+};
 
 /**
  * `pool`: dropped from a pool (H23) — the card as that pool's grid should

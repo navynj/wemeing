@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render } from '@testing-library/react';
+import { useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const pushed: string[] = [];
@@ -24,7 +25,7 @@ vi.mock('@/features/pool/actions', () => ({
   revokeInvite: () => Promise.resolve({ ok: true }),
 }));
 
-import { InputSheetProvider } from '@/features/input-sheet/sheet-provider';
+import { InputSheetProvider, useInputSheet } from '@/features/input-sheet/sheet-provider';
 import { PeopleProvider } from '@/features/people/people-provider';
 import { PoolGround } from '@/features/pool/pool-ground';
 import { PoolIndex } from '@/features/pool/pool-index';
@@ -265,11 +266,31 @@ describe('a joint splash on the grid (H23)', () => {
     expect(band.querySelector('[data-joint-more]')!.textContent).toBe('+4');
   });
 
-  it('is a row with its ripples as sub-rows in the Date view', () => {
+  it('is one row in the Date view: icon, title, lane chip, then faces and count; no sub-rows', () => {
     setView('date');
     const { container } = ground(A);
-    expect(container.querySelectorAll('[data-joint-rows="s-joint"]')).toHaveLength(1);
-    expect(container.querySelectorAll('[data-joint-sub]')).toHaveLength(2);
+    const rows = container.querySelectorAll('[data-pill="s-joint"]');
+    expect(rows).toHaveLength(1);
+    const row = rows[0];
+    expect(row.textContent).toContain('🏛️');
+    expect(row.textContent).toContain('Lost Ruins of Arnak');
+    expect(row.textContent).toContain('Media');
+    expect(row.querySelectorAll('[data-joint-faces] > :not([data-joint-more])')).toHaveLength(2);
+    expect(row.querySelector('[data-joint-count]')!.textContent).toBe('2 ripples');
+    // The faces and the count come after the lane chip.
+    const text = row.textContent!;
+    expect(text.indexOf('Media')).toBeLessThan(text.indexOf('2 ripples'));
+    expect(container.querySelector('[data-joint-sub]')).toBeNull();
+    expect(container.querySelector('[data-joint-rows]')).toBeNull();
+  });
+
+  it('comes to the top of the stack from its Date-view row', () => {
+    setView('date');
+    const { container } = ground(A);
+    fireEvent.click(container.querySelector('[data-pill="s-joint"]')!);
+    expect(container.querySelector('[data-pill="s-joint"]')!.hasAttribute('data-dived')).toBe(
+      false,
+    );
   });
 
   it('is a mark in its pool lane’s column in the Lane view, not a band (review)', () => {
@@ -473,10 +494,6 @@ describe('faces (0018)', () => {
     const { container } = ground(A);
     const rows = [...container.querySelectorAll('[data-row-author]')].map((a) => a.textContent);
     expect(new Set(rows)).toEqual(new Set(['Yoonji Lee', 'Mina']));
-    const subs = [...container.querySelectorAll('[data-joint-sub]')].map(
-      (row) => row.firstElementChild!.textContent,
-    );
-    expect(subs.sort()).toEqual(['Mina', 'Yoonji Lee']);
   });
 
   const PEOPLE = {
@@ -526,5 +543,55 @@ describe('faces (0018)', () => {
         ?.closest('[data-cell]')
         ?.querySelector('[data-mark-author]')?.textContent,
     ).toBe('Mina Kim');
+  });
+});
+
+describe('moving a pool’s splash to another lane (0020, review)', () => {
+  function Mover({
+    id,
+    to,
+  }: {
+    id: string;
+    to: { id: string; icon: string; name: string } | null;
+  }) {
+    const { markEdited, clearEdited } = useInputSheet();
+    useEffect(() => {
+      if (to) markEdited(id, { title: 'Lost Ruins of Arnak', icon: '🏛️', poolLane: to });
+      else clearEdited(id);
+    }, [id, to, markEdited, clearEdited]);
+    return null;
+  }
+  const FOOD = { id: 'l-food', icon: '🍽️', name: 'Food' };
+  const moved = (to: typeof FOOD | null) =>
+    render(
+      <InputSheetProvider>
+        <Mover id="s-joint" to={to} />
+        <PoolGround view={A} pools={POOLS} me={ME} today="2026-10-23" timeZone={TZ} />
+      </InputSheetProvider>,
+    );
+
+  it('shows the move at once: its mark in the new lane, its tag and chip naming it', () => {
+    setView('lane');
+    const { container } = moved(FOOD);
+    expect(container.querySelector('[data-cell="l-food"] [data-mark="s-joint"]')).not.toBeNull();
+    expect(container.querySelector('[data-cell="l-media"] [data-mark="s-joint"]')).toBeNull();
+  });
+
+  it('goes back where it was when the edit is taken back', () => {
+    setView('lane');
+    const { container, rerender } = moved(FOOD);
+    rerender(
+      <InputSheetProvider>
+        <Mover id="s-joint" to={null} />
+        <PoolGround view={A} pools={POOLS} me={ME} today="2026-10-23" timeZone={TZ} />
+      </InputSheetProvider>,
+    );
+    expect(container.querySelector('[data-cell="l-media"] [data-mark="s-joint"]')).not.toBeNull();
+  });
+
+  it('names the new lane on its Date-view row at once', () => {
+    setView('date');
+    const { container } = moved(FOOD);
+    expect(container.querySelector('[data-pill="s-joint"]')!.textContent).toContain('Food');
   });
 });

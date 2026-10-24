@@ -25,7 +25,7 @@ import { poolScopeOf } from './compose-scope';
 import { deleteJointSplash } from './actions';
 import { InvitePanel } from './invite-panel';
 import { MembersSheet } from './members-sheet';
-import { poolCards, poolColumns, poolPinned, type PoolViewKind } from './pool-cards';
+import { poolCards, poolColumns, poolPinned, withPoolMoves, type PoolViewKind } from './pool-cards';
 import { PoolLanesSheet } from './pool-lanes-sheet';
 import { rememberVisit, usePoolView } from './remembered';
 import { PoolSheet, SheetTitle } from './sheet';
@@ -102,9 +102,12 @@ export function PoolGround({
   const landed = dropHere !== null && cards.some((c) => c.splash.id === dropHere.splash.id);
   const shown = useMemo(() => {
     // An edit made a moment ago shows at once (review).
-    const kept = withEdits(cards, pendingEdits).filter(
-      (c) => !pendingDeletes.includes(c.splash.id),
-    );
+    const kept = withPoolMoves(
+      withEdits(cards, pendingEdits),
+      pendingEdits,
+      kind,
+      view.pool.name,
+    ).filter((c) => !pendingDeletes.includes(c.splash.id));
     if (!dropHere || landed) return kept;
     // In Swimmers my drop sits in my column, and a joint splash's first ripple branches into it.
     const seated: Card =
@@ -116,7 +119,7 @@ export function PoolGround({
           }
         : dropHere;
     return [seated, ...kept];
-  }, [cards, pendingEdits, pendingDeletes, dropHere, landed, kind, me]);
+  }, [cards, pendingEdits, pendingDeletes, dropHere, landed, kind, me, view.pool.name]);
   useEffect(() => {
     if (!landed) return;
     const timer = window.setTimeout(clearDropped, 1800);

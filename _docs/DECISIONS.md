@@ -456,3 +456,12 @@ A member's column in Swimmers opens nothing.
 **In a pool, Swimmers comes first, and a joint band spans the grid only there (review, 2026-10-23).** The pool's toggle reads Swimmers | Lane | Date. A pool with no remembered view opens on Swimmers, and re-tapping Pool walks the views in that order. A joint splash is a full-width band, with its ripple count and its writers' faces, only in Swimmers, where the columns are people. In the Lane view it is a mark in its pool lane's column like any other post. The Date view is unchanged.
 
 **A notification dot for what is new in my pools (review, 2026-10-23).** A pool has news when someone else has written there since my last visit on this device; that is the same rule as the switcher's per-pool dot. The shell loads each pool's latest activity once. A dot sits on the Pool tab when any pool has news, and on the pool name's dropdown arrow when another pool does; inside the switcher, each pool with news keeps its dot. Opening a pool clears its dot at once. The dot is white with a blue ring, outside the inactive tab's fade so it never dims.
+
+**A pool-lane move shows at once; a joint splash is one row in the Date view (review, 2026-10-23).**
+- **Instant move:** moving a pool's own splash to another lane in the edit sheet now shows before the save returns, like every other edit:
+  - its mark goes to the new lane's column in the Lane view;
+  - its lane chip and origin tag name the new lane;
+  - on its old pool lane's page it is gone;
+  - on Home, a mark in its pool's column takes the new pool lane's emoji.
+  If the save is refused, the edit is taken back and the reason shown, on the pool, on Home and on a lane's page alike.
+- **Date view:** a joint splash is one row, as on the grid: icon, title, lane chip, then its writers' stacked faces and its ripple count. There are no sub-rows and no branch lines. Tapping the row brings it to the top of the stack, where the ripple thread shows each ripple. The faces and the count are one component, shared with the Swimmers band.

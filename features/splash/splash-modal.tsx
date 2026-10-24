@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import { MotionConfig, motion, useDragControls, type PanInfo } from 'motion/react';
+import { MotionConfig, animate, motion, useDragControls, type PanInfo } from 'motion/react';
 
 import { usePrefersReducedMotion } from '@/components/ui/waves/use-reduced-motion';
 import { FLIP_SPRING } from '@/features/home/use-flip';
@@ -59,7 +59,10 @@ export function SplashModal({
   const reduce = usePrefersReducedMotion();
   const controls = useDragControls();
   const { sheet: compose } = useInputSheet();
+  const frame = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLDivElement>(null);
+  // Set when the sheet closes itself: its own exit has already played.
+  const closing = useRef(false);
   const scroller = useRef<HTMLDivElement>(null);
   const press = useRef<{ y: number; header: boolean; atTop: boolean; dragging: boolean } | null>(
     null,
@@ -67,22 +70,33 @@ export function SplashModal({
   const [leaving, setLeaving] = useState(false);
   const [viewport, setViewport] = useState<{ bottom: number; height: number } | null>(null);
 
-  const close = useCallback(() => setLeaving(true), []);
+  const close = useCallback(() => {
+    closing.current = true;
+    setLeaving(true);
+  }, []);
   const leave = useCallback(() => {
     if (closeTo) router.replace(closeTo, { scroll: false });
     else router.back();
   }, [closeTo, router]);
 
   // The screen behind holds still; focus comes in, and goes back on close.
+  // Closed by the route instead (back, or any navigation away), the sheet is
+  // already gone when this runs, so it leaves a still copy of itself to play
+  // the exit on (review): the back button closes with the same spring.
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
     const root = document.documentElement;
     const before = root.style.overflow;
+    const node = frame.current;
+    const body = scroller.current;
     root.style.overflow = 'hidden';
     panel.current?.focus({ preventScroll: true });
     return () => {
       root.style.overflow = before;
       opener?.focus?.({ preventScroll: true });
+      // Only a real removal: React's development double-run of effects
+      // cleans up while the sheet is still on the page, and must not play it.
+      if (!closing.current && node && !node.isConnected) playExit(node, body?.scrollTop ?? 0);
     };
   }, []);
 
@@ -193,6 +207,7 @@ export function SplashModal({
     <MotionConfig reducedMotion="user">
       <Close.Provider value={close}>
         <div
+          ref={frame}
           data-splash-modal
           className="fixed inset-x-0 top-0 z-30 flex flex-col items-center justify-end"
           style={{ bottom: viewport?.bottom ?? 0 }}
@@ -258,4 +273,39 @@ export function SplashModal({
       </Close.Provider>
     </MotionConfig>
   );
+}
+
+/**
+ * The exit for a sheet the route closed (review): a still, inert copy of it
+ * in place, its panel sent down on the board's spring and its scrim faded —
+ * a fade alone under reduced motion — then removed.
+ */
+export function playExit(node: HTMLElement, scrollTop: number): void {
+  const ghost = node.cloneNode(true) as HTMLElement;
+  ghost.removeAttribute('data-splash-modal');
+  ghost.setAttribute('data-splash-leaving', '');
+  ghost.setAttribute('aria-hidden', 'true');
+  ghost.inert = true;
+  ghost.style.pointerEvents = 'none';
+  document.body.appendChild(ghost);
+  const body = ghost.querySelector<HTMLElement>('[data-sheet-body]');
+  if (body) body.scrollTop = scrollTop;
+  const sheet = ghost.querySelector<HTMLElement>('[data-splash-sheet]');
+  const scrim = ghost.querySelector<HTMLElement>('[data-sheet-scrim]');
+  const reduce =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const runs = [
+    scrim ? animate(scrim, { opacity: 0 }, { duration: 0.2 }) : null,
+    sheet
+      ? reduce
+        ? animate(sheet, { opacity: 0 }, { duration: 0.2, ease: 'easeOut' })
+        : animate(
+            sheet,
+            { y: '100%', opacity: 0 },
+            { y: FLIP_SPRING, opacity: { duration: 0.2, ease: 'easeOut' } },
+          )
+      : null,
+  ].filter((run) => run !== null);
+  void Promise.all(runs.map((run) => run.finished)).finally(() => ghost.remove());
 }

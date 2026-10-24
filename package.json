@@ -20,7 +20,8 @@
     "verify": "pnpm lint && pnpm test:ci",
     "backup": "./scripts/backup.sh",
     "db:push": "./scripts/db-push.sh",
-    "verify:prod": "node scripts/verify-prod-rls.mjs"
+    "verify:prod": "node scripts/verify-prod-rls.mjs",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

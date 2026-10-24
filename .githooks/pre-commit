@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# The commit gate: types, lint, format and the full test suite, in that
+# order. Any failure stops the commit (set -e) — a check that reports a
+# problem and lets the commit through is no gate (744a021 went in with a
+# formatting failure). Bypassing it with --no-verify is not how work lands.
+#
+# The suite includes the DB-backed tests, so the local stack must be up
+# (pnpm db:start); a stack that is down fails the gate rather than skipping.
+set -euo pipefail
+
+step() { printf '\n→ gate: %s\n' "$1"; }
+
+step 'types'
+pnpm -s exec tsc --noEmit -p .
+
+step 'lint'
+pnpm -s lint
+
+out="$(mktemp)"
+trap 'rm -f "$out"' EXIT
+
+step 'format'
+pnpm -s exec prettier --check . > "$out" 2>&1 || {
+  grep '\[warn\]' "$out" | grep -v 'Code style issues' >&2 || true
+  echo '✖ format: run pnpm format' >&2
+  exit 1
+}
+
+step 'tests'
+pnpm -s test > "$out" 2>&1 || {
+  grep -E '×|FAIL|Tests ' "$out" | head -20 >&2
+  echo '✖ tests failed' >&2
+  exit 1
+}
+grep -E 'Tests ' "$out" || true
+
+printf '\n✓ gate passed\n'

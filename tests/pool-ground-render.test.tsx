@@ -778,3 +778,22 @@ describe('a day reads newest first, bands and marks alike (review)', () => {
     expect(container.querySelector('[data-day-continued="2026-10-20"]')).not.toBeNull();
   });
 });
+
+describe('a joint band on top of the stack reads as the top card does (review)', () => {
+  it('turns white with blue words and a pale icon, its faces ringed white; back to the joint surface when not on top', () => {
+    setView('swimmers');
+    const { container } = ground(A);
+    const band = () => container.querySelector('[data-joint-band="s-joint"]')!;
+    // Not on top yet: the solid joint surface.
+    expect(band().hasAttribute('data-dived')).toBe(true);
+    expect(band().className).toContain('bg-[#3739D4]');
+    fireEvent.click(band());
+    expect(band().hasAttribute('data-dived')).toBe(false);
+    expect(band().className).toContain('bg-white');
+    expect(band().className).toContain('text-main-900');
+    expect(band().querySelector('.bg-main-100\\/60')).not.toBeNull();
+    const faces = [...band().querySelectorAll('[data-joint-faces] > :not([data-joint-more])')];
+    expect(faces.every((face) => face.className.includes('ring-white'))).toBe(true);
+    expect(band().querySelector('[data-joint-count]')!.className).toContain('text-main-900/70');
+  });
+});

@@ -59,8 +59,10 @@ export function JointBand({
           data-ring={ring !== null ? '' : undefined}
           aria-label={title}
           onClick={() => onPick(card.splash.id)}
-          className={`flex w-full min-w-0 items-center gap-2.5 rounded-[28px] bg-[#3739D4] pr-4 pl-1.5 text-left text-white ${
-            dived ? 'opacity-70' : ''
+          // On top of the stack (review): white, its words in blue, as the
+          // top card reads; otherwise the solid joint surface, sitting back.
+          className={`flex w-full min-w-0 items-center gap-2.5 rounded-[28px] pr-4 pl-1.5 text-left ${
+            dived ? 'bg-[#3739D4] text-white opacity-70' : 'text-main-900 bg-white'
           }`}
           style={{ height: BAND_PX }}
         >
@@ -79,14 +81,16 @@ export function JointBand({
             ) : null}
             <span
               aria-hidden
-              className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white/30 text-base/none"
+              className={`relative flex h-8 w-8 items-center justify-center rounded-full text-base/none ${
+                dived ? 'bg-white/30' : 'bg-main-100/60'
+              }`}
             >
               {icon}
             </span>
           </span>
           <span className="min-w-0 flex-1 truncate text-sm font-medium">{title}</span>
-          <JointCount count={branches.length} />
-          <JointFaces branches={branches} size={FACE_PX} />
+          <JointCount count={branches.length} on={dived ? 'water' : 'white'} />
+          <JointFaces branches={branches} size={FACE_PX} on={dived ? 'water' : 'white'} />
         </button>
       </div>
     </>
@@ -116,9 +120,21 @@ function Rail({ day, label }: { day: IsoDate; label: { monthChanges: boolean } |
 }
 
 /** "3 ripples": how many a joint splash holds, on its band and its Date-view row. */
-export function JointCount({ count }: { count: number }) {
+export function JointCount({
+  count,
+  on = 'water',
+}: {
+  count: number;
+  /** The surface beneath: the joint surface on the water, or white on top of the stack. */
+  on?: 'water' | 'white';
+}) {
   return (
-    <span data-joint-count className="shrink-0 text-xs font-medium text-white/70 tabular-nums">
+    <span
+      data-joint-count
+      className={`shrink-0 text-xs font-medium tabular-nums ${
+        on === 'white' ? 'text-main-900/70' : 'text-white/70'
+      }`}
+    >
       {count === 1 ? '1 ripple' : `${count} ripples`}
     </span>
   );
@@ -129,7 +145,16 @@ export function JointCount({ count }: { count: number }) {
  * they first wrote, stacked, four faces then "+n". Solid discs, so a face
  * never shows the one beneath it.
  */
-export function JointFaces({ branches, size }: { branches: Branch[]; size: number }) {
+export function JointFaces({
+  branches,
+  size,
+  on = 'water',
+}: {
+  branches: Branch[];
+  size: number;
+  /** The surface beneath, whose colour the faces' ring takes so it parts them unseen. */
+  on?: 'water' | 'white';
+}) {
   const writers = [
     ...new Map(branches.map((b) => [b.authorId ?? b.initials, b] as const)).values(),
   ];
@@ -144,14 +169,19 @@ export function JointFaces({ branches, size }: { branches: Branch[]; size: numbe
           initials={writer.initials}
           // The ring is the surface's own colour (JOINT_SURFACE): it parts
           // stacked faces without drawing a line (review).
-          className={`text-main-900/60 flex items-center justify-center rounded-full bg-[#8283EE] text-[10px] font-medium ring-2 ring-[#3739D4] ${
-            at > 0 ? '-ml-1' : ''
-          }`}
+          className={`text-main-900/60 flex items-center justify-center rounded-full bg-[#8283EE] text-[10px] font-medium ring-2 ${
+            on === 'white' ? 'ring-white' : 'ring-[#3739D4]'
+          } ${at > 0 ? '-ml-1' : ''}`}
           style={{ width: size, height: size }}
         />
       ))}
       {more > 0 ? (
-        <span data-joint-more className="ml-1 text-[10px] font-medium text-white/70">
+        <span
+          data-joint-more
+          className={`ml-1 text-[10px] font-medium ${
+            on === 'white' ? 'text-main-900/70' : 'text-white/70'
+          }`}
+        >
           +{more}
         </span>
       ) : null}

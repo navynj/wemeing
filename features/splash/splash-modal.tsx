@@ -68,12 +68,16 @@ export function SplashModal({
     null,
   );
   const [leaving, setLeaving] = useState(false);
+  // While it leaves, the sheet keeps what it showed: a delete from inside it
+  // re-reads the route as it closes, and the swap must not flash (review).
+  const [held, setHeld] = useState<ReactNode>(null);
   const [viewport, setViewport] = useState<{ bottom: number; height: number } | null>(null);
 
   const close = useCallback(() => {
     closing.current = true;
+    setHeld(children);
     setLeaving(true);
-  }, []);
+  }, [children]);
   const leave = useCallback(() => {
     if (closeTo) router.replace(closeTo, { scroll: false });
     else router.back();
@@ -266,7 +270,7 @@ export function SplashModal({
               className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 lg:px-10 [&_[data-splash-side]]:sticky [&_[data-splash-side]]:top-0 [&_[data-splash-side]]:z-10 [&_[data-splash-side]]:bg-white"
               style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}
             >
-              {children}
+              {leaving ? held : children}
             </div>
           </motion.div>
         </div>

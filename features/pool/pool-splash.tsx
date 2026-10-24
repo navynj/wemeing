@@ -1,8 +1,9 @@
-import { notFound, redirect } from 'next/navigation';
+import { redirect } from 'next/navigation';
 
 import { initialsOf } from '@/features/home/grid';
 import { audienceFor } from '@/features/pool/audience-for';
 import { originTag } from '@/features/pool/origin-tag';
+import { SplashGone } from '@/features/splash/splash-gone';
 import { SplashPage } from '@/features/splash/splash-page';
 import { summarizeSplash } from '@/features/splash/summary';
 import { compareFlow } from '@/lib/flow-key';
@@ -43,7 +44,8 @@ export async function PoolSplash({ id, sid }: { id: string; sid: string }) {
       .returns<RippleWithCategory[]>(),
   ]);
   const board = view?.splashes.find((s) => s.id === sid);
-  if (!view || !board) notFound();
+  // Gone, or a pool I am not in: said in the sheet, never a 404 (review).
+  if (!view || !board) return <SplashGone />;
   if (ripples.error) throw ripples.error;
 
   const joint = board.owner_id === null;

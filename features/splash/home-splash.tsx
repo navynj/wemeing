@@ -1,6 +1,7 @@
-import { notFound, redirect } from 'next/navigation';
+import { redirect } from 'next/navigation';
 
 import { initialsOf } from '@/features/home/grid';
+import { SplashGone } from '@/features/splash/splash-gone';
 import { SplashPage } from '@/features/splash/splash-page';
 import { summarizeOrphan, summarizeSplash } from '@/features/splash/summary';
 import { flowInstant } from '@/lib/flow-key';
@@ -38,7 +39,9 @@ export async function HomeSplash({ id }: { id: string }) {
 
   const board = boards.find((b) => b.id === id) ?? null;
   const lone = board ? null : (ripples.find((r) => r.id === id && r.splash_id === null) ?? null);
-  if (!board && !lone) notFound();
+  // Gone (a delete from this very sheet re-reads here as it closes): said,
+  // never a 404 (review).
+  if (!board && !lone) return <SplashGone />;
 
   const blocks = (board ? ripples.filter((r) => r.splash_id === id) : [lone!]).sort(
     (a, b) =>

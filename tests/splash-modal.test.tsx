@@ -64,7 +64,11 @@ beforeEach(() => {
     }),
   });
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  // The exit copies a closed sheet leaves on the page while it animates out.
+  document.body.querySelectorAll('[data-splash-leaving]').forEach((ghost) => ghost.remove());
+});
 
 describe('the splash sheet (review)', () => {
   it('opened in the app, closes back: by Escape, by the dimmed screen', async () => {
@@ -142,5 +146,25 @@ describe('the splash sheet (review)', () => {
     expect(body.className).toContain('overflow-y-auto');
     expect(body.className).toContain('[&_[data-splash-side]]:sticky');
     expect(container.querySelector('[data-sheet-handle]')).not.toBeNull();
+  });
+});
+
+describe('deleting from inside the sheet (review)', () => {
+  function Deleting({ gone }: { gone: boolean }) {
+    return (
+      <InputSheetProvider>
+        <SplashModal closeTo={null}>{gone ? <p>This splash is gone.</p> : <Inside />}</SplashModal>
+      </InputSheetProvider>
+    );
+  }
+
+  it('keeps showing the splash while it closes, though the route re-reads it as gone', async () => {
+    const view = render(<Deleting gone={false} />);
+    fireEvent.click(view.getByText('delete'));
+    // The delete's re-read lands while the sheet is still on its way out.
+    view.rerender(<Deleting gone />);
+    expect(view.queryByText('This splash is gone.')).toBeNull();
+    expect(view.getByText('first')).toBeTruthy();
+    await waitFor(() => expect(router.back).toHaveBeenCalled(), { timeout: 3000 });
   });
 });

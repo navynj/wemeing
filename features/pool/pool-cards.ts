@@ -154,23 +154,64 @@ export function poolPinned(cards: Card[], me: string, view: PoolView): Card[] {
  */
 export function withPoolMoves(
   cards: Card[],
-  edits: Record<string, { poolLane?: { id: string; icon: string | null; name: string } }>,
+  edits: Record<
+    string,
+    {
+      poolLane?: { id: string; icon: string | null; name: string };
+      kind?: 'mine' | 'own' | 'joint';
+    }
+  >,
   kind: PoolViewKind,
   poolName: string,
+  me: { id: string; initials: string },
 ): Card[] {
   return cards.map((card) => {
-    const to = edits[card.splash.id]?.poolLane;
-    if (!to) return card;
-    return {
+    const edit = edits[card.splash.id];
+    const to = edit?.poolLane;
+    if (!edit || (!to && !edit.kind)) return card;
+    const column = to ? (kind === 'swimmers' ? card.column : to.id) : card.column;
+    const moved: Card = {
       ...card,
-      lane: { icon: to.icon, name: to.name },
-      origins: [originTag(poolName, to.icon, to.name)],
-      ...(kind === 'swimmers'
-        ? {}
-        : {
-            column: to.id,
-            branches: card.branches?.map((branch) => ({ ...branch, column: to.id })),
-          }),
+      ...(to
+        ? {
+            lane: { icon: to.icon, name: to.name },
+            origins: [originTag(poolName, to.icon, to.name)],
+            column,
+            branches: card.branches?.map((branch) => ({
+              ...branch,
+              column: kind === 'swimmers' ? branch.column : to.id,
+            })),
+          }
+        : {}),
     };
+    // Converted (0022): the pool's own — a band, its pin anyone's — or mine
+    // again — a mark under my name.
+    if (edit.kind === 'joint' && !card.branches) {
+      return {
+        ...moved,
+        author: undefined,
+        authorId: undefined,
+        branches: [
+          {
+            id: `${card.splash.id}-mine`,
+            column: kind === 'swimmers' ? me.id : (column ?? ''),
+            initials: me.initials,
+            authorId: me.id,
+          },
+        ],
+        menu: { pin: true, delete: true },
+      };
+    }
+    if ((edit.kind === 'mine' || edit.kind === 'own') && card.branches) {
+      return {
+        ...moved,
+        branches: undefined,
+        author: me.initials,
+        authorId: me.id,
+        column: kind === 'swimmers' ? me.id : column,
+        menu: { pin: true, delete: true },
+      };
+    }
+    return moved;
   });
 }

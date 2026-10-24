@@ -852,8 +852,20 @@ export type Database = {
     Functions: {
       _invite_pool: { Args: { p_token: string }; Returns: string }
       _place_history: { Args: { pid: string; uid: string }; Returns: undefined }
+      _place_on: {
+        Args: { cid: string; plid: string; sid: string; uid: string }
+        Returns: undefined
+      }
       _require_member: { Args: { pid: string }; Returns: string }
+      _require_only_mine: {
+        Args: { sid: string; uid: string }
+        Returns: undefined
+      }
       _require_uid: { Args: never; Returns: string }
+      _sending_lane: {
+        Args: { cid: string; pid: string; uid: string }
+        Returns: string
+      }
       _set_links: {
         Args: { p_links: Json; pid: string; uid: string }
         Returns: undefined
@@ -950,9 +962,25 @@ export type Database = {
         Args: { p_links: Json; p_pool: string }
         Returns: undefined
       }
+      set_splash_lane: {
+        Args: { p_my_lane: string; p_place_on?: string; p_splash: string }
+        Returns: undefined
+      }
       shares_pool: { Args: { other: string }; Returns: boolean }
       splash_in_my_pools: { Args: { sid: string }; Returns: boolean }
       splash_owner: { Args: { sid: string }; Returns: string }
+      splash_to_joint: {
+        Args: { p_pool_lane: string; p_splash: string }
+        Returns: undefined
+      }
+      splash_to_just_mine: {
+        Args: { p_pool_lane: string; p_splash: string }
+        Returns: undefined
+      }
+      splash_to_mine: {
+        Args: { p_my_lane: string; p_place_on?: string; p_splash: string }
+        Returns: undefined
+      }
       splash_writable: { Args: { sid: string }; Returns: boolean }
       visible_avatars: { Args: { uids: string[] }; Returns: string[] }
     }

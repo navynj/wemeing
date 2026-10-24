@@ -5,6 +5,8 @@ import { getMyProfile } from '@/lib/queries/profile';
 import { getMyPools, getPoolView } from '@/lib/queries/pools';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
+import { poolScopeOf } from '@/features/pool/compose-scope';
+import { PoolEditScope } from '@/features/pool/edit-scope';
 
 /**
  * A pool's home (H23). RLS decides whether it exists for this viewer at all:
@@ -26,14 +28,17 @@ export default async function PoolPage({ params, searchParams }: PageProps<'/poo
 
   return (
     <main className="water-ground flex h-dvh min-h-0 flex-col">
-      <PoolGround
-        view={view}
-        pools={pools}
-        me={profile.id}
-        today={todayIn(profile.timezone)}
-        timeZone={profile.timezone}
-        topParam={typeof top === 'string' ? top : null}
-      />
+      {/* Editing from here edits with this pool's lanes (0022). */}
+      <PoolEditScope scope={poolScopeOf(view)}>
+        <PoolGround
+          view={view}
+          pools={pools}
+          me={profile.id}
+          today={todayIn(profile.timezone)}
+          timeZone={profile.timezone}
+          topParam={typeof top === 'string' ? top : null}
+        />
+      </PoolEditScope>
     </main>
   );
 }

@@ -6,6 +6,7 @@ import { poolCards } from '@/features/pool/pool-cards';
 import { getMyProfile } from '@/lib/queries/profile';
 import { getPoolView } from '@/lib/queries/pools';
 import { createClient } from '@/lib/supabase/server';
+import { PoolEditScope } from '@/features/pool/edit-scope';
 
 /**
  * A pool lane's page (review): opened from its header on the pool's grid,
@@ -33,13 +34,15 @@ export default async function PoolLaneRoute({
 
   return (
     <main className="water-ground flex h-dvh min-h-0 flex-col">
-      <LanePage
-        lane={{ id: lane.id, name: lane.name, icon: lane.icon, description: lane.description }}
-        cards={cards}
-        categories={view.lanes.map((l) => ({ id: l.id, name: l.name, icon: l.icon }))}
-        topParam={typeof top === 'string' ? top : null}
-        pool={poolScopeOf(view)}
-      />
+      <PoolEditScope scope={poolScopeOf(view)}>
+        <LanePage
+          lane={{ id: lane.id, name: lane.name, icon: lane.icon, description: lane.description }}
+          cards={cards}
+          categories={view.lanes.map((l) => ({ id: l.id, name: l.name, icon: l.icon }))}
+          topParam={typeof top === 'string' ? top : null}
+          pool={poolScopeOf(view)}
+        />
+      </PoolEditScope>
     </main>
   );
 }

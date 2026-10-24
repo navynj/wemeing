@@ -9,6 +9,8 @@ export type AudienceLink = {
   myCategoryId: string;
   poolId: string;
   poolName: string;
+  /** The pool lane it links to (the shell loads it; 0022's warnings name it). */
+  poolLaneId?: string;
   /** Absent reads as both, the default (0017). */
   direction?: LinkDirection;
 };

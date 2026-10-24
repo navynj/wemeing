@@ -465,3 +465,16 @@ A member's column in Swimmers opens nothing.
   - on Home, a mark in its pool's column takes the new pool lane's emoji.
   If the save is refused, the edit is taken back and the reason shown, on the pool, on Home and on a lane's page alike.
 - **Date view:** a joint splash is one row, as on the grid: icon, title, lane chip, then its writers' stacked faces and its ripple count. There are no sub-rows and no branch lines. Tapping the row brings it to the top of the stack, where the ripple thread shows each ripple. The faces and the count are one component, shared with the Swimmers band.
+
+**0022: converting between personal, Just-mine and joint splashes (2026-10-23).** A splash changes kind only through four SECURITY DEFINER functions. Each checks membership and ownership itself, and none deletes a ripple or changes its author.
+- `splash_to_joint`: mine, in that pool, all ripples mine → joint. The pool owns it and I'm its creator. Every placement goes (the confirm sheet lists the other pools). My ripples take my lane where the link brings in (both, in), else none.
+- `splash_to_mine`: joint with only my ripples, or Just mine → mine in a lane I pick. From Home it stays in its pool, shared, only where that lane sends (both, out); from a pool, on the pool lane chosen there.
+- `splash_to_just_mine`: personal in that pool, or joint with only my ripples → Just mine. Every other placement goes.
+- `set_splash_lane`: my splash changes lane. Each pool it is shared to follows: it moves to the pool lane the new lane sends into, else it stops being shared (kept, switched off, as unlinking does).
+- Any conversion clears the pin, both ways.
+- The holds on a joint splash's pool and a Just-mine splash's pool let these functions through by a transaction-local flag, as `delete_pool` does.
+
+**In the edit sheet:**
+- **From a pool:** that pool's lane chips with Just mine, by the compose table. Making it joint asks first. A joint splash someone else wrote in cannot turn Just mine on ("Others have written here.").
+- **From Home:** my lanes, with a line per pool saying whether it moves or stops being shared. A joint splash only I wrote in becomes mine after a warning. A joint splash with others' ripples keeps its pool's lanes, with "Others have written here, so it stays in <Pool>."
+- Every conversion shows at once and goes back, with the reason, if it is refused.

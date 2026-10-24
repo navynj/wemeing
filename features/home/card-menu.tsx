@@ -8,6 +8,7 @@ import { useInputSheet } from '@/features/input-sheet/sheet-provider';
 
 import { splashHref } from '@/features/home/scope';
 import { monthKey } from '@/features/splash/summary';
+import { usePoolEditScope } from '@/features/pool/edit-scope';
 
 import type { Card } from './grid';
 
@@ -31,6 +32,7 @@ export function CardMenu({
   const [menu, setMenu] = useState<'closed' | 'open' | 'delete'>('closed');
   const { count } = card.splash;
   const { openEdit } = useInputSheet();
+  const pool = usePoolEditScope();
 
   return (
     <div
@@ -43,7 +45,7 @@ export function CardMenu({
           type="button"
           aria-label="Edit"
           data-card-edit
-          onClick={() => openEdit(card.splash.id)}
+          onClick={() => openEdit(card.splash.id, pool)}
           className="text-pool-500 flex h-8 w-8 items-center justify-center rounded-full"
         >
           <Pencil aria-hidden size={16} />

@@ -44,7 +44,14 @@ export function SheetHost({ context }: { context: SheetContext }) {
 
   if (!sheet) return null;
   if (sheet.kind === 'edit') {
-    return <SplashEditSheet splashId={sheet.splashId} context={context} onClose={closeSheet} />;
+    return (
+      <SplashEditSheet
+        splashId={sheet.splashId}
+        context={context}
+        pool={sheet.pool ?? null}
+        onClose={closeSheet}
+      />
+    );
   }
 
   return (

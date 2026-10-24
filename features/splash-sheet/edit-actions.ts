@@ -33,6 +33,12 @@ export type SplashEditState =
       /** A pool's own splash (joint, Just mine): its pool's lanes, and the one it is in (0020). */
       poolLanes: { id: string; name: string; icon: string | null }[];
       poolLaneId: string | null;
+      /** Mine: each pool it is shared to now, and on which pool lane (0022). */
+      sharedIn: { poolId: string; poolLaneId: string }[];
+      /** Someone else has a ripple here I can see: it cannot become mine (0022). */
+      othersWrote: boolean;
+      /** Every pool lane of my pools, for the sheet's warnings: "It will move to <lane>". */
+      laneNames: Record<string, { name: string; icon: string | null; poolId: string }>;
     }
   | { ok: false; message: string };
 
@@ -102,15 +108,27 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
       ? draftFrom(first, profile?.timezone ?? 'UTC').annotation
       : null;
 
-  let shared: string[] = [];
-  if (!joint && !splash.own_pool_id) {
-    const { data } = await supabase
-      .from('splash_placements')
-      .select('pool_id')
+  const [{ data: placements }, { count: others }, { data: allLanes }] = await Promise.all([
+    !joint && !splash.own_pool_id
+      ? supabase
+          .from('splash_placements')
+          .select('pool_id, pool_lane_id')
+          .eq('splash_id', id)
+          .eq('shared', true)
+      : Promise.resolve({ data: [] as { pool_id: string; pool_lane_id: string }[] }),
+    supabase
+      .from('ripples')
+      .select('id', { count: 'exact', head: true })
       .eq('splash_id', id)
-      .eq('shared', true);
-    shared = (data ?? []).map((p) => p.pool_id);
-  }
+      .neq('author_id', user.id),
+    // RLS: the lanes of pools I am a current member of.
+    supabase.from('pool_lanes').select('id, name, icon, pool_id'),
+  ]);
+  const sharedIn = (placements ?? []).map((p) => ({
+    poolId: p.pool_id,
+    poolLaneId: p.pool_lane_id,
+  }));
+  const shared = sharedIn.map((p) => p.poolId);
   return {
     ok: true,
     kind: joint ? 'joint' : splash.own_pool_id ? 'own' : 'mine',
@@ -125,6 +143,58 @@ export async function loadSplashEdit(id: string): Promise<SplashEditState> {
     annotation,
     poolLanes: lanes ?? [],
     poolLaneId: splash.pool_lane_id ?? placed?.pool_lane_id ?? null,
+    sharedIn,
+    othersWrote: (others ?? 0) > 0,
+    laneNames: Object.fromEntries(
+      (allLanes ?? []).map((l) => [l.id, { name: l.name, icon: l.icon, poolId: l.pool_id }]),
+    ),
+  };
+}
+
+const CONVERSION = z.discriminatedUnion('op', [
+  z.object({ op: z.literal('none') }),
+  z.object({ op: z.literal('move_pool'), poolLaneId: z.uuid() }),
+  z.object({ op: z.literal('to_joint'), poolLaneId: z.uuid() }),
+  z.object({ op: z.literal('to_just_mine'), poolLaneId: z.uuid() }),
+  z.object({ op: z.literal('to_mine'), myLaneId: z.uuid(), placeOn: z.uuid().nullable() }),
+  z.object({ op: z.literal('set_lane'), myLaneId: z.uuid(), placeOn: z.uuid().nullable() }),
+]);
+
+/** One conversion act (0022), or a move within the pool (0020); null when done. */
+async function convert(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  id: string,
+  plan: z.infer<typeof CONVERSION>,
+): Promise<{ ok: false; message: string } | null> {
+  const { error } =
+    plan.op === 'none'
+      ? { error: null }
+      : plan.op === 'move_pool'
+        ? await supabase.rpc('move_pool_splash', { p_splash: id, p_pool_lane: plan.poolLaneId })
+        : plan.op === 'to_joint'
+          ? await supabase.rpc('splash_to_joint', { p_splash: id, p_pool_lane: plan.poolLaneId })
+          : plan.op === 'to_just_mine'
+            ? await supabase.rpc('splash_to_just_mine', {
+                p_splash: id,
+                p_pool_lane: plan.poolLaneId,
+              })
+            : plan.op === 'to_mine'
+              ? await supabase.rpc('splash_to_mine', {
+                  p_splash: id,
+                  p_my_lane: plan.myLaneId,
+                  ...(plan.placeOn ? { p_place_on: plan.placeOn } : {}),
+                })
+              : await supabase.rpc('set_splash_lane', {
+                  p_splash: id,
+                  p_my_lane: plan.myLaneId,
+                  ...(plan.placeOn ? { p_place_on: plan.placeOn } : {}),
+                });
+  if (!error) return null;
+  return {
+    ok: false,
+    message: /others have written here/.test(error.message)
+      ? 'Others have written here.'
+      : error.message,
   };
 }
 
@@ -160,6 +230,8 @@ const Edit = z.object({
     .nullable(),
   /** A pool's own splash: the pool lane it moves to, when it moved (0020). */
   poolLaneId: z.uuid().nullable(),
+  /** A change of kind or lane, decided by the sheet (0022); absent is none. */
+  conversion: CONVERSION.optional(),
 });
 
 /**
@@ -183,7 +255,9 @@ export async function saveSplashEdit(
       .update({ title: edit.title, icon: edit.icon || null })
       .eq('id', edit.id);
     if (error) return { ok: false, message: error.message };
-    const moved = await movePoolSplash(supabase, edit.id, edit.poolLaneId);
+    const moved = edit.conversion
+      ? await convert(supabase, edit.id, edit.conversion)
+      : await movePoolSplash(supabase, edit.id, edit.poolLaneId);
     if (moved) return moved;
     revalidatePath('/');
     if (edit.poolId) {
@@ -227,14 +301,20 @@ export async function saveSplashEdit(
       .eq('splash_id', edit.id);
     if (error) return { ok: false, message: error.message };
   }
-  if (edit.kind === 'own') {
+  if (edit.conversion) {
+    const converted = await convert(supabase, edit.id, edit.conversion);
+    if (converted) return converted;
+  } else if (edit.kind === 'own') {
     const moved = await movePoolSplash(supabase, edit.id, edit.poolLaneId);
     if (moved) return moved;
   }
   revalidatePath('/');
   revalidatePath(`/splash/${edit.id}`);
   if (edit.poolId) revalidatePath(`/pool/${edit.poolId}/splash/${edit.id}`);
-  if (edit.kind === 'mine') {
+  // Hand-made sharing applies to a splash that stays mine; a conversion to
+  // joint or Just mine has already let go of every pool but one.
+  const stillMine = !edit.conversion || ['none', 'set_lane'].includes(edit.conversion.op);
+  if (edit.kind === 'mine' && stillMine) {
     for (const { poolId, on } of edit.share) {
       const done = await setPlacement(edit.id, poolId, on);
       if (!done.ok) return { ok: false, message: `Saved, but not shared: ${done.message}` };

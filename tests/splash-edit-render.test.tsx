@@ -24,6 +24,13 @@ const JOINT = {
     { id: 'l-media', name: 'Media', icon: '🎬' },
   ],
   poolLaneId: 'l-games',
+  sharedIn: [],
+  // Mina wrote here too: from Home it stays among its pool's lanes (0022).
+  othersWrote: true,
+  laneNames: {
+    'l-games': { name: 'Games', icon: '🎲', poolId: 'p-ours' },
+    'l-media': { name: 'Media', icon: '🎬', poolId: 'p-ours' },
+  },
 };
 const loaded = vi.hoisted(() => ({ state: null as unknown }));
 /** What the next save resolves to; unset is a plain success. */
@@ -231,14 +238,17 @@ describe('a pool’s own splash in the edit sheet (0020)', () => {
     expect(lanes.textContent).toContain('Media');
     fireEvent.click(view.getByText('Media'));
     await save(view);
-    expect(saved[0]).toMatchObject({ kind: 'joint', poolLaneId: 'l-media' });
+    expect(saved[0]).toMatchObject({
+      kind: 'joint',
+      conversion: { op: 'move_pool', poolLaneId: 'l-media' },
+    });
   });
 
   it('sends no move when the lane is unchanged', async () => {
     const view = await open({});
     fireEvent.change(view.getByLabelText('Title'), { target: { value: 'Renamed' } });
     await save(view);
-    expect(saved[0]).toMatchObject({ poolLaneId: null });
+    expect(saved[0]).toMatchObject({ conversion: { op: 'none' } });
   });
 
   it('keeps my own lane chips, not the pool’s, for my splash shared to a pool', async () => {
@@ -283,6 +293,150 @@ describe('a pool-lane move from the edit sheet (review)', () => {
     expect(pending()['s-joint']).toBeUndefined();
     expect(view.container.querySelector('[data-drop-message]')!.textContent).toBe(
       'that lane is not in this pool',
+    );
+  });
+});
+
+describe('converting from the edit sheet (0022)', () => {
+  const SCOPE = {
+    poolId: 'p-ours',
+    poolName: 'Our Pool',
+    lanes: [
+      {
+        id: 'l-games',
+        name: 'Games',
+        icon: '🎲',
+        myCategoryId: 'c-games',
+        direction: 'both' as const,
+      },
+      { id: 'l-media', name: 'Media', icon: '🎬', myCategoryId: null, direction: null },
+    ],
+  };
+  const MINE_SHARED = {
+    kind: 'mine',
+    title: 'Arnak night',
+    declaredLaneId: 'c-games',
+    shared: ['p-ours', 'p-other'],
+    sharedIn: [
+      { poolId: 'p-ours', poolLaneId: 'l-games' },
+      { poolId: 'p-other', poolLaneId: 'o-play' },
+    ],
+    poolId: null,
+    poolLanes: [],
+    poolLaneId: null,
+    othersWrote: false,
+    laneNames: {
+      'l-games': { name: 'Games', icon: '🎲', poolId: 'p-ours' },
+      'o-play': { name: 'Play', icon: '🃏', poolId: 'p-other' },
+    },
+  };
+  const CTX = {
+    ...CONTEXT,
+    categories: [
+      { id: 'c-games', name: 'Games', icon: '🎲' },
+      { id: 'c-day', name: 'Day', icon: '🖋' },
+    ],
+    pools: [
+      { id: 'p-ours', name: 'Our Pool' },
+      { id: 'p-other', name: 'Other Pool' },
+    ],
+    links: [
+      {
+        myCategoryId: 'c-games',
+        poolId: 'p-ours',
+        poolName: 'Our Pool',
+        poolLaneId: 'l-games',
+        direction: 'both' as const,
+      },
+      {
+        myCategoryId: 'c-games',
+        poolId: 'p-other',
+        poolName: 'Other Pool',
+        poolLaneId: 'o-play',
+        direction: 'out' as const,
+      },
+    ],
+  } as unknown as typeof CONTEXT;
+
+  async function sheet(state: Record<string, unknown>, pool: typeof SCOPE | null) {
+    loaded.state = { ...JOINT, ...state };
+    const view = render(
+      <InputSheetProvider>
+        <SplashEditSheet splashId="s-1" context={CTX} pool={pool} onClose={() => {}} />
+        <Probe />
+      </InputSheetProvider>,
+    );
+    await waitFor(() => expect(view.container.querySelector('[data-edit-form]')).not.toBeNull());
+    return view;
+  }
+
+  it('from a pool: Just mine off asks first, lists the other pools, then makes it joint at once', async () => {
+    const view = await sheet(MINE_SHARED, SCOPE);
+    const toggle = view.getByLabelText('Just mine') as HTMLButtonElement;
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(toggle);
+    fireEvent.click(view.container.querySelector('[data-edit-save]')!);
+    const confirm = view.container.querySelector('[data-joint-confirm]')!;
+    expect(confirm.textContent).toContain(
+      'Make this a joint splash in Our Pool? Everyone in Our Pool can add to it and edit its title. You keep your ripples.',
+    );
+    expect(confirm.textContent).toContain('It will be removed from Other Pool.');
+    expect(saved).toHaveLength(0);
+    await act(async () => {
+      fireEvent.click(view.container.querySelector('[data-joint-confirm-go]')!);
+    });
+    expect(saved[0]).toMatchObject({ conversion: { op: 'to_joint', poolLaneId: 'l-games' } });
+    const pending = JSON.parse(view.container.querySelector('[data-pending]')!.textContent!);
+    expect(pending['s-1']).toMatchObject({ kind: 'joint', poolLane: { id: 'l-games' } });
+  });
+
+  it('from a pool: a joint splash someone else wrote in cannot turn Just mine on', async () => {
+    const view = await sheet({ othersWrote: true }, SCOPE);
+    expect((view.getByLabelText('Just mine') as HTMLButtonElement).disabled).toBe(true);
+    expect(view.container.querySelector('[data-landing-hint]')!.textContent).toBe(
+      'Others have written here.',
+    );
+  });
+
+  it('from Home: changing my shared splash’s lane says, per pool, move or stop', async () => {
+    const view = await sheet(MINE_SHARED, null);
+    expect(view.container.querySelector('[data-edit-my-lanes]')).not.toBeNull();
+    fireEvent.click(view.getByText('Day'));
+    const warnings = [...view.container.querySelectorAll('[data-edit-warning]')].map(
+      (w) => w.textContent,
+    );
+    expect(warnings).toEqual([
+      'It will stop being shared to Our Pool.',
+      'It will stop being shared to Other Pool.',
+    ]);
+    await save(view);
+    expect(saved[0]).toMatchObject({
+      conversion: { op: 'set_lane', myLaneId: 'c-day', placeOn: null },
+    });
+  });
+
+  it('from Home: a joint splash only I wrote in becomes mine in the lane I pick', async () => {
+    const view = await sheet({ othersWrote: false }, null);
+    expect(view.container.querySelector('[data-edit-pool-lanes]')).toBeNull();
+    fireEvent.click(view.getByText('Games'));
+    const warnings = [...view.container.querySelectorAll('[data-edit-warning]')].map(
+      (w) => w.textContent,
+    );
+    expect(warnings[0]).toBe(
+      'This is a joint splash in Our Pool. Moving it to your lane makes it yours alone; members can no longer add to it.',
+    );
+    expect(warnings[1]).toBe('It will move to Games in Our Pool.');
+    await save(view);
+    expect(saved[0]).toMatchObject({
+      conversion: { op: 'to_mine', myLaneId: 'c-games', placeOn: null },
+    });
+  });
+
+  it('from Home: a joint splash someone else wrote in shows only its pool’s lanes and says why', async () => {
+    const view = await sheet({ othersWrote: true }, null);
+    expect(view.container.querySelector('[data-edit-my-lanes]')).toBeNull();
+    expect(view.container.querySelector('[data-edit-pool-lanes]')!.textContent).toContain(
+      'Others have written here, so it stays in Our Pool.',
     );
   });
 });

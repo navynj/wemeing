@@ -16,6 +16,7 @@ import { useOptimisticAction, type ActionOutcome } from '@/lib/use-optimistic-ac
 
 import { deleteJointSplash } from '@/features/pool/actions';
 import { authorClock } from '@/features/pool/times';
+import { usePoolEditScope } from '@/features/pool/edit-scope';
 
 import { adoptRipple, deleteSplash, setSplashPinned, updateSplashHeader } from './actions';
 import { BlockEditor, type BlockDraft, type EditorTarget } from './block-editor';
@@ -115,6 +116,7 @@ export function SplashPage({
   const laneless = splash.ownPoolId !== null || scope === 'joint';
   const router = useRouter();
   const { markDeleted, openEdit, pendingEdits } = useInputSheet();
+  const editScope = usePoolEditScope();
   const [editor, setEditor] = useState<EditorTarget | null>(null);
   const {
     value: page,
@@ -313,7 +315,9 @@ export function SplashPage({
           laneChip={pool ? pool.laneChip : undefined}
           // A post of one has no row to edit yet; it gets one from the header itself.
           onOpenEdit={
-            page.splash.orphan || scope === 'theirs' ? null : () => openEdit(page.splash.id)
+            page.splash.orphan || scope === 'theirs'
+              ? null
+              : () => openEdit(page.splash.id, editScope)
           }
           onDelete={async () => {
             // Gone the moment it is asked for, from every surface (CLAUDE.md,

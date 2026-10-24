@@ -18,7 +18,7 @@ import type { SplashSummary } from '@/features/splash/summary';
 export type OpenSheet =
   | { kind: 'splash'; pool: PoolScope | null }
   /** The same sheet in edit mode (review): a splash's title, icon, dates, lane, audience. */
-  | { kind: 'edit'; splashId: string }
+  | { kind: 'edit'; splashId: string; pool?: PoolScope | null }
   | null;
 
 /** A splash edited a moment ago, as every surface should show it until the re-read lands. */
@@ -28,6 +28,8 @@ export type PendingEdit = {
   declaredLaneId?: string | null;
   /** A pool's own splash moved to another of its pool's lanes (0020). */
   poolLane?: { id: string; icon: string | null; name: string };
+  /** Converted (0022): what it is now — my own, Just mine, or the pool's. */
+  kind?: 'mine' | 'own' | 'joint';
 };
 
 /**
@@ -52,7 +54,8 @@ type SheetApi = {
   /** From a pool, with that pool as the default (H23); from Home, with none. */
   openSheet: (pool?: PoolScope | null) => void;
   /** The pencil on a card or a splash's page: the sheet in edit mode. */
-  openEdit: (splashId: string) => void;
+  /** From a pool screen, with that pool (0022): its lanes and Just mine; from Home, none. */
+  openEdit: (splashId: string, pool?: PoolScope | null) => void;
   pendingEdits: Record<string, PendingEdit>;
   markEdited: (splashId: string, edit: PendingEdit) => void;
   clearEdited: (splashId: string) => void;
@@ -86,7 +89,10 @@ export function InputSheetProvider({ children }: { children: ReactNode }) {
     [],
   );
   const closeSheet = useCallback(() => setSheet(null), []);
-  const openEdit = useCallback((splashId: string) => setSheet({ kind: 'edit', splashId }), []);
+  const openEdit = useCallback(
+    (splashId: string, pool: PoolScope | null = null) => setSheet({ kind: 'edit', splashId, pool }),
+    [],
+  );
   const [pendingEdits, setPendingEdits] = useState<Record<string, PendingEdit>>({});
   const markEdited = useCallback(
     (splashId: string, edit: PendingEdit) =>

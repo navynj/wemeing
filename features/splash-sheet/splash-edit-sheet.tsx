@@ -11,14 +11,14 @@ import {
   spanKeys,
   type Annotation,
 } from '@/features/input-sheet/draft';
-import { LaneChips } from '@/features/input-sheet/lane-chips';
-import { useInputSheet } from '@/features/input-sheet/sheet-provider';
+import { useInputSheet, type PendingEdit } from '@/features/input-sheet/sheet-provider';
 import { EmojiInput } from '@/features/lanes/emoji-input';
-import { linkedPools } from '@/features/pool/audience';
-import { AudienceChip } from '@/features/pool/audience-sheet';
+import type { PoolScope } from '@/features/pool/compose-scope';
 import { wallClockToInstant } from '@/lib/ripple-kind';
 
+import type { Conversion } from './conversion';
 import { loadSplashEdit, saveSplashEdit, type SplashEditState } from './edit-actions';
+import { useEditLanes } from './edit-lanes';
 import { SHEET_MAX_HEIGHT, type SheetContext } from './splash-sheet';
 
 type Loaded = Extract<SplashEditState, { ok: true }>;
@@ -31,16 +31,21 @@ const SETTLE_MS = 2500;
  * or a splash's page: title, icon, dates, lane and Audience for my own
  * splash; title, icon and dates for Just mine (its pool fixed); title and
  * icon for a joint splash. Ripples are edited on the splash's page, not
- * here. Save shows the change at once everywhere the splash is drawn and
- * the save runs behind it; a refusal takes it back and says why.
+ * here. Opened from a pool, its lanes are that pool's with Just mine; from
+ * Home, mine (0022, edit-lanes.tsx). Save shows the change at once
+ * everywhere the splash is drawn — a conversion included — and the save runs
+ * behind it; a refusal takes it back and says why.
  */
 export function SplashEditSheet({
   splashId,
   context,
+  pool = null,
   onClose,
 }: {
   splashId: string;
   context: SheetContext;
+  /** The pool screen it was opened from, or null from Home. */
+  pool?: PoolScope | null;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -82,17 +87,16 @@ export function SplashEditSheet({
             <EditForm
               initial={loaded}
               context={context}
+              pool={pool}
               onCancel={onClose}
               onSave={(edit) => {
-                // Shown at once everywhere the splash is drawn (CLAUDE.md, the principle).
+                // Shown at once everywhere the splash is drawn (CLAUDE.md, the
+                // principle) — a move or a change of kind too (0020, 0022).
                 markEdited(splashId, {
                   title: edit.title,
                   icon: edit.icon,
                   declaredLaneId: edit.kind === 'mine' ? edit.declaredLaneId : undefined,
-                  // A move among the pool's lanes shows at once too (review, 0020).
-                  poolLane: edit.poolLaneId
-                    ? loaded?.poolLanes.find((lane) => lane.id === edit.poolLaneId)
-                    : undefined,
+                  ...pendingFor(edit.conversion, loaded),
                 });
                 onClose();
                 void saveSplashEdit({ id: splashId, ...edit }).then((done) => {
@@ -130,9 +134,38 @@ type Edit = {
     occurredTime: string | null;
     startInstant: string | null;
     endInstant: string | null;
-  } | null; /** Only when it moved: a pool's own splash's new pool lane (0020). */
+  } | null;
+  /** Only when it moved: a pool's own splash's new pool lane (0020). */
   poolLaneId: string | null;
+  /** A change of kind or lane (0022). */
+  conversion: Conversion;
 };
+
+/** What a conversion looks like before the server has it: kind, lane, pool lane. */
+function pendingFor(conversion: Conversion, loaded: Loaded): Partial<PendingEdit> {
+  const poolLane = (id: string | null) => {
+    const lane = id ? loaded.laneNames[id] : undefined;
+    return id && lane ? { id, icon: lane.icon, name: lane.name } : undefined;
+  };
+  switch (conversion.op) {
+    case 'move_pool':
+      return { poolLane: poolLane(conversion.poolLaneId) };
+    case 'to_joint':
+      return { kind: 'joint', poolLane: poolLane(conversion.poolLaneId) };
+    case 'to_just_mine':
+      return { kind: 'own', poolLane: poolLane(conversion.poolLaneId) };
+    case 'to_mine':
+      return {
+        kind: 'mine',
+        declaredLaneId: conversion.myLaneId,
+        poolLane: poolLane(conversion.placeOn),
+      };
+    case 'set_lane':
+      return { declaredLaneId: conversion.myLaneId, poolLane: poolLane(conversion.placeOn) };
+    default:
+      return {};
+  }
+}
 
 /** The same annotation, compared on what it says. */
 function sameAnnotation(a: Annotation | null, b: Annotation | null): boolean {
@@ -142,37 +175,36 @@ function sameAnnotation(a: Annotation | null, b: Annotation | null): boolean {
 function EditForm({
   initial,
   context,
+  pool,
   onCancel,
   onSave,
 }: {
   initial: Loaded;
   context: SheetContext;
+  pool: PoolScope | null;
   onCancel: () => void;
   onSave: (edit: Edit) => void;
 }) {
-  const { categories, links, pools, today, timeZone } = context;
+  const { pools, today, timeZone } = context;
+  const lanes = useEditLanes(initial, context, pool);
+  const [confirming, setConfirming] = useState(false);
   const [title, setTitle] = useState(initial.title);
   const [icon, setIcon] = useState(initial.icon ?? '');
   // The composer's own date control (review), prefilled from where the date
   // lives: a declaration's days, or the first ripple's annotation.
   const [annotation, setAnnotation] = useState<Annotation | null>(initial.annotation);
   const declared = initial.date.source === 'declared';
-  const [poolLaneId, setPoolLaneId] = useState(initial.poolLaneId);
-  const pooled = initial.kind === 'joint' || initial.kind === 'own';
-  const [laneId, setLaneId] = useState<string | null>(initial.declaredLaneId);
-  const [shared, setShared] = useState<string[]>(initial.shared);
   const mine = initial.kind === 'mine';
   const joint = initial.kind === 'joint';
-  const linked = linkedPools(laneId, links);
   const poolName = pools.find((p) => p.id === initial.poolId)?.name ?? 'its pool';
+  const laneId = mine && lanes.laneId !== null ? lanes.laneId : initial.declaredLaneId;
+  const shared = lanes.shared;
 
   const changed =
     title.trim() !== initial.title ||
     (icon || null) !== initial.icon ||
     (!joint && !sameAnnotation(annotation, initial.annotation)) ||
-    (pooled && poolLaneId !== initial.poolLaneId) ||
-    (mine && laneId !== initial.declaredLaneId) ||
-    (mine && [...shared].sort().join() !== [...initial.shared].sort().join());
+    lanes.changed;
   const rangeOk = !annotation || annotationVerdict(annotation) === 'ok';
 
   /** Where the edited date goes: the declaration, or the first ripple's annotation. */
@@ -223,18 +255,6 @@ function EditForm({
         />
       </div>
 
-      {pooled && initial.poolLanes.length > 0 ? (
-        // A pool's own splash moves among that pool's lanes only (review, 0020).
-        <div data-edit-pool-lanes>
-          <LaneChips
-            categories={initial.poolLanes}
-            selectedId={poolLaneId}
-            onSelect={(id) => id && setPoolLaneId(id)}
-            surface="white"
-          />
-        </div>
-      ) : null}
-
       {joint ? (
         <p className="text-pool-500 text-xs">
           A joint splash belongs to {poolName}: its title and icon are everyone&apos;s to edit.
@@ -252,38 +272,7 @@ function EditForm({
         </div>
       )}
 
-      {mine ? (
-        <div className="flex items-start gap-2">
-          <div className="min-w-0 flex-1">
-            <LaneChips
-              categories={categories}
-              selectedId={laneId}
-              onSelect={setLaneId}
-              surface="white"
-            />
-          </div>
-          {pools.length > 0 ? (
-            <AudienceChip
-              shared={shared.filter((id) => linked.includes(id))}
-              linked={pools
-                .filter((p) => linked.includes(p.id))
-                .map((p) => ({ poolId: p.id, name: p.name }))}
-              unlinked={pools
-                .filter((p) => !linked.includes(p.id))
-                .map((p) => ({ poolId: p.id, name: p.name }))}
-              onToggle={(poolId, on) =>
-                setShared((current) =>
-                  on ? [...new Set([...current, poolId])] : current.filter((id) => id !== poolId),
-                )
-              }
-            />
-          ) : null}
-        </div>
-      ) : initial.kind === 'own' ? (
-        <p data-edit-just-mine className="text-pool-500 text-xs">
-          Just mine · {poolName}
-        </p>
-      ) : null}
+      {lanes.node}
 
       <div className="flex gap-3">
         <button
@@ -297,33 +286,70 @@ function EditForm({
           type="button"
           data-edit-save
           disabled={!changed || !rangeOk}
-          onClick={() =>
-            onSave({
-              kind: initial.kind,
-              title: title.trim(),
-              icon: icon || null,
-              ...dates(),
-              declaredLaneId: mine ? laneId : null,
-              // Only the switches that moved.
-              share: mine
-                ? [
-                    ...shared
-                      .filter((id) => !initial.shared.includes(id))
-                      .map((poolId) => ({ poolId, on: true })),
-                    ...initial.shared
-                      .filter((id) => !shared.includes(id))
-                      .map((poolId) => ({ poolId, on: false })),
-                  ]
-                : [],
-              poolId: initial.poolId,
-              poolLaneId: pooled && poolLaneId !== initial.poolLaneId ? poolLaneId : null,
-            })
-          }
+          onClick={() => (lanes.confirm && !confirming ? setConfirming(true) : save())}
           className="bg-main-900 flex-1 rounded-full py-2.5 text-base font-semibold text-white disabled:opacity-40"
         >
           Save
         </button>
       </div>
+      {confirming && lanes.confirm ? (
+        <div
+          data-joint-confirm
+          role="alertdialog"
+          className="bg-pool-100 flex flex-col gap-3 rounded-2xl p-4"
+        >
+          <p className="text-ink text-sm">
+            Make this a joint splash in {lanes.confirm.pool}? Everyone in {lanes.confirm.pool} can
+            add to it and edit its title. You keep your ripples.
+          </p>
+          {lanes.confirm.removed.length > 0 ? (
+            <p data-joint-removed className="text-ink text-sm">
+              It will be removed from {lanes.confirm.removed.join(', ')}.
+            </p>
+          ) : null}
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              className="border-pool-200 text-ink flex-1 rounded-full border bg-white py-2 text-sm font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              data-joint-confirm-go
+              onClick={save}
+              className="bg-main-900 flex-1 rounded-full py-2 text-sm font-semibold text-white"
+            >
+              Make it joint
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
+
+  function save(): void {
+    onSave({
+      kind: initial.kind,
+      title: title.trim(),
+      icon: icon || null,
+      ...dates(),
+      declaredLaneId: mine ? laneId : null,
+      // Only the switches that moved.
+      share: mine
+        ? [
+            ...shared
+              .filter((id) => !initial.shared.includes(id))
+              .map((poolId) => ({ poolId, on: true })),
+            ...initial.shared
+              .filter((id) => !shared.includes(id))
+              .map((poolId) => ({ poolId, on: false })),
+          ]
+        : [],
+      poolId: initial.poolId,
+      poolLaneId: null,
+      conversion: lanes.conversion,
+    });
+  }
 }

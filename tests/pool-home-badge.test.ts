@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { placeCard } from '@/features/home/grid';
+import { placeCard, withEdits } from '@/features/home/grid';
 import { withPoolBadge } from '@/features/pool/home-badge';
 import type { SplashSummary } from '@/features/splash/summary';
 
@@ -66,5 +66,23 @@ describe('the pool badge on Home (H23, 0016)', () => {
     expect(card.pools).toBeUndefined();
     expect(card.href).toBeUndefined();
     expect(card.column).toBeUndefined();
+  });
+});
+
+describe('a joint splash made mine, on Home (0022)', () => {
+  it('leaves its pool’s column and badge for the lane it now declares, at once', () => {
+    const joint = withPoolBadge(placeCard(summary('s-joint'), '', 'UTC'), {
+      poolId: 'p-ours',
+      poolName: 'Our Pool',
+      latestLane: null,
+      poolLane: { name: 'Games', icon: '🎲' },
+    });
+    const [mine] = withEdits([joint], {
+      's-joint': { title: 's-joint', icon: null, declaredLaneId: 'my-games', kind: 'mine' },
+    });
+    expect(mine.column).toBeUndefined();
+    expect(mine.pools).toBeUndefined();
+    expect(mine.href).toBeUndefined();
+    expect(mine.splash.declaredLaneId).toBe('my-games');
   });
 });

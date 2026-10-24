@@ -255,6 +255,7 @@ export function withEdits(
       icon: string | null;
       declaredLaneId?: string | null;
       poolLane?: { id: string; icon: string | null; name: string };
+      kind?: 'mine' | 'own' | 'joint';
     }
   >,
 ): Card[] {
@@ -269,11 +270,24 @@ export function withEdits(
         title: edit.title,
         icon: edit.icon,
         ...(edit.declaredLaneId !== undefined ? { declaredLaneId: edit.declaredLaneId } : {}),
+        ...(edit.kind === 'mine' ? { ownPoolId: null } : {}),
       },
       // Moved to another pool lane (0020): where a mark in its pool's column
       // on Home borrows the pool lane's emoji, it borrows the new one at once.
       ...(edit.poolLane && card.lane && cardColumn(card)?.startsWith('pool:')
         ? { lane: { ...card.lane, icon: edit.poolLane.icon } }
+        : {}),
+      // Made mine (0022): on Home it leaves its pool's column and badge for
+      // the lane it now declares.
+      ...(edit.kind === 'mine' && !card.branches
+        ? {
+            column: undefined,
+            lane: undefined,
+            pools: undefined,
+            href: undefined,
+            menu: undefined,
+            editable: true,
+          }
         : {}),
     };
   });

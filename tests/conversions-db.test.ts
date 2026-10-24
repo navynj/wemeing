@@ -1,0 +1,309 @@
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+
+import { asAdmin, asUser } from './as-user';
+
+/**
+ * Converting splashes (0022) through the edit sheet's save, against the real
+ * schema with throwaway users. Ana opens Sarang (Word linked to her Church
+ * both ways; Free unlinked) and Study (Play, which her Church sends to); Ben
+ * joins Sarang. No conversion deletes a ripple or changes its author.
+ *
+ * Needs the local stack; excluded from the CI config like every DB test.
+ */
+const as = vi.hoisted(() => ({ user: '' }));
+vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
+vi.mock('@/lib/supabase/server', async () => {
+  const { asUser: client } = await import('./as-user');
+  return {
+    createClient: async () => {
+      const supabase = client(as.user);
+      supabase.auth.getUser = (async () => ({
+        data: { user: { id: as.user } },
+        error: null,
+      })) as unknown as typeof supabase.auth.getUser;
+      return supabase;
+    },
+  };
+});
+
+import { saveSplashEdit } from '@/features/splash-sheet/edit-actions';
+
+const CHURCH = crypto.randomUUID();
+const DAY = crypto.randomUUID();
+let ana: string;
+let ben: string;
+let sarang: string;
+let study: string;
+const lane: Record<string, string> = {};
+
+async function person(name: string): Promise<string> {
+  const { data, error } = await asAdmin().auth.admin.createUser({
+    email: `convert-${name}-${Date.now()}@during.today`,
+    email_confirm: true,
+  });
+  if (error) throw error;
+  await asAdmin()
+    .from('profiles')
+    .insert({ id: data.user.id, display_name: name, timezone: 'America/Vancouver' });
+  return data.user.id;
+}
+
+/** A splash of Ana's in Church with one ripple, shared to the pools given. */
+async function anas(shareTo: [string, string][], pinned = false): Promise<string> {
+  const id = crypto.randomUUID();
+  await asUser(ana)
+    .from('splashes')
+    .insert({
+      id,
+      owner_id: ana,
+      title: 'mine',
+      declared_lane_id: CHURCH,
+      pinned_at: pinned ? new Date().toISOString() : null,
+    });
+  await asUser(ana)
+    .from('ripples')
+    .insert({ author_id: ana, category_id: CHURCH, note: 'Ana wrote', splash_id: id });
+  for (const [pool, poolLane] of shareTo) {
+    const { error } = await asUser(ana)
+      .from('splash_placements')
+      .insert({ splash_id: id, pool_id: pool, pool_lane_id: poolLane });
+    if (error) throw error;
+  }
+  return id;
+}
+
+const base = {
+  title: 'mine',
+  icon: null,
+  declaredStart: null,
+  declaredEnd: null,
+  declaredLaneId: null,
+  share: [],
+  block: null,
+  poolLaneId: null,
+};
+
+beforeAll(async () => {
+  ana = await person('Ana');
+  ben = await person('Ben');
+  await asAdmin()
+    .from('my_categories')
+    .insert([
+      { id: CHURCH, user_id: ana, name: 'Church', icon: '⛪' },
+      { id: DAY, user_id: ana, name: 'Day', icon: '🖋' },
+    ]);
+  const made = await asUser(ana).rpc('create_pool', {
+    p_name: 'Sarang',
+    p_kind: null as unknown as 'friends',
+    p_lanes: [
+      { name: 'Word', icon: '📖', my_category_id: CHURCH, direction: 'both' },
+      { name: 'Free', icon: '🕊', my_category_id: null },
+    ],
+    p_include_history: false,
+  });
+  if (made.error) throw made.error;
+  sarang = made.data!;
+  const other = await asUser(ana).rpc('create_pool', {
+    p_name: 'Study',
+    p_kind: null as unknown as 'friends',
+    p_lanes: [{ name: 'Play', icon: '🃏', my_category_id: CHURCH, direction: 'out' }],
+    p_include_history: false,
+  });
+  if (other.error) throw other.error;
+  study = other.data!;
+  for (const row of (
+    await asUser(ana).from('pool_lanes').select('id, name').in('pool_id', [sarang, study])
+  ).data!) {
+    lane[row.name] = row.id;
+  }
+  const token = (await asUser(ana).rpc('create_invite', { p_pool: sarang })).data![0].token;
+  const joined = await asUser(ben).rpc('join_pool', {
+    p_token: token,
+    p_links: [],
+    p_include_history: false,
+  });
+  if (joined.error) throw joined.error;
+});
+
+afterAll(async () => {
+  const admin = asAdmin();
+  for (const id of [sarang, study].filter(Boolean)) {
+    await admin.from('splashes').delete().eq('pool_id', id);
+    await admin.from('pools').delete().eq('id', id);
+  }
+  for (const id of [ana, ben].filter(Boolean)) {
+    await admin.from('ripples').delete().eq('author_id', id);
+    await admin.from('splashes').delete().eq('owner_id', id);
+    await admin.auth.admin.deleteUser(id);
+  }
+});
+
+const row = async (id: string) =>
+  (await asAdmin().from('splashes').select('*').eq('id', id).single()).data!;
+const ripplesOf = async (id: string) =>
+  (await asAdmin().from('ripples').select('author_id, category_id').eq('splash_id', id)).data!;
+const placementsOf = async (id: string) =>
+  (
+    await asAdmin()
+      .from('splash_placements')
+      .select('pool_id, pool_lane_id, shared')
+      .eq('splash_id', id)
+  ).data!;
+
+describe('Just mine off in a pool: my splash becomes joint', () => {
+  it('keeps my authorship, takes my lane by direction, and leaves every other pool', async () => {
+    as.user = ana;
+    const id = await anas(
+      [
+        [sarang, lane.Word],
+        [study, lane.Play],
+      ],
+      true,
+    );
+    const done = await saveSplashEdit({
+      ...base,
+      id,
+      kind: 'mine',
+      declaredLaneId: CHURCH,
+      poolId: null,
+      conversion: { op: 'to_joint', poolLaneId: lane.Word },
+    });
+    expect(done).toEqual({ ok: true });
+    const s = await row(id);
+    expect(s).toMatchObject({
+      owner_id: null,
+      pool_id: sarang,
+      pool_lane_id: lane.Word,
+      created_by: ana,
+      pinned_at: null,
+    });
+    // Word is linked both ways: the ripple keeps Ana's Church.
+    expect(await ripplesOf(id)).toEqual([{ author_id: ana, category_id: CHURCH }]);
+    expect(await placementsOf(id)).toEqual([]);
+  });
+
+  it('on an unlinked pool lane, my ripple takes no lane', async () => {
+    as.user = ana;
+    const id = await anas([[sarang, lane.Word]]);
+    await saveSplashEdit({
+      ...base,
+      id,
+      kind: 'mine',
+      declaredLaneId: CHURCH,
+      poolId: null,
+      conversion: { op: 'to_joint', poolLaneId: lane.Free },
+    });
+    expect(await ripplesOf(id)).toEqual([{ author_id: ana, category_id: null }]);
+  });
+
+  it('keeps a locked ripple locked: a member still cannot read it', async () => {
+    as.user = ana;
+    const id = await anas([[sarang, lane.Word]]);
+    const locked = (await asUser(ana).from('ripples').select('id').eq('splash_id', id).single())
+      .data!.id;
+    await asUser(ana).from('ripple_audience').insert({ ripple_id: locked, target_type: 'lock' });
+    await saveSplashEdit({
+      ...base,
+      id,
+      kind: 'mine',
+      declaredLaneId: CHURCH,
+      poolId: null,
+      conversion: { op: 'to_joint', poolLaneId: lane.Word },
+    });
+    expect((await asUser(ben).from('splashes').select('id').eq('id', id)).data).toHaveLength(1);
+    expect((await asUser(ben).from('ripples').select('id').eq('id', locked)).data).toEqual([]);
+  });
+});
+
+describe('a joint splash back to mine', () => {
+  async function jointOfAnas(): Promise<string> {
+    as.user = ana;
+    const id = await anas([[sarang, lane.Word]], false);
+    await saveSplashEdit({
+      ...base,
+      id,
+      kind: 'mine',
+      declaredLaneId: CHURCH,
+      poolId: null,
+      conversion: { op: 'to_joint', poolLaneId: lane.Word },
+    });
+    return id;
+  }
+
+  it('is refused while another member has a ripple on it', async () => {
+    const id = await jointOfAnas();
+    await asUser(ben)
+      .from('ripples')
+      .insert({ author_id: ben, category_id: null, note: 'Ben wrote', splash_id: id });
+    as.user = ana;
+    for (const conversion of [
+      { op: 'to_mine' as const, myLaneId: CHURCH, placeOn: null },
+      { op: 'to_just_mine' as const, poolLaneId: lane.Free },
+    ]) {
+      const done = await saveSplashEdit({ ...base, id, kind: 'joint', poolId: sarang, conversion });
+      expect(done).toEqual({ ok: false, message: 'Others have written here.' });
+    }
+    expect((await row(id)).owner_id).toBeNull();
+  });
+
+  it('from Home, with only my ripples, becomes mine in my lane and stays shared where it sends', async () => {
+    const id = await jointOfAnas();
+    await asAdmin().from('splashes').update({ pinned_at: new Date().toISOString() }).eq('id', id);
+    as.user = ana;
+    const done = await saveSplashEdit({
+      ...base,
+      id,
+      kind: 'joint',
+      poolId: sarang,
+      conversion: { op: 'to_mine', myLaneId: CHURCH, placeOn: null },
+    });
+    expect(done).toEqual({ ok: true });
+    expect(await row(id)).toMatchObject({
+      owner_id: ana,
+      pool_id: null,
+      declared_lane_id: CHURCH,
+      pinned_at: null,
+    });
+    expect(await ripplesOf(id)).toEqual([{ author_id: ana, category_id: CHURCH }]);
+    // Church sends to Sarang's Word: it stays there, shared.
+    expect(await placementsOf(id)).toEqual([
+      { pool_id: sarang, pool_lane_id: lane.Word, shared: true },
+    ]);
+  });
+
+  it('from Home, into a lane that sends nowhere, leaves the pool', async () => {
+    const id = await jointOfAnas();
+    as.user = ana;
+    await saveSplashEdit({
+      ...base,
+      id,
+      kind: 'joint',
+      poolId: sarang,
+      conversion: { op: 'to_mine', myLaneId: DAY, placeOn: null },
+    });
+    expect(await placementsOf(id)).toEqual([]);
+  });
+});
+
+describe('my shared splash changes lane from Home', () => {
+  it('moves where the new lane sends and stops being shared elsewhere', async () => {
+    as.user = ana;
+    const id = await anas([
+      [sarang, lane.Word],
+      [study, lane.Play],
+    ]);
+    const done = await saveSplashEdit({
+      ...base,
+      id,
+      kind: 'mine',
+      declaredLaneId: DAY,
+      poolId: null,
+      conversion: { op: 'set_lane', myLaneId: DAY, placeOn: null },
+    });
+    expect(done).toEqual({ ok: true });
+    const placed = await placementsOf(id);
+    expect(placed.every((p) => !p.shared)).toBe(true);
+    expect(placed).toHaveLength(2);
+    expect((await row(id)).declared_lane_id).toBe(DAY);
+  });
+});

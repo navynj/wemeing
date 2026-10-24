@@ -595,3 +595,43 @@ describe('moving a pool’s splash to another lane (0020, review)', () => {
     expect(container.querySelector('[data-pill="s-joint"]')!.textContent).toContain('Food');
   });
 });
+
+describe('a conversion shows at once (0022)', () => {
+  function Convert({ id, kind }: { id: string; kind: 'joint' | 'own' }) {
+    const { markEdited } = useInputSheet();
+    useEffect(
+      () =>
+        markEdited(id, {
+          title: 'Fried egg',
+          icon: null,
+          kind,
+          poolLane: { id: 'l-food', icon: '🍽️', name: 'Food' },
+        }),
+      [id, kind, markEdited],
+    );
+    return null;
+  }
+
+  it('my placed splash made joint is a band across Swimmers at once', () => {
+    setView('swimmers');
+    const { container } = render(
+      <InputSheetProvider>
+        <Convert id="s-mine" kind="joint" />
+        <PoolGround view={A} pools={POOLS} me={ME} today="2026-10-23" timeZone={TZ} />
+      </InputSheetProvider>,
+    );
+    expect(container.querySelector('[data-joint-band="s-mine"]')).not.toBeNull();
+  });
+
+  it('a joint splash made mine is a mark under my name at once', () => {
+    setView('swimmers');
+    const { container } = render(
+      <InputSheetProvider>
+        <Convert id="s-joint" kind="own" />
+        <PoolGround view={A} pools={POOLS} me={ME} today="2026-10-23" timeZone={TZ} />
+      </InputSheetProvider>,
+    );
+    expect(container.querySelector('[data-joint-band="s-joint"]')).toBeNull();
+    expect(container.querySelector(`[data-cell="${ME}"] [data-mark="s-joint"]`)).not.toBeNull();
+  });
+});

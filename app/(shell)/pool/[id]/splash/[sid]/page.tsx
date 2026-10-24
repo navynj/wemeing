@@ -12,6 +12,8 @@ import { getMyLinks, getMyPlacements, getMyPoolNames, getPoolView } from '@/lib/
 import { WITH_CATEGORY, type RippleWithCategory } from '@/lib/queries/ripples';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/time';
+import { poolScopeOf } from '@/features/pool/compose-scope';
+import { PoolEditScope } from '@/features/pool/edit-scope';
 
 /**
  * A splash in a pool (H23, review): the same page as Home's — the same
@@ -72,28 +74,30 @@ export default async function PoolSplashRoute({ params }: PageProps<'/pool/[id]/
   return (
     // The same frame as Home's splash page: one column, two halves when wide.
     <main className="mx-auto flex w-full max-w-xl flex-1 flex-col px-6 lg:max-w-5xl">
-      <SplashPage
-        splash={summary}
-        blocks={blocks}
-        photos={photos}
-        lockedIds={(lockRows ?? []).map((row) => row.ripple_id)}
-        categories={categories}
-        origin={{ label: view.pool.name, href: `/pool/${id}?top=${sid}` }}
-        timeZone={profile.timezone}
-        today={todayIn(profile.timezone)}
-        initials={initialsOf(profile.display_name)}
-        poolTags={lane ? [originTag(view.pool.name, lane.icon, lane.name)] : []}
-        audience={audienceFor({ board, summary, me: profile.id, links, pools, placements })}
-        pool={{
-          poolId: id,
-          me: profile.id,
-          scope: joint ? 'joint' : board.owner_id === profile.id ? 'mine' : 'theirs',
-          initialsOf: initials,
-          laneChip: lane ? { icon: lane.icon, name: lane.name } : null,
-          canDeleteJoint: joint && blocks.every((r) => r.author_id === profile.id),
-          zoneOf: Object.fromEntries(view.members.map((m) => [m.userId, m.timeZone])),
-        }}
-      />
+      <PoolEditScope scope={poolScopeOf(view)}>
+        <SplashPage
+          splash={summary}
+          blocks={blocks}
+          photos={photos}
+          lockedIds={(lockRows ?? []).map((row) => row.ripple_id)}
+          categories={categories}
+          origin={{ label: view.pool.name, href: `/pool/${id}?top=${sid}` }}
+          timeZone={profile.timezone}
+          today={todayIn(profile.timezone)}
+          initials={initialsOf(profile.display_name)}
+          poolTags={lane ? [originTag(view.pool.name, lane.icon, lane.name)] : []}
+          audience={audienceFor({ board, summary, me: profile.id, links, pools, placements })}
+          pool={{
+            poolId: id,
+            me: profile.id,
+            scope: joint ? 'joint' : board.owner_id === profile.id ? 'mine' : 'theirs',
+            initialsOf: initials,
+            laneChip: lane ? { icon: lane.icon, name: lane.name } : null,
+            canDeleteJoint: joint && blocks.every((r) => r.author_id === profile.id),
+            zoneOf: Object.fromEntries(view.members.map((m) => [m.userId, m.timeZone])),
+          }}
+        />
+      </PoolEditScope>
     </main>
   );
 }

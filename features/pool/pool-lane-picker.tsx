@@ -23,13 +23,21 @@ export function PoolLanePicker({
   categories,
   pick,
   onPick,
+  initialJustMine = false,
+  justMineLocked = null,
+  onJustMine,
 }: {
   scope: PoolScope;
   categories: Pick<MyCategory, 'id' | 'name'>[];
   pick: PoolPick;
   onPick: (pick: PoolPick) => void;
+  /** Editing (0022): where the switch starts — on for a splash of mine. */
+  initialJustMine?: boolean;
+  /** Why the switch cannot move, shown in its place ("Others have written here."). */
+  justMineLocked?: string | null;
+  onJustMine?: (on: boolean) => void;
 }) {
-  const [justMine, setJustMine] = useState(false);
+  const [justMine, setJustMine] = useState(initialJustMine);
   const chosen = scope.lanes.find((l) => l.id === pick?.poolLaneId) ?? null;
   const nameOf = (id: string): string | null => categories.find((c) => c.id === id)?.name ?? null;
 
@@ -58,7 +66,7 @@ export function PoolLanePicker({
       </div>
       <div className="flex items-center justify-between gap-3">
         <span data-landing-hint className="text-pool-500 min-w-0 truncate text-xs">
-          {chosen ? landingHint(chosen, justMine, nameOf) : null}
+          {justMineLocked ?? (chosen ? landingHint(chosen, justMine, nameOf) : null)}
         </span>
         <label data-just-mine className="text-pool-500 flex shrink-0 items-center gap-2 text-xs">
           Just mine
@@ -67,8 +75,10 @@ export function PoolLanePicker({
             label="Just mine"
             tone="ink"
             size="sm"
+            disabled={justMineLocked !== null}
             onChange={(on) => {
               setJustMine(on);
+              onJustMine?.(on);
               if (chosen) onPick(resolvePick(chosen, on));
             }}
           />

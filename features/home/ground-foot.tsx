@@ -73,9 +73,7 @@ export function GroundFoot({
         aria-label="Places"
         data-place-strip
         className={`no-scrollbar flex items-center gap-3 ${
-          wide
-            ? 'min-h-0 flex-col overflow-y-auto p-1.5'
-            : 'min-w-0 flex-1 overflow-x-auto p-1.5'
+          wide ? 'min-h-0 flex-col overflow-y-auto p-1.5' : 'min-w-0 flex-1 overflow-x-auto p-1.5'
         }`}
       >
         <Place
@@ -151,9 +149,7 @@ function Place({
   children: ReactNode;
 }) {
   // Selection is ink (H20f): a ring on the place I am in.
-  const className = `relative flex shrink-0 rounded-full ${
-    current ? 'ring-ink ring-[3px]' : ''
-  }`;
+  const className = `relative flex shrink-0 rounded-full ${current ? 'ring-ink ring-[3px]' : ''}`;
   const body = (
     <>
       {children}

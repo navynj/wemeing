@@ -34,11 +34,12 @@ Daily personal use, small fixes, no new surfaces unless use demands them.
 
 **What this window can conclude (H11):** input cost and recall value only — whether a record is cheap enough to make, and whether the archive is worth returning to. **Solo usage decay is not evidence of product failure.** The witnessed hook is absent by design until P2, so its absence explains a decay that says nothing about the product with friends present.
 
-## P2: Link world
+## P2: the pool world (was Link)
 
-**Blocker before P2 ships: scope the Link read path.** Today a linked friend can read every unlocked ripple of mine (0001's "ripples are readable by author, and by links unless locked"), which was never intended. Production had no links when this was found (2026-10-23, H23), so nothing has leaked. `tests/rls.test.ts` holds the intended rule as an expected failure — a linked friend reads no ripple outside a shared pool — and it fails the day the path is scoped, which is the signal to drop `.fails` and retire the tests that assert the old behaviour.
+**The P2 blocker is resolved by retiring Link (0023, 2026-10-23).** A linked friend could read every unlocked ripple of mine. Rather than scope that path, Link is retired: pools are the one way to share. Production held no links, so nothing had leaked; the links table and its rows stay, granting nothing. `tests/rls.test.ts` now asserts that a former linked friend reads nothing outside a shared pool.
 
-- Link + invite link (mutual), friends strip with live ring + elapsed
+- **Following someone is a pool of two.** The invite link, the friends strip with its live ring and elapsed time, and Realtime all run through pools, not links.
+- **Discovery comes later, from Open pools** (see Later), not from a friend graph.
 - The audience chip returns to the ripple sheet; Splash shared by two (H20d, H20g)
 - Friend rail on the far right, sharing the time axis; Realtime updates when a friend drops
 - View-count UI: opening a Ripple records a view event; the count is visible to the author only

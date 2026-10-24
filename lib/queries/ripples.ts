@@ -26,8 +26,8 @@ export const WITH_CATEGORY =
  * Dormant (H20b) with the paged day; kept for P3's Swim.
  *
  * The author filter narrows, it does not protect: RLS decides what a viewer
- * may see. Without it the same call would also return linked friends' rows,
- * which is the rail's query, not the timeline's.
+ * may see. Without it the same call would also return rows seen through my
+ * pools, which is the pool's query, not the timeline's.
  */
 export async function getRipplesForDate(
   supabase: DuringClient,

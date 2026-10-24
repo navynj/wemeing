@@ -29,73 +29,54 @@ describe('signed out', () => {
   });
 });
 
-describe('the Link path', () => {
-  it('shows a linked friend an unlocked ripple', async () => {
-    const { data, error } = await asUser(MINA)
-      .from('ripples')
-      .select('id, note')
-      .eq('id', UNLOCKED_RIPPLE);
-
-    expect(error).toBeNull();
-    expect(data).toHaveLength(1);
-  });
-
-  it('hides a locked ripple from a linked friend', async () => {
-    const { data, error } = await asUser(MINA)
-      .from('ripples')
-      .select('id, note')
-      .eq('id', LOCKED_RIPPLE);
-
+/**
+ * Link retired (0023): pools are the one way to share, so a link between two
+ * people grants nothing. Jae is still linked to Yoonji in the seed and shares
+ * no pool with anyone: he stands for a former linked friend.
+ */
+describe('a former linked friend (0023)', () => {
+  it('reads none of my ripples outside a shared pool, locked or not', async () => {
+    const { data, error } = await asUser(JAE).from('ripples').select('id').eq('author_id', YOONJI);
     expect(error).toBeNull();
     expect(data).toEqual([]);
+    for (const id of [UNLOCKED_RIPPLE, LOCKED_RIPPLE]) {
+      expect((await asUser(JAE).from('ripples').select('id').eq('id', id)).data).toEqual([]);
+    }
+  });
+
+  it('reads none of my splashes, nor my profile', async () => {
+    expect((await asUser(JAE).from('splashes').select('id').eq('owner_id', YOONJI)).data).toEqual(
+      [],
+    );
+    expect((await asUser(JAE).from('profiles').select('id').eq('id', YOONJI)).data).toEqual([]);
+  });
+
+  it('cannot make a new link', async () => {
+    const { error } = await asUser(JAE).from('links').insert({ user_a: JAE, user_b: MINA });
+    expect(error).not.toBeNull();
+  });
+
+  it('still reads the link rows they are part of (kept, granting nothing)', async () => {
+    const { data } = await asUser(JAE).from('links').select('user_a, user_b');
+    expect(data).toHaveLength(1);
   });
 
   it('keeps a locked ripple visible to its author', async () => {
     const { data } = await asUser(YOONJI).from('ripples').select('id').eq('id', LOCKED_RIPPLE);
-
     expect(data).toHaveLength(1);
   });
 
-  it('hides everything from someone who is not linked', async () => {
-    // Mina and Jae share a friend, not a Link (C3: never join tables to imply
-    // friendship). Jae's ripple is unlocked and still unreachable.
+  it('shows nothing between people with neither a link nor a pool', async () => {
     const { data } = await asUser(MINA).from('ripples').select('id').eq('id', JAE_RIPPLE);
-
-    expect(data).toEqual([]);
-  });
-
-  it("shows a day's ripples to the friend but never the locked one", async () => {
-    const { data } = await asUser(MINA).from('ripples').select('id').eq('author_id', YOONJI);
-
-    const ids = (data ?? []).map((ripple) => ripple.id);
-    expect(ids.length).toBeGreaterThan(0);
-    expect(ids).not.toContain(LOCKED_RIPPLE);
-  });
-});
-
-/**
- * ROADMAP blocker for P2: the Link read path must be scoped. Today a linked
- * friend reads every unlocked ripple of mine, which was never intended
- * (raised 2026-10-23, H23). Production has no links, so nothing leaks yet.
- *
- * `it.fails` holds the intended rule while the policy still contradicts it:
- * this passes while the leak exists and FAILS the moment the path is scoped,
- * which is the signal to drop `.fails` and retire the Link-path tests above
- * that assert the old behaviour.
- */
-describe('the Link path, as it must become before P2', () => {
-  it.fails('hides from a linked friend every ripple outside a shared pool', async () => {
-    // Yoonji and Mina are Linked and share no pool.
-    const { data } = await asUser(MINA).from('ripples').select('id').eq('author_id', YOONJI);
     expect(data).toEqual([]);
   });
 });
 
 describe('lock state', () => {
-  it('does not expose audience rows to a linked friend', async () => {
+  it('does not expose audience rows to anyone but their author', async () => {
     // Reading the absence of a lock row would be enough to infer the presence
     // of one elsewhere, so routing is private in both directions.
-    const { data } = await asUser(MINA).from('ripple_audience').select('*');
+    const { data } = await asUser(JAE).from('ripple_audience').select('*');
 
     expect(data).toEqual([]);
   });
@@ -129,23 +110,11 @@ describe('the witness signal', () => {
     expect(data).toEqual([]);
   });
 
-  it('records a view of a ripple the viewer can see', async () => {
-    const { error } = await asUser(MINA).rpc('record_ripple_view', { rid: UNLOCKED_RIPPLE });
+  // Recording a view of a ripple seen through a pool: pools-rls.test.ts.
+  it('refuses a view from someone who cannot see the ripple (a former link)', async () => {
+    const { error } = await asUser(JAE).rpc('record_ripple_view', { rid: UNLOCKED_RIPPLE });
 
-    expect(error).toBeNull();
-  });
-
-  it('counts people rather than openings', async () => {
-    const mina = asUser(MINA);
-    await mina.rpc('record_ripple_view', { rid: UNLOCKED_RIPPLE });
-    await mina.rpc('record_ripple_view', { rid: UNLOCKED_RIPPLE });
-
-    const { count } = await asUser(YOONJI)
-      .from('ripple_views')
-      .select('*', { count: 'exact', head: true })
-      .eq('ripple_id', UNLOCKED_RIPPLE);
-
-    expect(count).toBe(1);
+    expect(error).not.toBeNull();
   });
 
   it('refuses a view of a locked ripple', async () => {
@@ -177,10 +146,16 @@ describe('the witness signal', () => {
 });
 
 describe('profiles', () => {
-  it('is readable by a linked user', async () => {
-    const { data } = await asUser(MINA).from('profiles').select('display_name').eq('id', YOONJI);
+  it('is readable by its owner', async () => {
+    const { data } = await asUser(YOONJI).from('profiles').select('display_name').eq('id', YOONJI);
 
     expect(data).toEqual([{ display_name: 'Yoonji' }]);
+  });
+
+  it('is not readable by a former link (0023)', async () => {
+    const { data } = await asUser(JAE).from('profiles').select('display_name').eq('id', YOONJI);
+
+    expect(data).toEqual([]);
   });
 
   it('is not readable by a stranger', async () => {

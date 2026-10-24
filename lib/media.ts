@@ -38,12 +38,12 @@ function reportSigningFailure(error: unknown): void {
  * Ripple at all.
  *
  * The check is the point. A path-prefix read policy — `<owner>/…` — can only
- * answer "is this mine", which S0 rejected: in P2 a linked friend must be able
- * to see media on a Ripple they are allowed to see, and must still be refused
- * a locked one. That question is `can_see_ripple`, so the visibility check runs
- * through the viewer's own session (RLS answers it), and only then does the
- * service role sign. The same code path serves P1's owner-only case and P2's
- * without changing.
+ * answer "is this mine", which S0 rejected: a pool member must be able to see
+ * media on a Ripple they are allowed to see, and must still be refused a
+ * locked one (Link retired in 0023; pools are the one way to share). So the
+ * visibility check runs through the viewer's own session (RLS answers it),
+ * and only then does the service role sign. The same code path serves the
+ * owner and a pool member without changing.
  *
  * Fallible per item and never throwing: what could not be signed is left out.
  */

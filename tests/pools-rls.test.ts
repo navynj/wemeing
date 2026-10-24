@@ -184,6 +184,21 @@ describe('placement', () => {
     expect(data).toEqual([{ note: 'Whistler' }]);
   });
 
+  it('records a view of a ripple a member sees through the pool, counting people (0023)', async () => {
+    const block = (await asUser(ana).from('ripples').select('id').eq('splash_id', ANA_OLD_POST))
+      .data![0].id;
+    for (let i = 0; i < 2; i += 1) {
+      expect((await asUser(ben).rpc('record_ripple_view', { rid: block })).error).toBeNull();
+    }
+    const { count } = await asUser(ana)
+      .from('ripple_views')
+      .select('*', { count: 'exact', head: true })
+      .eq('ripple_id', block);
+    expect(count).toBe(1);
+    // Someone outside the pool cannot.
+    expect((await asUser(cal).rpc('record_ripple_view', { rid: block })).error).not.toBeNull();
+  });
+
   it('keeps every member’s lane links private', async () => {
     const { data } = await asUser(ben).from('lane_mappings').select('user_id');
     expect(new Set((data ?? []).map((m) => m.user_id))).toEqual(new Set([ben]));

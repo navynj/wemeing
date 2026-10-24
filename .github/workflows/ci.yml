@@ -1,0 +1,51 @@
+# The gate, in CI (review): types, lint, format and the non-database tests
+# (the CI suite) on every push to main — the same checks as the local
+# pre-commit hook, minus the tests that need a local Postgres. Vercel waits
+# for this run before a production build and skips the build unless it
+# passed (scripts/vercel-ignore.mjs, vercel.json ignoreCommand).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # PageProps, LayoutProps and the route types are generated, not committed.
+      - name: Generate route types
+        run: pnpm exec next typegen
+
+      - name: Types
+        run: pnpm exec tsc --noEmit -p .
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format
+        run: pnpm exec prettier --check .
+
+      - name: Tests (the CI suite, no database)
+        run: pnpm test:ci

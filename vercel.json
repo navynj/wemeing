@@ -2,10 +2,16 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "buildCommand": "pnpm verify && next build",
+  "ignoreCommand": "node scripts/vercel-ignore.mjs",
   "redirects": [
     {
       "source": "/:path*",
-      "has": [{ "type": "host", "value": "www\\.(?<apex>.*)" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "www\\.(?<apex>.*)"
+        }
+      ],
       "destination": "https://:apex/:path*",
       "permanent": true
     }
